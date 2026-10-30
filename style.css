@@ -17,3 +17,5 @@
 .sidebar-title-actions{display:flex;align-items:center;gap:3px}
 #collapse-sidebar{font-size:25px;line-height:1;color:#b7a7e7}
 #collapse-sidebar:hover{color:#fff;background:#34303e}
+
+.tab-menu-separator{height:1px;background:#42414a;margin:5px 6px}
