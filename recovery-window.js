@@ -7,11 +7,12 @@ async function run(name){
  if(name==='configure')r=await window.hexora.recovery.configure(password);
  if(name==='unlock')r=await window.hexora.recovery.unlock(password);
  if(name==='backup')r=await window.hexora.recovery.backup();
+ if(name==='verify')r=await window.hexora.recovery.verify(password);
  if(name==='restore')r=await window.hexora.recovery.restore(password);
- show(r?.cancelled?'Cancelled.':name==='backup'?'Encrypted backup created: '+r.file+' ('+r.tabs+' tabs)':name==='restore'?'Preparing to restart Hexora...':'Recovery is ready. Select Back up now to create your first backup.');
+ show(r?.cancelled?'Cancelled.':name==='backup'?'Encrypted backup created: '+r.file+' ('+r.tabs+' tabs)':name==='verify'?'VERIFIED: '+r.tabs+' recoverable tabs; AES-GCM authentication and SQLite integrity check passed. Live workspace unchanged.':name==='restore'?'Preparing to restart Hexora...':'Recovery is ready. Select Back up now to create your first backup.');
  if(name!=='restore')$('password').value='';
  await status();
  }catch(e){show('Error: '+e.message)}finally{buttons.forEach(b=>b.disabled=false)}
 }
-for(const name of ['configure','unlock','backup','restore'])$(name).addEventListener('click',()=>run(name));
+for(const name of ['configure','unlock','backup','verify','restore'])$(name).addEventListener('click',()=>run(name));
 status();
