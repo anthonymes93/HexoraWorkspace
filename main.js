@@ -25,6 +25,12 @@ const LAYOUT_KEY='detachedWindowIds';
 function savedDetachedIds(){try{const values=JSON.parse(store.getMeta(LAYOUT_KEY)||'[]');return Array.isArray(values)?values.filter(x=>Number.isSafeInteger(x)&&x>0).slice(0,32):[];}catch{return [];}}
 function setDetachedSaved(id,present){const ids=new Set(savedDetachedIds());if(present)ids.add(id);else ids.delete(id);store.setMeta(LAYOUT_KEY,JSON.stringify([...ids]));}
 let win,store,activeId=null,sidebarWidth=330,live=new Map(),loading=new Map(),stateTimer=null,modalVisible=false,recoveryPassword=null,recoveryDir=null,recoveryTimer=null,recoveryBusy=false,lastBackup=null;
+function userWebsiteUrl(value){
+ if(typeof value!=='string'||!value.trim()||value.length>2048)throw new Error('Enter a valid website URL.');
+ const candidate=value.trim();const url=new URL(/^[a-zA-Z][\w+.-]*:\/\//.test(candidate)?candidate:'https://'+candidate);
+ if(!['http:','https:'].includes(url.protocol)||!url.hostname||url.username||url.password)throw new Error('Only standard HTTP or HTTPS website addresses are allowed.');
+ return url.href;
+}
 function safeUrl(value){try{const u=new URL(value);return ['https:','http:'].includes(u.protocol)?u.href:HOME;}catch{return HOME;}}
 function wire(t){const view=new WebContentsView({webPreferences:{partition:'persist:hexora-chatgpt',sandbox:true,contextIsolation:true,nodeIntegration:false,webSecurity:true,javascript:true}});const wc=view.webContents;
  wc.setAudioMuted(!!t.muted);
@@ -223,6 +229,17 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
   const current=store.get(activeId);const wc=live.get(activeId)?.webContents;
   if(action==='new')newTab(typeof arg==='string'?arg:'web');
   else if(action==='activate')activate(Number(arg));
+  else if(action==='open-website'){
+   const url=userWebsiteUrl(arg?.url);
+   const title=typeof arg?.title==='string'&&arg.title.trim()?arg.title.trim().slice(0,100):new URL(url).hostname;
+   const id=arg?.newTab?newTab(typeof arg.workspace==='string'?arg.workspace:'web',url):Number(arg?.id);
+   const row=store.get(id);if(!row)throw new Error('Tab no longer exists.');
+   const t=toModel(row);t.url=url;t.title=title;store.save(t);
+   const view=live.get(id);
+   if(view){view.webContents.loadURL(url).catch(err=>console.error('Could not open website',err));}
+   if(!arg?.newTab)activate(id);
+   emit();return id;
+  }
   else if(action==='close')closeTab(arg);
   else if(action==='reload'){
    if(wc){const view=live.get(activeId);win.contentView.removeChildView(view);win.contentView.addChildView(view);bounds();wc.reloadIgnoringCache();}
