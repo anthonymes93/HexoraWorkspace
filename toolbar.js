@@ -40,7 +40,7 @@ function render(p){
  const shown=[...p.tabs.slice(0,16)];
  if(p.active&&!shown.some(x=>x.id===p.active.id))shown.unshift({...p.active,active:true,suspended:false});
  for(const item of shown){
-  const el=document.createElement('button');el.className='tab'+(item.id===p.activeId?' active':'');
+  const el=document.createElement('button');el.draggable=true;el.addEventListener('dragstart',e=>{e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain','hexora-tab:'+item.id);});el.className='tab'+(item.id===p.activeId?' active':'');
   const name=document.createElement('span');name.className='name';name.textContent=(item.pinned?'◆ ':'')+(item.title||'ChatGPT');
   const close=document.createElement('span');close.className='close';close.textContent='×';close.onclick=e=>{e.stopPropagation();action('close',item.id);};
   el.title=item.url;el.onclick=()=>action('activate',item.id);
@@ -83,3 +83,8 @@ async function recoveryAction(name){
  }catch(e){recoveryMessage('Error: '+e.message);}
 }
 for(const name of ['backup','configure','unlock','restore'])$('recovery-'+name).onclick=()=>recoveryAction(name);
+
+// Drop a detached conversation back onto the main tab strip.
+const tabStrip=$('tabs');
+tabStrip.addEventListener('dragover',e=>{e.preventDefault();e.dataTransfer.dropEffect='move';});
+tabStrip.addEventListener('drop',e=>{e.preventDefault();const match=/^hexora-tab:(\d+)$/.exec(e.dataTransfer.getData('text/plain')||'');if(match)action('dock',Number(match[1]));});
