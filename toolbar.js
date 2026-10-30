@@ -4,7 +4,7 @@ let activeWorkspace = 'web', activeTabs = [], tabWorkspace = {}, sidebarOpen = t
 try { const saved = JSON.parse(localStorage.getItem('hexora-workspace-settings') || '{}'); if(saved.workspaces?.length) { workspaces.splice(0,workspaces.length,...saved.workspaces); } if(saved.selected && workspaces.some(w=>w.id===saved.selected)) activeWorkspace=saved.selected; if(saved.sidebarOpen===false) sidebarOpen=false; } catch {}
 function save() { localStorage.setItem('hexora-workspace-settings',JSON.stringify({workspaces,selected:activeWorkspace,sidebarOpen})); }
 function action(name,id) { return window.hexora.action(name,id); }
-function updateSidebar() { $('sidebar').classList.toggle('hidden',!sidebarOpen); $('top-main').classList.toggle('expanded',!sidebarOpen); action('sidebar',sidebarOpen); save(); }
+function updateSidebar() { $('sidebar').classList.toggle('hidden',!sidebarOpen); $('top-main').classList.toggle('expanded',!sidebarOpen); action('sidebar',!sidebarOpen); save(); }
 function switchWorkspace(id) { activeWorkspace=id; const first=activeTabs.find(t=>tabWorkspace[t.id]===id); if(first) action('activate',first.id); render();save(); }
 function render() {
  const current=workspaces.find(w=>w.id===activeWorkspace)||workspaces[0];
