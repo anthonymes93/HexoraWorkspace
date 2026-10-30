@@ -3,3 +3,12 @@
 .quick-pin{font-size:12px;opacity:.65;flex-shrink:0;padding:4px;border-radius:6px;cursor:pointer}.quick-pin:hover{opacity:1;background:#44404f}.chat-row{gap:6px}.chat-row .label{margin-right:3px}.tab span[title="Suspended"]{color:#b4a0ef}
 
 .page-controls{display:flex;gap:8px;justify-content:space-between;align-items:center;padding:12px 2px;font-size:11px;color:#92929e}.page-controls button{font-size:11px;background:#282832;border:1px solid #42414a;border-radius:6px;padding:6px 8px}.page-controls button:disabled{opacity:.3;cursor:default}
+
+/* Website tab context menu and URL modal */
+.tab-context-menu{position:fixed;z-index:60;min-width:246px;padding:6px;border:1px solid #43414c;border-radius:12px;background:#222329;box-shadow:0 15px 48px #000a}
+.tab-context-menu button{display:block;width:100%;padding:11px 12px;background:transparent;border:0;border-radius:8px;text-align:left;color:#e9e9ed;font-size:12px}
+.tab-context-menu button:hover{background:#393542;color:#fff}
+#website-form{display:flex;flex-direction:column;gap:9px}
+#website-form label{color:#c9c7d1;font-size:12px;margin-top:6px}
+.website-actions{display:flex;justify-content:flex-end;gap:9px;margin-top:9px}
+.website-error{color:#ffaaa8;font-size:12px;min-height:0;margin:0}
