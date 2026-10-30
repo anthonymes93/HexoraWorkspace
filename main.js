@@ -49,7 +49,7 @@ function pageRow(r){return{id:r.id,url:r.url,title:r.title,workspace:r.workspace
 function state(workspace='web',offset=0){return{activeId,total:store.total(),counts:store.counts(),tabs:store.page(workspace,offset,50).map(pageRow),active:activeId?store.get(activeId):null,offset};}
 function emit(){if(!win||win.isDestroyed())return;clearTimeout(stateTimer);stateTimer=setTimeout(()=>{if(!win||win.isDestroyed())return;win.webContents.send('tabs:changed');},70);}
 function activate(id){const raw=store.get(Number(id));if(!raw)return false;
- if(detached.has(raw.id)){const popup=detached.get(raw.id);if(!popup.isDestroyed()){if(popup.isMinimized())popup.restore();popup.focus();return true;}}
+ if(detached.has(raw.id)){const popup=detached.get(raw.id);if(!popup.isDestroyed()){if(popup.isMinimized())popup.restore();showGroupedTab(popup,raw.id);popup.focus();return true;}}
  for(const [otherId,view] of live)if(otherId!==id&&!detached.has(otherId))win.contentView.removeChildView(view);
  activeId=raw.id;const t=toModel(raw);t.lastActive=Date.now();store.save(t);store.setMeta('activeId',String(activeId));
  let view=live.get(id);if(!view){view=wire(t);live.set(id,view);}
@@ -60,14 +60,18 @@ function evict(){if(live.size<=MAX_LIVE)return;const candidates=Array.from(live.
  while(live.size>MAX_LIVE&&candidates.length)discard(candidates.shift());}
 function newTab(workspace='web',url=HOME){const id=store.nextId(),t={id,title:'New tab',url:safeUrl(url),workspace:typeof workspace==='string'?workspace:'web',pinned:false,muted:false,lastActive:Date.now(),ordinal:id};store.save(t);activate(id);return id;}
 function closeTab(id){id=Number(id);if(!store.get(id))return;
- if(detached.has(id)){const popup=detached.get(id);setDetachedSaved(id,false);detached.delete(id);if(!popup.isDestroyed())popup.close();}
+ if(detached.has(id)){const popup=detached.get(id);setDetachedSaved(id,false);store.setMeta('windowHost:'+id,'');detached.delete(id);if(!popup.isDestroyed()){
+  const view=live.get(id);if(view)popup.contentView.removeChildView(view);
+  popup.hexoraTabs=(popup.hexoraTabs||[]).filter(tab=>tab!==id);
+  if(popup.hexoraTabs.length){if(popup.hexoraTabId===id)showGroupedTab(popup,popup.hexoraTabs[0]);else sendGroup(popup);}else popup.close();
+ }}
  discard(id);store.delete(id);if(activeId===id){activeId=null;const target=store.lastActiveId();if(target)activate(target);else newTab();}emit();}
 function sweep(){const now=Date.now();for(const id of Array.from(live.keys())){if(id===activeId)continue;const t=store.get(id),v=live.get(id);if(!t){discard(id);continue;}if(detached.has(id)||t.pinned||now-t.last_active<IDLE_MS||v.webContents.isLoading()||v.webContents.isCurrentlyAudible?.())continue;discard(id);}emit();}
 function detachTab(id){
  id=Number(id);const row=store.get(id);
  if(!row||!win||win.isDestroyed())return false;
  const existing=detached.get(id);
- if(existing&&!existing.isDestroyed()){existing.focus();return true;}
+ if(existing&&!existing.isDestroyed()){showGroupedTab(existing,id);existing.focus();return true;}
  let view=live.get(id);
  if(!view){view=wire(toModel(row));live.set(id,view);}
  win.contentView.removeChildView(view);
