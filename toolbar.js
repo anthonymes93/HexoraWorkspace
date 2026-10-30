@@ -30,7 +30,7 @@ function render(p){
   const mute=document.createElement('span');mute.className='quick-pin';mute.title=item.muted?'Unmute':'Mute';mute.textContent=item.muted?'◉':'♫';mute.onclick=e=>{e.stopPropagation();action('mute',item.id);};
   const detach=document.createElement('span');detach.className='quick-pin';detach.title='Detach into another window';detach.textContent='↗';detach.onclick=e=>{e.stopPropagation();action('detach',item.id);};
   const pin=document.createElement('span');pin.className='quick-pin';pin.title=item.pinned?'Unpin':'Pin';pin.textContent=item.pinned?'◆':'◇';pin.onclick=e=>{e.stopPropagation();action('pin',item.id);};
-  el.append(symbol,name,mute,pin,detach);el.onclick=()=>action('activate',item.id);conversations.append(el);
+  el.append(symbol,name,mute,pin,detach);el.onclick=()=>action('activate',item.id);el.addEventListener('contextmenu',e=>{e.preventDefault();e.stopPropagation();showTabMenu(e.clientX,e.clientY,item);});conversations.append(el);
  }
  const nav=document.createElement('div');nav.className='page-controls';
  const prev=document.createElement('button');prev.textContent='‹ Previous';prev.disabled=offset===0;prev.onclick=()=>{offset=Math.max(0,offset-50);refresh();};
@@ -117,7 +117,7 @@ $('website-overlay').onclick=e=>{if(e.target===$('website-overlay'))hideWebsiteM
 $('website-form').onsubmit=async e=>{
  e.preventDefault();if(!websiteTarget)return;
  let url=$('website-url').value.trim();if(!url){$('website-error').textContent='Enter a website address.';return;}
- if(!/^[a-zA-Z][\\w+.-]*:\/\//.test(url))url='https://'+url;
+ if(!/^[a-zA-Z][\w+.-]*:\/\//.test(url))url='https://'+url;
  try{
   const parsed=new URL(url);if(!['http:','https:'].includes(parsed.protocol)||!parsed.hostname||parsed.username||parsed.password)throw Error();
   const target=websiteTarget;
@@ -126,5 +126,5 @@ $('website-form').onsubmit=async e=>{
  }catch(err){$('website-error').textContent=err.message||'Enter a valid HTTP or HTTPS address.';}
 };
 document.addEventListener('click',e=>{if(!e.target.closest('#tab-context-menu'))hideTabMenu();});
-document.addEventListener('contextmenu',e=>{if(!e.target.closest('.tab'))hideTabMenu();});
+document.addEventListener('contextmenu',e=>{if(!e.target.closest('.tab, .chat-row'))hideTabMenu();});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){hideTabMenu();if(websiteTarget)hideWebsiteModal();}});
