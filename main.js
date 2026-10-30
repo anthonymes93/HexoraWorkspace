@@ -83,12 +83,14 @@ function detachTab(id){
  const saveWindow=()=>{if(!popup.isDestroyed())store.setMeta('windowBounds:'+id,JSON.stringify(popup.getBounds()));};
  popup.on('resize',()=>{layout();saveWindow();});
  popup.on('move',saveWindow);
+ popup.on('close',()=>{
+  saveWindow();
+  popup.contentView.removeChildView(view);
+ });
  popup.on('closed',()=>{
   detached.delete(id);
   if(!quitting&&win&&!win.isDestroyed()&&store.get(id)){
-   const active=store.get(activeId);
    if(activeId===id){win.contentView.addChildView(view);bounds();win.focus();}
-   else {win.contentView.removeChildView(view);}
    emit();
   }
  });
