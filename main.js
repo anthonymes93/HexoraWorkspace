@@ -4,6 +4,16 @@ const path=require('node:path');
 const {TabStore}=require('./tab-store');
 const fs=require('node:fs');
 const {snapshot,stageRestore,applyPending}=require('./recovery');
+// Prevent two Hexora instances from accessing the same Chromium profile.
+const hasSingleInstanceLock=app.requestSingleInstanceLock();
+if(!hasSingleInstanceLock){
+ app.quit();
+}else{
+ app.on('second-instance',()=>{
+  const main=BrowserWindow.getAllWindows().find(w=>!w.isDestroyed()&&w.getTitle().includes('Hexora Workspace'));
+  if(main){if(main.isMinimized())main.restore();main.show();main.focus();}
+ });
+}
 const HOME='https://chatgpt.com/';
 const TOP_HEIGHT=120,IDLE_MS=24*60*60*1000,MAX_LIVE=8;
 let recoveryWindow=null;
@@ -50,7 +60,7 @@ function openRecoveryWindow(){
  recoveryWindow.on('closed',()=>{recoveryWindow=null;});
 }
 function sendPage(payload){const w=typeof payload?.workspace==='string'?payload.workspace:'web';const offset=Number.isSafeInteger(payload?.offset)?payload.offset:0;return state(w,offset);}
-app.whenReady().then(()=>{
+if(hasSingleInstanceLock)app.whenReady().then(()=>{
  const dataDir=app.getPath('userData');
  try{applyPending(dataDir);}catch(err){dialog.showErrorBox('Hexora restore could not be applied',err.message);}
  try{const prefs=JSON.parse(fs.readFileSync(path.join(dataDir,'hexora-recovery-config.json'),'utf8'));if(prefs.directory)recoveryDir=prefs.directory;}catch{}
