@@ -1,14 +1,14 @@
 const $=id=>document.getElementById(id);
 const workspaces=[{id:'web',name:'Web Development',emoji:'◈'},{id:'business',name:'Business',emoji:'▤'},{id:'personal',name:'Personal',emoji:'☼'},{id:'ideas',name:'Ideas Lab',emoji:'✦'}];
-let activeWorkspace='web',sidebarOpen=true,offset=0,currentPage=null,refreshing=false;
+let activeWorkspace='web',sidebarOpen=true,offset=0,currentPage=null,refreshing=false,refreshPending=false;
 try{const s=JSON.parse(localStorage.getItem('hexora-workspace-settings')||'{}');if(s.workspaces?.length)workspaces.splice(0,workspaces.length,...s.workspaces);if(s.selected)activeWorkspace=s.selected;if(s.sidebarOpen===false)sidebarOpen=false;}catch{}
 const save=()=>localStorage.setItem('hexora-workspace-settings',JSON.stringify({workspaces,selected:activeWorkspace,sidebarOpen}));
 const action=(name,arg)=>window.hexora.action(name,arg);
 async function refresh(){
- if(refreshing)return;refreshing=true;
+ if(refreshing){refreshPending=true;return;}refreshing=true;
  try{const p=await window.hexora.page(activeWorkspace,offset);if(!p)return;currentPage=p;render(p);}
  catch(e){console.error('Could not read saved tabs',e);}
- finally{refreshing=false;}
+ finally{refreshing=false;if(refreshPending){refreshPending=false;refresh();}}
 }
 function render(p){
  const workspace=workspaces.find(w=>w.id===activeWorkspace)||workspaces[0];
