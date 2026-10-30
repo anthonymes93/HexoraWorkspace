@@ -6,7 +6,7 @@ const fs=require('node:fs');
 const {snapshot,stageRestore,applyPending}=require('./recovery');
 const HOME='https://chatgpt.com/';
 const TOP_HEIGHT=120,IDLE_MS=24*60*60*1000,MAX_LIVE=8;
-let win,store,activeId=null,sidebarWidth=330,live=new Map(),loading=new Map(),stateTimer=null,recoveryPassword=null,recoveryDir=null,recoveryTimer=null,recoveryBusy=false,lastBackup=null;
+let win,store,activeId=null,sidebarWidth=330,live=new Map(),loading=new Map(),stateTimer=null,modalVisible=false,recoveryPassword=null,recoveryDir=null,recoveryTimer=null,recoveryBusy=false,lastBackup=null;
 function safeUrl(value){try{const u=new URL(value);return ['https:','http:'].includes(u.protocol)?u.href:HOME;}catch{return HOME;}}
 function wire(t){const view=new WebContentsView({webPreferences:{partition:'persist:hexora-chatgpt',sandbox:true,contextIsolation:true,nodeIntegration:false,webSecurity:true,javascript:true}});const wc=view.webContents;
  wc.setAudioMuted(!!t.muted);
@@ -31,7 +31,7 @@ function activate(id){const raw=store.get(Number(id));if(!raw)return false;
  for(const [otherId,view] of live)if(otherId!==id)win.contentView.removeChildView(view);
  activeId=raw.id;const t=toModel(raw);t.lastActive=Date.now();store.save(t);store.setMeta('activeId',String(activeId));
  let view=live.get(id);if(!view){view=wire(t);live.set(id,view);}
- win.contentView.addChildView(view);bounds();view.webContents.focus();evict();emit();return true;
+ if(!modalVisible){win.contentView.addChildView(view);bounds();view.webContents.focus();}evict();emit();return true;
 }
 function evict(){if(live.size<=MAX_LIVE)return;const candidates=Array.from(live.keys()).filter(id=>id!==activeId&&!store.get(id)?.pinned);
  candidates.sort((a,b)=>(store.get(a)?.last_active||0)-(store.get(b)?.last_active||0));
@@ -92,6 +92,14 @@ app.whenReady().then(()=>{
   else if(action==='forward'&&wc?.navigationHistory.canGoForward())wc.navigationHistory.goForward();
   else if(action==='open-external')shell.openExternal(current?.url||HOME);
   else if(action==='sidebar'){sidebarWidth=arg?64:330;bounds();}
+  else if(action==='modal'){
+   modalVisible=!!arg;
+   const view=live.get(activeId);
+   if(view){
+    if(modalVisible){win.contentView.removeChildView(view);win.webContents.focus();}
+    else {win.contentView.addChildView(view);bounds();view.webContents.focus();}
+   }
+  }
   else if(['pin','mute','workspace'].includes(action)){
    const id=Number(action==='workspace'?arg?.id:arg),raw=store.get(id);
    if(raw){const t=toModel(raw);if(action==='pin')t.pinned=!t.pinned;if(action==='mute'){t.muted=!t.muted;live.get(id)?.webContents.setAudioMuted(t.muted);}if(action==='workspace'&&typeof arg.workspace==='string')t.workspace=arg.workspace;store.save(t);emit();}
