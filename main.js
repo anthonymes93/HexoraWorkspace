@@ -33,7 +33,7 @@ function userWebsiteUrl(value){
 }
 function safeUrl(value){try{const u=new URL(value);return ['https:','http:'].includes(u.protocol)?u.href:HOME;}catch{return HOME;}}
 function chromeMode(id){return store.getMeta('chromeMode:'+id)==='true';}
-function chromeUserAgent(wc){const ua=wc.getUserAgent();return ua.replace(/\\s+(?:Electron|hexora-workspace)\\/[^\\s]+/gi,'').replace(/\\s{2,}/g,' ').trim();}
+function chromeUserAgent(wc){const ua=wc.getUserAgent();return ua.replace(/\s+(?:Electron|hexora-workspace)\/[^\s]+/gi,'').replace(/\s{2,}/g,' ').trim();}
 function wire(t){const view=new WebContentsView({webPreferences:{partition:'persist:hexora-chatgpt',sandbox:true,contextIsolation:true,nodeIntegration:false,webSecurity:true,javascript:true}});const wc=view.webContents;
  wc.setAudioMuted(!!t.muted);
  if(chromeMode(t.id))wc.setUserAgent(chromeUserAgent(wc));
