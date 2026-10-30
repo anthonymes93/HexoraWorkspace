@@ -1,6 +1,7 @@
 const $=id=>document.getElementById(id);
 const workspaces=[{id:'web',name:'Web Development',emoji:'◈'},{id:'business',name:'Business',emoji:'▤'},{id:'personal',name:'Personal',emoji:'☼'},{id:'ideas',name:'Ideas Lab',emoji:'✦'}];
 let activeWorkspace='web',sidebarOpen=true,offset=0,currentPage=null,refreshing=false,refreshPending=false;
+let contextTab=null,websiteTarget=null;
 try{const s=JSON.parse(localStorage.getItem('hexora-workspace-settings')||'{}');if(s.workspaces?.length)workspaces.splice(0,workspaces.length,...s.workspaces);if(s.selected)activeWorkspace=s.selected;if(s.sidebarOpen===false)sidebarOpen=false;}catch{}
 const save=()=>localStorage.setItem('hexora-workspace-settings',JSON.stringify({workspaces,selected:activeWorkspace,sidebarOpen}));
 const action=(name,arg)=>window.hexora.action(name,arg);
@@ -44,6 +45,7 @@ function render(p){
   const name=document.createElement('span');name.className='name';name.textContent=(item.pinned?'◆ ':'')+(item.title||'ChatGPT');
   const close=document.createElement('span');close.className='close';close.textContent='×';close.onclick=e=>{e.stopPropagation();action('close',item.id);};
   el.title=item.url;el.onclick=()=>action('activate',item.id);
+  el.addEventListener('contextmenu',e=>{e.preventDefault();showTabMenu(e.clientX,e.clientY,item);});
   const pop=document.createElement('span');pop.className='close';pop.title='Detach tab into new window';pop.textContent='↗';pop.onclick=e=>{e.stopPropagation();action('detach',item.id);};
   el.append(name,pop,close);tabs.append(el);
  }
@@ -88,3 +90,41 @@ for(const name of ['backup','configure','unlock','restore'])$('recovery-'+name).
 const tabStrip=$('tabs');
 tabStrip.addEventListener('dragover',e=>{e.preventDefault();e.dataTransfer.dropEffect='move';});
 tabStrip.addEventListener('drop',e=>{e.preventDefault();const match=/^hexora-tab:(\d+)$/.exec(e.dataTransfer.getData('text/plain')||'');if(match)action('dock',Number(match[1]));});
+
+// Right-click any tab to turn it into a website, or open a website in a separate tab.
+function hideTabMenu(){ $('tab-context-menu').classList.add('hidden'); contextTab=null; }
+function showTabMenu(x,y,item){
+ contextTab=item;
+ const menu=$('tab-context-menu');menu.classList.remove('hidden');
+ menu.style.left=Math.max(8,Math.min(x,innerWidth-menu.offsetWidth-8))+'px';
+ menu.style.top=Math.max(8,Math.min(y,innerHeight-menu.offsetHeight-8))+'px';
+}
+function showWebsiteModal(newTab){
+ if(!contextTab)return;
+ websiteTarget={id:contextTab.id,newTab,workspace:activeWorkspace};hideTabMenu();
+ $('website-url').value='';$('website-title').value='';$('website-error').textContent='';
+ $('website-dialog-title').textContent=newTab?'Open website in new tab':'Open website in this tab';
+ $('website-overlay').classList.remove('hidden');action('modal',true);$('website-url').focus();
+}
+function hideWebsiteModal(){
+ $('website-overlay').classList.add('hidden');websiteTarget=null;action('modal',false);
+}
+$('tab-menu-replace').onclick=()=>showWebsiteModal(false);
+$('tab-menu-new').onclick=()=>showWebsiteModal(true);
+$('website-cancel').onclick=hideWebsiteModal;
+$('website-close').onclick=hideWebsiteModal;
+$('website-overlay').onclick=e=>{if(e.target===$('website-overlay'))hideWebsiteModal();};
+$('website-form').onsubmit=async e=>{
+ e.preventDefault();if(!websiteTarget)return;
+ let url=$('website-url').value.trim();if(!url){$('website-error').textContent='Enter a website address.';return;}
+ if(!/^[a-zA-Z][\\w+.-]*:\/\//.test(url))url='https://'+url;
+ try{
+  const parsed=new URL(url);if(!['http:','https:'].includes(parsed.protocol)||!parsed.hostname||parsed.username||parsed.password)throw Error();
+  const target=websiteTarget;
+  await action('open-website',{...target,url:parsed.href,title:$('website-title').value.trim()});
+  hideWebsiteModal();refresh();
+ }catch(err){$('website-error').textContent=err.message||'Enter a valid HTTP or HTTPS address.';}
+};
+document.addEventListener('click',e=>{if(!e.target.closest('#tab-context-menu'))hideTabMenu();});
+document.addEventListener('contextmenu',e=>{if(!e.target.closest('.tab'))hideTabMenu();});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){hideTabMenu();if(websiteTarget)hideWebsiteModal();}});
