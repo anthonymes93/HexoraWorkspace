@@ -1,97 +1,69 @@
-const {app,BrowserWindow,WebContentsView,ipcMain,shell} = require('electron');
+'use strict';
+const {app,BrowserWindow,WebContentsView,ipcMain,shell}=require('electron');
 const path=require('node:path');
-const fs=require('node:fs');
+const {TabStore}=require('./tab-store');
 const HOME='https://chatgpt.com/';
-const TOP_HEIGHT=120, INACTIVE_MS=24*60*60*1000;
-let sidebarWidth=330,win,tabs=[],activeId=null,nextId=1,saveTimer=null;
-const statePath=()=>path.join(app.getPath('userData'),'hexora-tabs.json');
-function validUrl(url){try{const u=new URL(url);return ['https:','http:'].includes(u.protocol)?u.href:HOME;}catch{return HOME;}}
-function saveNow(){
-  if(!win||win.isDestroyed())return;
-  const state={version:1,activeId,tabs:tabs.map(t=>({id:t.id,url:validUrl(t.url),title:t.title,workspace:t.workspace,pinned:t.pinned,lastActive:t.lastActive,muted:t.muted,suspended:t.suspended}))};
-  try{const file=statePath();fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file+'.tmp',JSON.stringify(state));fs.renameSync(file+'.tmp',file);}catch(err){console.error('Failed to save tabs',err);}
+const TOP_HEIGHT=120,IDLE_MS=24*60*60*1000,MAX_LIVE=8;
+let win,store,activeId=null,sidebarWidth=330,live=new Map(),loading=new Map(),stateTimer=null;
+function safeUrl(value){try{const u=new URL(value);return ['https:','http:'].includes(u.protocol)?u.href:HOME;}catch{return HOME;}}
+function wire(t){const view=new WebContentsView({webPreferences:{partition:'persist:hexora-chatgpt',sandbox:true,contextIsolation:true,nodeIntegration:false,webSecurity:true,javascript:true}});const wc=view.webContents;
+ wc.setAudioMuted(!!t.muted);
+ const update=(title=false)=>{const row=store.get(t.id);if(!row)return;if(title)row.title=wc.getTitle()?.slice(0,100)||row.title;const url=wc.getURL();if(/^https?:/.test(url))row.url=url;store.save(toModel(row));emit();};
+ wc.on('page-title-updated',()=>update(true));
+ wc.on('did-navigate',()=>update());
+ wc.on('did-navigate-in-page',()=>update());
+ wc.on('did-start-loading',()=>{loading.set(t.id,true);emit();});
+ wc.on('did-stop-loading',()=>{loading.delete(t.id);emit();});
+ wc.on('render-process-gone',()=>{loading.delete(t.id);emit();});
+ wc.setWindowOpenHandler(({url})=>/^https:\/\//.test(url)?{action:'allow',overrideBrowserWindowOptions:{width:540,height:750,autoHideMenuBar:true,webPreferences:{partition:'persist:hexora-chatgpt',sandbox:true,contextIsolation:true,nodeIntegration:false,webSecurity:true}}}:{action:'deny'});
+ wc.loadURL(safeUrl(t.url)).catch(err=>console.error('Tab load error',err));
+ return view;
 }
-function saveSoon(){clearTimeout(saveTimer);saveTimer=setTimeout(saveNow,350);}
-function snapshot(){return tabs.map(t=>({id:t.id,title:t.title,url:t.url,workspace:t.workspace,active:t.id===activeId,loading:t.loading,pinned:t.pinned,muted:t.muted,suspended:t.suspended,lastActive:t.lastActive}));}
-function publish(){if(win&&!win.isDestroyed())win.webContents.send('tabs:state',snapshot());saveSoon();}
-function current(){return tabs.find(t=>t.id===activeId);}
-function bounds(){if(!win||win.isDestroyed())return;const [width,height]=win.getContentSize();const tab=current();if(tab?.view)tab.view.setBounds({x:sidebarWidth,y:TOP_HEIGHT,width:Math.max(0,width-sidebarWidth),height:Math.max(0,height-TOP_HEIGHT)});}
-function createView(t){
- const view=new WebContentsView({webPreferences:{partition:'persist:hexora-chatgpt',sandbox:true,contextIsolation:true,nodeIntegration:false,webSecurity:true,javascript:true}});
- t.view=view;t.suspended=false;t.loading=true;
- const wc=view.webContents;
- wc.setAudioMuted(t.muted);
- wc.on('page-title-updated',(_e,title)=>{if(t.view!==view)return;t.title=(title||'ChatGPT').slice(0,100);publish();});
- wc.on('did-start-loading',()=>{if(t.view!==view)return;t.loading=true;publish();});
- wc.on('did-stop-loading',()=>{if(t.view!==view)return;t.loading=false;publish();});
- const updateUrl=()=>{if(t.view!==view)return;const url=wc.getURL();if(url.startsWith('http'))t.url=url;publish();};
- wc.on('did-navigate',updateUrl);wc.on('did-navigate-in-page',updateUrl);
- wc.on('render-process-gone',()=>{if(t.view!==view)return;t.title='Page crashed — reload';publish();});
- wc.setWindowOpenHandler(({url})=>{if(!url.startsWith('https://'))return{action:'deny'};return{action:'allow',overrideBrowserWindowOptions:{width:540,height:750,autoHideMenuBar:true,webPreferences:{partition:'persist:hexora-chatgpt',sandbox:true,contextIsolation:true,nodeIntegration:false,webSecurity:true}}};});
- wc.loadURL(validUrl(t.url)).catch(err=>{if(t.view!==view)return;t.title='Load failed: '+err.message;publish();});
+function toModel(r){return{id:r.id,url:safeUrl(r.url),title:r.title||'ChatGPT',workspace:r.workspace||'web',pinned:!!r.pinned,muted:!!r.muted,lastActive:r.last_active??r.lastActive??Date.now(),ordinal:r.ordinal||r.id};}
+function discard(id){const view=live.get(id);if(!view)return;live.delete(id);if(win&&!win.isDestroyed())win.contentView.removeChildView(view);loading.delete(id);view.webContents.close();}
+function bounds(){if(!win||win.isDestroyed())return;const v=live.get(activeId);if(!v)return;const [w,h]=win.getContentSize();v.setBounds({x:sidebarWidth,y:TOP_HEIGHT,width:Math.max(0,w-sidebarWidth),height:Math.max(0,h-TOP_HEIGHT)});}
+function pageRow(r){return{id:r.id,url:r.url,title:r.title,workspace:r.workspace,pinned:!!r.pinned,muted:!!r.muted,lastActive:r.last_active,active:r.id===activeId,loading:!!loading.get(r.id),suspended:!live.has(r.id)};}
+function state(workspace='web',offset=0){return{activeId,total:store.total(),counts:store.counts(),tabs:store.page(workspace,offset,50).map(pageRow),active:activeId?store.get(activeId):null,offset};}
+function emit(){if(!win||win.isDestroyed())return;clearTimeout(stateTimer);stateTimer=setTimeout(()=>{if(!win||win.isDestroyed())return;win.webContents.send('tabs:changed');},70);}
+function activate(id){const raw=store.get(Number(id));if(!raw)return false;
+ for(const [otherId,view] of live)if(otherId!==id)win.contentView.removeChildView(view);
+ activeId=raw.id;const t=toModel(raw);t.lastActive=Date.now();store.save(t);store.setMeta('activeId',String(activeId));
+ let view=live.get(id);if(!view){view=wire(t);live.set(id,view);}
+ win.contentView.addChildView(view);bounds();view.webContents.focus();evict();emit();return true;
 }
-function activate(id){
- const t=tabs.find(t=>t.id===id);if(!t||!win)return;
- const prior=current();if(prior&&prior.id!==t.id)prior.lastActive=Date.now();
- for(const other of tabs)if(other.id!==id&&other.view)win.contentView.removeChildView(other.view);
- activeId=id;t.lastActive=Date.now();
- if(!t.view)createView(t);
- win.contentView.addChildView(t.view);bounds();t.view.webContents.focus();publish();
-}
-function addTab(url=HOME,workspace='web'){
- const t={id:nextId++,url:validUrl(url),title:'ChatGPT',workspace:typeof workspace==='string'?workspace:'web',pinned:false,muted:false,lastActive:Date.now(),suspended:false,loading:false,view:null};
- tabs.push(t);activate(t.id);return t.id;
-}
-function closeTab(id){
- const index=tabs.findIndex(t=>t.id===id);if(index<0)return;
- const t=tabs[index];if(t.view){win.contentView.removeChildView(t.view);t.view.webContents.close();t.view=null;}
- tabs.splice(index,1);
- if(activeId===id){activeId=null;if(tabs.length)activate(tabs[Math.min(index,tabs.length-1)].id);else addTab();}
- else publish();
-}
-function suspend(t){
- if(t.id===activeId||t.pinned||!t.view)return false;
- const wc=t.view.webContents;
- if(wc.isCurrentlyAudible?.()||wc.isLoading())return false;
- t.url=validUrl(wc.getURL()||t.url);
- win.contentView.removeChildView(t.view);t.view=null;t.suspended=true;t.loading=false;wc.close();return true;
-}
-function sweep(){const now=Date.now();let changed=false;for(const t of tabs){if(t.id!==activeId&&!t.pinned&&now-t.lastActive>=INACTIVE_MS)changed=suspend(t)||changed;}if(changed)publish();}
-function restore(){
- let saved;try{saved=JSON.parse(fs.readFileSync(statePath(),'utf8'));}catch{}
- if(!saved||!Array.isArray(saved.tabs)||saved.version!==1||!saved.tabs.length){addTab();return;}
- const unique=new Set();
- for(const s of saved.tabs.slice(0,250)){
-  if(!Number.isSafeInteger(s.id)||unique.has(s.id))continue;unique.add(s.id);
-  tabs.push({id:s.id,url:validUrl(s.url),title:typeof s.title==='string'?s.title.slice(0,100):'ChatGPT',workspace:typeof s.workspace==='string'?s.workspace:'web',pinned:!!s.pinned,muted:!!s.muted,lastActive:Number.isFinite(s.lastActive)?s.lastActive:Date.now(),suspended:true,loading:false,view:null});
-  nextId=Math.max(nextId,s.id+1);
- }
- if(!tabs.length){addTab();return;}
- activate(tabs.some(t=>t.id===saved.activeId)?saved.activeId:tabs[0].id);
-}
+function evict(){if(live.size<=MAX_LIVE)return;const candidates=Array.from(live.keys()).filter(id=>id!==activeId&&!store.get(id)?.pinned);
+ candidates.sort((a,b)=>(store.get(a)?.last_active||0)-(store.get(b)?.last_active||0));
+ while(live.size>MAX_LIVE&&candidates.length)discard(candidates.shift());}
+function newTab(workspace='web',url=HOME){const id=store.nextId(),t={id,title:'New tab',url:safeUrl(url),workspace:typeof workspace==='string'?workspace:'web',pinned:false,muted:false,lastActive:Date.now(),ordinal:id};store.save(t);activate(id);return id;}
+function closeTab(id){id=Number(id);if(!store.get(id))return;discard(id);store.delete(id);if(activeId===id){activeId=null;const target=store.lastActiveId();if(target)activate(target);else newTab();}emit();}
+function sweep(){const now=Date.now();for(const id of Array.from(live.keys())){if(id===activeId)continue;const t=store.get(id),v=live.get(id);if(!t){discard(id);continue;}if(t.pinned||now-t.last_active<IDLE_MS||v.webContents.isLoading()||v.webContents.isCurrentlyAudible?.())continue;discard(id);}emit();}
+function sendPage(payload){const w=typeof payload?.workspace==='string'?payload.workspace:'web';const offset=Number.isSafeInteger(payload?.offset)?payload.offset:0;return state(w,offset);}
 app.whenReady().then(()=>{
+ store=new TabStore(app.getPath('userData'));
+ store.importLegacy(path.join(app.getPath('userData'),'hexora-tabs.json'));
  win=new BrowserWindow({width:1360,height:900,minWidth:700,minHeight:400,title:'Hexora Workspace',autoHideMenuBar:true,backgroundColor:'#111215',webPreferences:{preload:path.join(__dirname,'preload.js'),contextIsolation:true,sandbox:true,nodeIntegration:false}});
- win.loadFile('toolbar.html');win.on('resize',bounds);
- win.webContents.on('did-finish-load',publish);
- restore();setInterval(sweep,60*1000).unref();
- ipcMain.handle('tabs:action',(_event,action,id)=>{
-   const t=current();
-   if(action==='new')addTab(HOME,typeof id==='string'?id:'web');
-   else if(action==='activate')activate(id);
-   else if(action==='close')closeTab(id);
-   else if(action==='reload'&&t){if(!t.view)activate(t.id);else t.view.webContents.reload();}
-   else if(action==='back'&&t?.view?.webContents.navigationHistory.canGoBack())t.view.webContents.navigationHistory.goBack();
-   else if(action==='forward'&&t?.view?.webContents.navigationHistory.canGoForward())t.view.webContents.navigationHistory.goForward();
-   else if(action==='open-external')shell.openExternal(t?.url||HOME);
-   else if(action==='sidebar'){sidebarWidth=id?64:330;bounds();}
-   else if(action==='pin'){const target=tabs.find(x=>x.id===id);if(target)target.pinned=!target.pinned;}
-   else if(action==='mute'){const target=tabs.find(x=>x.id===id);if(target){target.muted=!target.muted;target.view?.webContents.setAudioMuted(target.muted);}}
-   else if(action==='workspace'&&id&&typeof id.id==='number'&&typeof id.workspace==='string'){const target=tabs.find(x=>x.id===id.id);if(target)target.workspace=id.workspace;}
-   else if(action==='suspend'){const target=tabs.find(x=>x.id===id);if(target)suspend(target);}
-   publish();
+ win.loadFile('toolbar.html');win.on('resize',bounds);win.webContents.on('did-finish-load',emit);
+ const last=Number(store.getMeta('activeId'));if(!last||!activate(last)){const backup=store.lastActiveId();if(!backup||!activate(backup))newTab();}
+ ipcMain.handle('tabs:page',(_e,arg)=>sendPage(arg));
+ ipcMain.handle('tabs:search',(_e,term)=>store.search(term,50).map(pageRow));
+ ipcMain.handle('tabs:action',(_e,action,arg)=>{
+  const current=store.get(activeId);const wc=live.get(activeId)?.webContents;
+  if(action==='new')newTab(typeof arg==='string'?arg:'web');
+  else if(action==='activate')activate(Number(arg));
+  else if(action==='close')closeTab(arg);
+  else if(action==='reload')wc?.reload();
+  else if(action==='back'&&wc?.navigationHistory.canGoBack())wc.navigationHistory.goBack();
+  else if(action==='forward'&&wc?.navigationHistory.canGoForward())wc.navigationHistory.goForward();
+  else if(action==='open-external')shell.openExternal(current?.url||HOME);
+  else if(action==='sidebar'){sidebarWidth=arg?64:330;bounds();}
+  else if(['pin','mute','workspace'].includes(action)){
+   const id=Number(action==='workspace'?arg?.id:arg),raw=store.get(id);
+   if(raw){const t=toModel(raw);if(action==='pin')t.pinned=!t.pinned;if(action==='mute'){t.muted=!t.muted;live.get(id)?.webContents.setAudioMuted(t.muted);}if(action==='workspace'&&typeof arg.workspace==='string')t.workspace=arg.workspace;store.save(t);emit();}
+  }
+  else if(action==='suspend'){const id=Number(arg);if(id!==activeId&&!store.get(id)?.pinned)discard(id);}
+  emit();return true;
  });
- win.on('close',()=>{saveNow();});
- win.on('closed',()=>{clearTimeout(saveTimer);win=null;tabs=[];activeId=null;});
+ setInterval(sweep,60*1000).unref();
+ win.on('closed',()=>{clearTimeout(stateTimer);win=null;for(const id of Array.from(live.keys()))discard(id);store.close();});
 });
-app.on('before-quit',()=>{clearTimeout(saveTimer);saveNow();});
 app.on('window-all-closed',()=>{if(process.platform!=='darwin')app.quit();});
