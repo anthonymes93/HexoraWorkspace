@@ -45,7 +45,7 @@ function render(p){
   el.title=item.url;el.onclick=()=>action('activate',item.id);el.append(name,close);tabs.append(el);
  }
 }
-function updateSidebar(){$('sidebar').classList.toggle('hidden',!sidebarOpen);$('top-main').classList.toggle('expanded',!sidebarOpen);action('sidebar',!sidebarOpen);save();}
+function updateSidebar(){$('sidebar').classList.toggle('hidden',!sidebarOpen);document.querySelector('.top-main').classList.toggle('expanded',!sidebarOpen);action('sidebar',!sidebarOpen);save();}
 for(const id of ['new','new-rail','new-sidebar','add-tab'])$(id).onclick=()=>action('new',activeWorkspace);
 for(const id of ['back','forward','reload'])$(id).onclick=()=>action(id);
 for(const id of ['external','settings-rail'])$(id).onclick=()=>action('open-external');
