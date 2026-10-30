@@ -12,3 +12,8 @@
 #website-form label{color:#c9c7d1;font-size:12px;margin-top:6px}
 .website-actions{display:flex;justify-content:flex-end;gap:9px;margin-top:9px}
 .website-error{color:#ffaaa8;font-size:12px;min-height:0;margin:0}
+
+/* Explicit workspace-panel collapse control */
+.sidebar-title-actions{display:flex;align-items:center;gap:3px}
+#collapse-sidebar{font-size:25px;line-height:1;color:#b7a7e7}
+#collapse-sidebar:hover{color:#fff;background:#34303e}
