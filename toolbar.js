@@ -96,6 +96,7 @@ function hideTabMenu(restore=true){ const wasOpen=!$('tab-context-menu').classLi
 function showTabMenu(x,y,item){
  contextTab=item;
  action('modal',true);
+ $('tab-menu-chrome').textContent=item.chromeMode?'✓ Disable Chrome compatibility':'◉ Enable Chrome compatibility';
  const menu=$('tab-context-menu');menu.classList.remove('hidden');
  menu.style.left=Math.max(8,Math.min(x,innerWidth-menu.offsetWidth-8))+'px';
  menu.style.top=Math.max(8,Math.min(y,innerHeight-menu.offsetHeight-8))+'px';
@@ -112,6 +113,11 @@ function hideWebsiteModal(){
 }
 $('tab-menu-replace').onclick=()=>showWebsiteModal(false);
 $('tab-menu-new').onclick=()=>showWebsiteModal(true);
+$('tab-menu-chrome').onclick=async()=>{
+ if(!contextTab)return;
+ const id=contextTab.id;hideTabMenu();
+ try{await action('chrome-mode',id);refresh();}catch(err){alert('Chrome compatibility mode: '+err.message);}
+};
 $('website-cancel').onclick=hideWebsiteModal;
 $('website-close').onclick=hideWebsiteModal;
 $('website-overlay').onclick=e=>{if(e.target===$('website-overlay'))hideWebsiteModal();};
