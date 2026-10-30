@@ -7,6 +7,7 @@
   <button id="search-rail" class="railbtn" title="Search open tabs">⌕</button>
   <button id="new-rail" class="railbtn" title="New ChatGPT tab">＋</button>
   <button id="split-rail" class="railbtn" title="Split view — coming soon" disabled>◫</button>
+  <button id="recovery-rail" class="railbtn" title="Encrypted backups">⛨</button>
   <button id="settings-rail" class="railbtn bottom" title="Open ChatGPT in browser">↗</button>
 </div>
 <aside class="sidebar" id="sidebar">
@@ -20,5 +21,17 @@
   <header class="top"><div><h1 id="current-workspace">◈ Web Development</h1><div class="subtitle">Your conversations, your workspace</div></div><div class="actions"><button id="search" class="pill">⌕ <span>Search</span></button><button id="split" class="pill" title="Coming soon" disabled>◫ <span>Split view</span></button><button id="new" class="pill primary">＋ <span>New chat</span></button></div></header>
   <div class="tabsbar"><div id="tabs" class="tabs"></div><button id="add-tab" class="tab-plus" title="New tab">＋</button><div class="nav"><button id="back" title="Back">‹</button><button id="forward" title="Forward">›</button><button id="reload" title="Reload">↻</button><button id="external" title="Open in browser">↗</button></div></div>
 </main>
+<div id="recovery-overlay" class="overlay hidden"><div class="dialog">
+ <div class="dialog-header"><b>Hexora Recovery</b><button id="recovery-close">×</button></div>
+ <p class="hint">Encrypted backups to an external drive or a cloud-synced folder. Your recovery password is never stored.</p>
+ <div id="recovery-status" class="hint"></div>
+ <input id="recovery-password" type="password" placeholder="Recovery password (12+ characters)" autocomplete="off" />
+ <button class="pill" id="recovery-configure">Choose backup folder & unlock</button>
+ <button class="pill" id="recovery-unlock">Unlock existing backup folder</button>
+ <button class="pill primary" id="recovery-backup">Back up now</button>
+ <button class="pill" id="recovery-restore">Restore from encrypted file...</button>
+ <p id="recovery-message" class="hint"></p>
+ <p class="hint">Hourly backups run only while Hexora is open and recovery is unlocked. Confirm files really sync off this computer.</p>
+ </div></div>
 <div id="search-overlay" class="overlay hidden"><div class="dialog"><div class="dialog-header"><b>Search open conversations</b><button id="search-close">×</button></div><input id="search-input" placeholder="Find a tab by title..."/><div id="search-results"></div><p class="hint">Searches currently open tabs, not your full ChatGPT history.</p></div></div>
 <script src="toolbar.js"></script></body></html>
