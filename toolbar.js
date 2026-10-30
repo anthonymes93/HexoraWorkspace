@@ -12,6 +12,7 @@ async function refresh(){
  finally{refreshing=false;if(refreshPending){refreshPending=false;refresh();}}
 }
 function render(p){
+ if(p.activeId&&p.activePanelMode){const desired=p.activePanelMode==='wide';if(sidebarOpen!==desired){sidebarOpen=desired;updateSidebar(false);}}
  const workspace=workspaces.find(w=>w.id===activeWorkspace)||workspaces[0];
  $('current-workspace').textContent=workspace.emoji+'  '+workspace.name;
  const container=$('workspaces');container.replaceChildren();
@@ -50,7 +51,7 @@ function render(p){
   el.append(name,pop,close);tabs.append(el);
  }
 }
-function updateSidebar(){$('sidebar').classList.toggle('hidden',!sidebarOpen);document.querySelector('.top-main').classList.toggle('expanded',!sidebarOpen);action('sidebar',!sidebarOpen);save();}
+function updateSidebar(persist=true){$('sidebar').classList.toggle('hidden',!sidebarOpen);document.querySelector('.top-main').classList.toggle('expanded',!sidebarOpen);action('sidebar',!sidebarOpen);if(persist&&currentPage?.activeId)action('panel-mode',{id:currentPage.activeId,mode:sidebarOpen?'wide':'thin'});save();}
 for(const id of ['new','new-rail','new-sidebar','add-tab'])$(id).onclick=()=>action('new',activeWorkspace);
 for(const id of ['back','forward','reload'])$(id).onclick=()=>action(id);
 for(const id of ['external','settings-rail'])$(id).onclick=()=>action('open-external');
@@ -99,6 +100,8 @@ function showTabMenu(x,y,item){
  contextTab=item;
  action('modal',true);
  $('tab-menu-chrome').textContent=item.chromeMode?'✓ Disable Chrome compatibility':'◉ Enable Chrome compatibility';
+ $('tab-menu-panel-wide').textContent=(item.panelMode==='wide'?'✓ ':'')+'Wide workspace panel';
+ $('tab-menu-panel-thin').textContent=(item.panelMode==='thin'?'✓ ':'')+'Thin workspace panel';
  const menu=$('tab-context-menu');menu.classList.remove('hidden');
  menu.style.left=Math.max(8,Math.min(x,innerWidth-menu.offsetWidth-8))+'px';
  menu.style.top=Math.max(8,Math.min(y,innerHeight-menu.offsetHeight-8))+'px';
@@ -115,6 +118,7 @@ function hideWebsiteModal(){
 }
 $('tab-menu-replace').onclick=()=>showWebsiteModal(false);
 $('tab-menu-new').onclick=()=>showWebsiteModal(true);
+for(const mode of ['wide','thin'])$('tab-menu-panel-'+mode).onclick=async()=>{if(!contextTab)return;const id=contextTab.id;hideTabMenu();try{await action('panel-mode',{id,mode});refresh();}catch(err){alert(err.message);}};
 $('tab-menu-chrome').onclick=async()=>{
  if(!contextTab)return;
  const id=contextTab.id;hideTabMenu();
