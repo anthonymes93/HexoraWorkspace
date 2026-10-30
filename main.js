@@ -54,8 +54,9 @@ function closeTab(id){id=Number(id);if(!store.get(id))return;discard(id);store.d
 function sweep(){const now=Date.now();for(const id of Array.from(live.keys())){if(id===activeId)continue;const t=store.get(id),v=live.get(id);if(!t){discard(id);continue;}if(t.pinned||now-t.last_active<IDLE_MS||v.webContents.isLoading()||v.webContents.isCurrentlyAudible?.())continue;discard(id);}emit();}
 function openRecoveryWindow(){
  if(recoveryWindow&&!recoveryWindow.isDestroyed()){recoveryWindow.focus();return;}
- recoveryWindow=new BrowserWindow({parent:win,modal:false,show:false,width:590,height:600,minWidth:480,minHeight:500,title:'Hexora Recovery',backgroundColor:'#17181c',autoHideMenuBar:true,webPreferences:{preload:path.join(__dirname,'preload.js'),contextIsolation:true,sandbox:true,nodeIntegration:false}});
- recoveryWindow.once('ready-to-show',()=>{if(recoveryWindow&&!recoveryWindow.isDestroyed()){recoveryWindow.show();recoveryWindow.focus();}});
+ recoveryWindow=new BrowserWindow({parent:win,modal:false,show:true,width:590,height:600,minWidth:480,minHeight:500,title:'Hexora Recovery',backgroundColor:'#17181c',autoHideMenuBar:true,webPreferences:{preload:path.join(__dirname,'preload.js'),contextIsolation:true,sandbox:true,nodeIntegration:false}});
+ recoveryWindow.focus();
+ recoveryWindow.webContents.on('did-fail-load',(_event,code,reason,url,isMainFrame)=>{if(isMainFrame){console.error('Recovery page failed:',code,reason,url);dialog.showErrorBox('Hexora Recovery failed to load',reason+' ('+code+')');}});
  recoveryWindow.loadFile('recovery-window.html').catch(err=>{console.error('Recovery window failed',err);dialog.showErrorBox('Hexora Recovery',err.message);});
  recoveryWindow.on('closed',()=>{recoveryWindow=null;});
 }
