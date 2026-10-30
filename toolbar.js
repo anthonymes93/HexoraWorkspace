@@ -100,8 +100,15 @@ function showTabMenu(x,y,item){
  contextTab=item;
  action('modal',true);
  $('tab-menu-chrome').textContent=item.chromeMode?'✓ Disable Chrome compatibility':'◉ Enable Chrome compatibility';
- $('tab-menu-panel-wide').textContent=(item.panelMode==='wide'?'✓ ':'')+'Wide workspace panel';
- $('tab-menu-panel-thin').textContent=(item.panelMode==='thin'?'✓ ':'')+'Thin workspace panel';
+ const pref=item.panelPreference||{mode:item.panelMode,source:'default'};
+ $('tab-menu-panel-wide').textContent=(pref.tabOverride==='wide'?'✓ ':'')+'This tab: Wide';
+ $('tab-menu-panel-thin').textContent=(pref.tabOverride==='thin'?'✓ ':'')+'This tab: Thin';
+ $('tab-menu-panel-inherit').textContent=(!pref.tabOverride?'✓ ':'')+'This tab: Use domain setting';
+ $('tab-menu-domain-wide').textContent=(pref.domainOverride==='wide'?'✓ ':'')+'This domain: Wide';
+ $('tab-menu-domain-thin').textContent=(pref.domainOverride==='thin'?'✓ ':'')+'This domain: Thin';
+ $('tab-menu-domain-label').textContent=pref.domain?'Domain: '+pref.domain:'No domain';
+ $('tab-menu-domain-wide').disabled=!pref.domain;
+ $('tab-menu-domain-thin').disabled=!pref.domain;
  const menu=$('tab-context-menu');menu.classList.remove('hidden');
  menu.style.left=Math.max(8,Math.min(x,innerWidth-menu.offsetWidth-8))+'px';
  menu.style.top=Math.max(8,Math.min(y,innerHeight-menu.offsetHeight-8))+'px';
@@ -118,7 +125,11 @@ function hideWebsiteModal(){
 }
 $('tab-menu-replace').onclick=()=>showWebsiteModal(false);
 $('tab-menu-new').onclick=()=>showWebsiteModal(true);
-for(const mode of ['wide','thin'])$('tab-menu-panel-'+mode).onclick=async()=>{if(!contextTab)return;const id=contextTab.id;hideTabMenu();try{await action('panel-mode',{id,mode});refresh();}catch(err){alert(err.message);}};
+for(const mode of ['wide','thin']){
+ $('tab-menu-panel-'+mode).onclick=async()=>{if(!contextTab)return;const id=contextTab.id;hideTabMenu();try{await action('panel-mode',{id,mode});refresh();}catch(err){alert(err.message);}};
+ $('tab-menu-domain-'+mode).onclick=async()=>{if(!contextTab)return;const id=contextTab.id;hideTabMenu();try{await action('panel-domain-mode',{id,mode});refresh();}catch(err){alert(err.message);}};
+}
+$('tab-menu-panel-inherit').onclick=async()=>{if(!contextTab)return;const id=contextTab.id;hideTabMenu();try{await action('panel-tab-inherit',id);refresh();}catch(err){alert(err.message);}};
 $('tab-menu-chrome').onclick=async()=>{
  if(!contextTab)return;
  const id=contextTab.id;hideTabMenu();
