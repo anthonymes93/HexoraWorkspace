@@ -11,6 +11,8 @@ let win,store,activeId=null,sidebarWidth=330,live=new Map(),loading=new Map(),st
 function safeUrl(value){try{const u=new URL(value);return ['https:','http:'].includes(u.protocol)?u.href:HOME;}catch{return HOME;}}
 function wire(t){const view=new WebContentsView({webPreferences:{partition:'persist:hexora-chatgpt',sandbox:true,contextIsolation:true,nodeIntegration:false,webSecurity:true,javascript:true}});const wc=view.webContents;
  wc.setAudioMuted(!!t.muted);
+ view.setBackgroundColor('#111215');
+ wc.on('did-fail-load',(_event,code,description,url,isMainFrame)=>{if(isMainFrame)console.error('[Hexora] Page load failed:',code,description,url);});
  const update=(title=false)=>{const row=store.get(t.id);if(!row)return;if(title)row.title=wc.getTitle()?.slice(0,100)||row.title;const url=wc.getURL();if(/^https?:/.test(url))row.url=url;store.save(toModel(row));emit();};
  wc.on('page-title-updated',()=>update(true));
  wc.on('did-navigate',()=>update());
@@ -42,8 +44,9 @@ function closeTab(id){id=Number(id);if(!store.get(id))return;discard(id);store.d
 function sweep(){const now=Date.now();for(const id of Array.from(live.keys())){if(id===activeId)continue;const t=store.get(id),v=live.get(id);if(!t){discard(id);continue;}if(t.pinned||now-t.last_active<IDLE_MS||v.webContents.isLoading()||v.webContents.isCurrentlyAudible?.())continue;discard(id);}emit();}
 function openRecoveryWindow(){
  if(recoveryWindow&&!recoveryWindow.isDestroyed()){recoveryWindow.focus();return;}
- recoveryWindow=new BrowserWindow({parent:win,modal:false,width:590,height:600,minWidth:480,minHeight:500,title:'Hexora Recovery',backgroundColor:'#17181c',autoHideMenuBar:true,webPreferences:{preload:path.join(__dirname,'preload.js'),contextIsolation:true,sandbox:true,nodeIntegration:false}});
- recoveryWindow.loadFile('recovery-window.html');
+ recoveryWindow=new BrowserWindow({parent:win,modal:false,show:false,width:590,height:600,minWidth:480,minHeight:500,title:'Hexora Recovery',backgroundColor:'#17181c',autoHideMenuBar:true,webPreferences:{preload:path.join(__dirname,'preload.js'),contextIsolation:true,sandbox:true,nodeIntegration:false}});
+ recoveryWindow.once('ready-to-show',()=>{if(recoveryWindow&&!recoveryWindow.isDestroyed()){recoveryWindow.show();recoveryWindow.focus();}});
+ recoveryWindow.loadFile('recovery-window.html').catch(err=>{console.error('Recovery window failed',err);dialog.showErrorBox('Hexora Recovery',err.message);});
  recoveryWindow.on('closed',()=>{recoveryWindow=null;});
 }
 function sendPage(payload){const w=typeof payload?.workspace==='string'?payload.workspace:'web';const offset=Number.isSafeInteger(payload?.offset)?payload.offset:0;return state(w,offset);}
@@ -94,7 +97,9 @@ app.whenReady().then(()=>{
   if(action==='new')newTab(typeof arg==='string'?arg:'web');
   else if(action==='activate')activate(Number(arg));
   else if(action==='close')closeTab(arg);
-  else if(action==='reload')wc?.reload();
+  else if(action==='reload'){
+   if(wc){const view=live.get(activeId);win.contentView.removeChildView(view);win.contentView.addChildView(view);bounds();wc.reloadIgnoringCache();}
+  }
   else if(action==='back'&&wc?.navigationHistory.canGoBack())wc.navigationHistory.goBack();
   else if(action==='forward'&&wc?.navigationHistory.canGoForward())wc.navigationHistory.goForward();
   else if(action==='open-external')shell.openExternal(current?.url||HOME);
