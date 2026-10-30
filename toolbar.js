@@ -59,3 +59,24 @@ $('search').onclick=showSearch;$('search-rail').onclick=showSearch;$('search-clo
 $('search-overlay').onclick=e=>{if(e.target===$('search-overlay'))hideSearch();};
 document.addEventListener('keydown',e=>{if(e.key==='Escape')hideSearch();if(e.ctrlKey&&e.key.toLowerCase()==='k'){e.preventDefault();showSearch();}if(e.ctrlKey&&e.key.toLowerCase()==='t'){e.preventDefault();action('new',activeWorkspace);}});
 window.hexora.onState(()=>{refresh();});updateSidebar();refresh();
+
+function recoveryMessage(text){$('recovery-message').textContent=text;}
+async function recoveryStatus(){try{const st=await window.hexora.recovery.status();$('recovery-status').textContent='Destination: '+(st.directory||'Not selected')+' | '+(st.enabled?'Unlocked':'Locked')+(st.lastBackup?' | Last backup: '+st.lastBackup.time:'');}catch(e){recoveryMessage(e.message);}}
+$('recovery-rail').onclick=()=>{$('recovery-overlay').classList.remove('hidden');recoveryMessage('');recoveryStatus();};
+$('recovery-close').onclick=()=>{$('recovery-overlay').classList.add('hidden');$('recovery-password').value='';};
+$('recovery-overlay').onclick=e=>{if(e.target===$('recovery-overlay'))$('recovery-close').click();};
+async function recoveryAction(name){
+ const pass=$('recovery-password').value;
+ try{
+  recoveryMessage('Working...');
+  let result;
+  if(name==='backup')result=await window.hexora.recovery.backup();
+  else if(name==='configure')result=await window.hexora.recovery.configure(pass);
+  else if(name==='unlock')result=await window.hexora.recovery.unlock(pass);
+  else if(name==='restore')result=await window.hexora.recovery.restore(pass);
+  recoveryMessage(result?.cancelled?'Cancelled.':name==='backup'?'Backup saved: '+result.file+' ('+result.tabs+' tabs).':name==='restore'?'Restore prepared; restarting...':'Recovery folder ready. Run Back up now to create the first copy.');
+  if(name!=='restore')$('recovery-password').value='';
+  recoveryStatus();
+ }catch(e){recoveryMessage('Error: '+e.message);}
+}
+for(const name of ['backup','configure','unlock','restore'])$('recovery-'+name).onclick=()=>recoveryAction(name);
