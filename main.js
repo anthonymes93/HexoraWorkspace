@@ -20,6 +20,9 @@ const TOP_HEIGHT=120,IDLE_MS=24*60*60*1000,MAX_LIVE=8;
 let recoveryWindow=null;
 const detached=new Map();
 let quitting=false;
+const LAYOUT_KEY='detachedWindowIds';
+function savedDetachedIds(){try{const values=JSON.parse(store.getMeta(LAYOUT_KEY)||'[]');return Array.isArray(values)?values.filter(x=>Number.isSafeInteger(x)&&x>0).slice(0,32):[];}catch{return [];}}
+function setDetachedSaved(id,present){const ids=new Set(savedDetachedIds());if(present)ids.add(id);else ids.delete(id);store.setMeta(LAYOUT_KEY,JSON.stringify([...ids]));}
 let win,store,activeId=null,sidebarWidth=330,live=new Map(),loading=new Map(),stateTimer=null,modalVisible=false,recoveryPassword=null,recoveryDir=null,recoveryTimer=null,recoveryBusy=false,lastBackup=null;
 function safeUrl(value){try{const u=new URL(value);return ['https:','http:'].includes(u.protocol)?u.href:HOME;}catch{return HOME;}}
 function wire(t){const view=new WebContentsView({webPreferences:{partition:'persist:hexora-chatgpt',sandbox:true,contextIsolation:true,nodeIntegration:false,webSecurity:true,javascript:true}});const wc=view.webContents;
@@ -55,7 +58,7 @@ function evict(){if(live.size<=MAX_LIVE)return;const candidates=Array.from(live.
  while(live.size>MAX_LIVE&&candidates.length)discard(candidates.shift());}
 function newTab(workspace='web',url=HOME){const id=store.nextId(),t={id,title:'New tab',url:safeUrl(url),workspace:typeof workspace==='string'?workspace:'web',pinned:false,muted:false,lastActive:Date.now(),ordinal:id};store.save(t);activate(id);return id;}
 function closeTab(id){id=Number(id);if(!store.get(id))return;
- if(detached.has(id)){const popup=detached.get(id);detached.delete(id);if(!popup.isDestroyed())popup.close();}
+ if(detached.has(id)){const popup=detached.get(id);setDetachedSaved(id,false);detached.delete(id);if(!popup.isDestroyed())popup.close();}
  discard(id);store.delete(id);if(activeId===id){activeId=null;const target=store.lastActiveId();if(target)activate(target);else newTab();}emit();}
 function sweep(){const now=Date.now();for(const id of Array.from(live.keys())){if(id===activeId)continue;const t=store.get(id),v=live.get(id);if(!t){discard(id);continue;}if(detached.has(id)||t.pinned||now-t.last_active<IDLE_MS||v.webContents.isLoading()||v.webContents.isCurrentlyAudible?.())continue;discard(id);}emit();}
 function detachTab(id){
@@ -78,6 +81,7 @@ function detachTab(id){
  const y=valid?Math.max(area.y,Math.min(rectangle.y,area.y+area.height-100)):area.y+60;
  const popup=new BrowserWindow({x,y,width:w,height:h,minWidth:400,minHeight:300,title:'Hexora · '+(row.title||'ChatGPT'),backgroundColor:'#111215',autoHideMenuBar:true});
  detached.set(id,popup);
+ setDetachedSaved(id,true);
  popup.contentView.addChildView(view);
  const layout=()=>{if(!popup.isDestroyed()){const [cw,ch]=popup.getContentSize();view.setBounds({x:0,y:0,width:cw,height:ch});}};
  const saveWindow=()=>{if(!popup.isDestroyed())store.setMeta('windowBounds:'+id,JSON.stringify(popup.getBounds()));};
@@ -89,6 +93,7 @@ function detachTab(id){
  });
  popup.on('closed',()=>{
   detached.delete(id);
+  if(!quitting)setDetachedSaved(id,false);
   if(!quitting&&win&&!win.isDestroyed()&&store.get(id)){
    if(activeId===id){win.contentView.addChildView(view);bounds();win.focus();}
    emit();
@@ -123,6 +128,12 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
  win=new BrowserWindow({width:1360,height:900,minWidth:700,minHeight:400,title:'Hexora Workspace',autoHideMenuBar:true,backgroundColor:'#111215',webPreferences:{preload:path.join(__dirname,'preload.js'),contextIsolation:true,sandbox:true,nodeIntegration:false}});
  win.loadFile('toolbar.html');win.on('resize',bounds);win.webContents.on('did-finish-load',emit);
  const last=Number(store.getMeta('activeId'));if(!last||!activate(last)){const backup=store.lastActiveId();if(!backup||!activate(backup))newTab();}
+ // Reopen each detached tab at its saved screen position after the primary workspace starts.
+ // Missing/deleted tab IDs are cleaned up, and one bad window cannot prevent startup.
+ for(const id of savedDetachedIds()){
+  if(!store.get(id)){setDetachedSaved(id,false);continue;}
+  try{detachTab(id);}catch(err){console.error('Could not restore detached window',id,err);}
+ }
  ipcMain.handle('recovery:status',()=>({directory:recoveryDir,enabled:!!(recoveryDir&&recoveryPassword),lastBackup}));
  ipcMain.handle('recovery:configure',async(_e,password)=>{
   if(typeof password!=='string'||password.length<12)throw new Error('Enter a recovery password of at least 12 characters.');
