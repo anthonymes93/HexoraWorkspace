@@ -1,0 +1,92 @@
+
+# ==========================================
+# HEXORA — Git Ignore
+# Electron / Node.js / Windows / VS Code
+# ==========================================
+
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Environment variables and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+secrets/
+credentials/
+
+# Electron builds and packaged apps
+dist/
+build/
+out/
+release/
+releases/
+*.asar
+*.exe
+*.msi
+*.appx
+*.dmg
+*.deb
+*.rpm
+
+# Electron user data and browser profiles
+userData/
+electron-user-data/
+browser-profile/
+profiles/
+session-data/
+cookies/
+*.sqlite
+*.sqlite-journal
+*.sqlite-wal
+*.sqlite-shm
+
+# Logs and debugging
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Temporary files and caches
+.cache/
+.temp/
+.tmp/
+tmp/
+temp/
+coverage/
+.nyc_output/
+*.tmp
+*.bak
+*.swp
+
+# Windows files
+Thumbs.db
+Thumbs.db:encryptable
+Desktop.ini
+$RECYCLE.BIN/
+
+# macOS files
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# VS Code local settings
+.vscode/*
+!.vscode/extensions.json
+!.vscode/launch.json
+!.vscode/tasks.json
+!.vscode/settings.json
+
+# IDE files
+.idea/
+*.code-workspace
+
+# Test artifacts
+test-results/
+playwright-report/
