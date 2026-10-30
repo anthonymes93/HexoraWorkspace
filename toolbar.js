@@ -51,10 +51,10 @@ for(const id of ['back','forward','reload'])$(id).onclick=()=>action(id);
 for(const id of ['external','settings-rail'])$(id).onclick=()=>action('open-external');
 $('toggle-sidebar').onclick=()=>{sidebarOpen=!sidebarOpen;updateSidebar();};
 $('add-workspace').onclick=()=>{const name=prompt('Workspace name:');if(!name?.trim())return;const id='ws'+Date.now();workspaces.push({id,name:name.trim().slice(0,55),emoji:'◈'});activeWorkspace=id;offset=0;save();refresh();};
-function showSearch(){$('search-overlay').classList.remove('hidden');$('search-input').value='';filterTabs();$('search-input').focus();}
+function showSearch(){action('modal',true);$('search-overlay').classList.remove('hidden');$('search-input').value='';filterTabs();$('search-input').focus();}
 let searchSeq=0;
 async function filterTabs(){const seq=++searchSeq;const items=await window.hexora.search($('search-input').value);if(seq!==searchSeq)return;const el=$('search-results');el.replaceChildren();for(const item of items){const b=document.createElement('button');b.className='result';b.textContent=item.title||item.url;b.onclick=()=>{hideSearch();action('activate',item.id);};el.append(b);}if(!items.length)el.textContent='No matches.';}
-function hideSearch(){$('search-overlay').classList.add('hidden');}
+function hideSearch(){$('search-overlay').classList.add('hidden');action('modal',false);}
 $('search').onclick=showSearch;$('search-rail').onclick=showSearch;$('search-close').onclick=hideSearch;$('search-input').oninput=filterTabs;
 $('search-overlay').onclick=e=>{if(e.target===$('search-overlay'))hideSearch();};
 document.addEventListener('keydown',e=>{if(e.key==='Escape')hideSearch();if(e.ctrlKey&&e.key.toLowerCase()==='k'){e.preventDefault();showSearch();}if(e.ctrlKey&&e.key.toLowerCase()==='t'){e.preventDefault();action('new',activeWorkspace);}});
@@ -62,8 +62,8 @@ window.hexora.onState(()=>{refresh();});updateSidebar();refresh();
 
 function recoveryMessage(text){$('recovery-message').textContent=text;}
 async function recoveryStatus(){try{const st=await window.hexora.recovery.status();$('recovery-status').textContent='Destination: '+(st.directory||'Not selected')+' | '+(st.enabled?'Unlocked':'Locked')+(st.lastBackup?' | Last backup: '+st.lastBackup.time:'');}catch(e){recoveryMessage(e.message);}}
-$('recovery-rail').onclick=()=>{$('recovery-overlay').classList.remove('hidden');recoveryMessage('');recoveryStatus();};
-$('recovery-close').onclick=()=>{$('recovery-overlay').classList.add('hidden');$('recovery-password').value='';};
+$('recovery-rail').onclick=()=>{action('modal',true);$('recovery-overlay').classList.remove('hidden');recoveryMessage('');recoveryStatus();};
+$('recovery-close').onclick=()=>{$('recovery-overlay').classList.add('hidden');action('modal',false);$('recovery-password').value='';};
 $('recovery-overlay').onclick=e=>{if(e.target===$('recovery-overlay'))$('recovery-close').click();};
 async function recoveryAction(name){
  const pass=$('recovery-password').value;
