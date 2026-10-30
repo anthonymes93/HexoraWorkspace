@@ -59,6 +59,22 @@ function wire(t){const view=new WebContentsView({webPreferences:{partition:'pers
 function toModel(r){return{id:r.id,url:safeUrl(r.url),title:r.title||'ChatGPT',workspace:r.workspace||'web',pinned:!!r.pinned,muted:!!r.muted,lastActive:r.last_active??r.lastActive??Date.now(),ordinal:r.ordinal||r.id};}
 function discard(id){const view=live.get(id);if(!view)return;live.delete(id);const pop=detached.get(id);if(pop&&!pop.isDestroyed())pop.contentView.removeChildView(view);else if(win&&!win.isDestroyed())win.contentView.removeChildView(view);loading.delete(id);view.webContents.close();}
 function bounds(){if(!win||win.isDestroyed())return;const v=live.get(activeId);if(!v)return;const [w,h]=win.getContentSize();v.setBounds({x:sidebarWidth,y:TOP_HEIGHT,width:Math.max(0,w-sidebarWidth),height:Math.max(0,h-TOP_HEIGHT)});}
+// Animate the native Electron view alongside the CSS workspace panel.
+let sidebarAnimation=null;
+function setSidebarWidth(collapsed){
+ const start=sidebarWidth,target=collapsed?64:330;
+ if(sidebarAnimation){clearInterval(sidebarAnimation);sidebarAnimation=null;}
+ if(start===target){bounds();return;}
+ const began=performance.now(),duration=240;
+ sidebarAnimation=setInterval(()=>{
+  const progress=Math.min(1,(performance.now()-began)/duration);
+  const eased=1-Math.pow(1-progress,3);
+  sidebarWidth=Math.round(start+(target-start)*eased);
+  bounds();
+  if(progress>=1){clearInterval(sidebarAnimation);sidebarAnimation=null;sidebarWidth=target;bounds();}
+ },16);
+}
+
 function pageRow(r){return{id:r.id,url:r.url,title:r.title,workspace:r.workspace,pinned:!!r.pinned,muted:!!r.muted,lastActive:r.last_active,active:r.id===activeId,detached:detached.has(r.id),loading:!!loading.get(r.id),suspended:!live.has(r.id),chromeMode:chromeMode(r.id),panelMode:panelMode(r.id),panelPreference:panelPreference(r.id)};}
 function state(workspace='web',offset=0){return{activeId,total:store.total(),counts:store.counts(),tabs:store.page(workspace,offset,50).map(pageRow),active:activeId?store.get(activeId):null,activePanelMode:activeId?panelMode(activeId):'wide',offset};}
 function emit(){if(!win||win.isDestroyed())return;clearTimeout(stateTimer);stateTimer=setTimeout(()=>{if(!win||win.isDestroyed())return;win.webContents.send('tabs:changed');},70);}
@@ -275,7 +291,7 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
   else if(action==='back'&&wc?.navigationHistory.canGoBack())wc.navigationHistory.goBack();
   else if(action==='forward'&&wc?.navigationHistory.canGoForward())wc.navigationHistory.goForward();
   else if(action==='open-external')shell.openExternal(current?.url||HOME);
-  else if(action==='sidebar'){sidebarWidth=arg?64:330;bounds();}
+  else if(action==='sidebar'){setSidebarWidth(!!arg);}
   else if(action==='recovery-window'){openRecoveryWindow();}
   else if(action==='detach'){detachTab(arg||activeId);}
   else if(action==='dock'){dockTab(arg);}
@@ -297,6 +313,6 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
   emit();return true;
  });
  setInterval(sweep,60*1000).unref();
- win.on('closed',()=>{quitting=true;for(const popup of detached.values())if(!popup.isDestroyed())popup.close();detached.clear();clearInterval(recoveryTimer);recoveryPassword=null;clearTimeout(stateTimer);win=null;for(const id of Array.from(live.keys()))discard(id);store.close();});
+ win.on('closed',()=>{quitting=true;if(sidebarAnimation)clearInterval(sidebarAnimation);for(const popup of detached.values())if(!popup.isDestroyed())popup.close();detached.clear();clearInterval(recoveryTimer);recoveryPassword=null;clearTimeout(stateTimer);win=null;for(const id of Array.from(live.keys()))discard(id);store.close();});
 });
 app.on('window-all-closed',()=>{if(process.platform!=='darwin')app.quit();});
