@@ -63,7 +63,7 @@ function closeTab(id){id=Number(id);if(!store.get(id))return;
  if(detached.has(id)){const popup=detached.get(id);setDetachedSaved(id,false);store.setMeta('windowHost:'+id,'');detached.delete(id);if(!popup.isDestroyed()){
   const view=live.get(id);if(view)popup.contentView.removeChildView(view);
   popup.hexoraTabs=(popup.hexoraTabs||[]).filter(tab=>tab!==id);
-  if(popup.hexoraTabs.length){if(popup.hexoraTabId===id)showGroupedTab(popup,popup.hexoraTabs[0]);else sendGroup(popup);}else popup.close();
+  if(popup.hexoraTabs.length){rebaseGroup(popup);if(popup.hexoraTabId===id)showGroupedTab(popup,popup.hexoraTabs[0]);else sendGroup(popup);}else popup.close();
  }}
  discard(id);store.delete(id);if(activeId===id){activeId=null;const target=store.lastActiveId();if(target)activate(target);else newTab();}emit();}
 function sweep(){const now=Date.now();for(const id of Array.from(live.keys())){if(id===activeId)continue;const t=store.get(id),v=live.get(id);if(!t){discard(id);continue;}if(detached.has(id)||t.pinned||now-t.last_active<IDLE_MS||v.webContents.isLoading()||v.webContents.isCurrentlyAudible?.())continue;discard(id);}emit();}
@@ -122,6 +122,12 @@ function detachTab(id){
 }
 
 
+function rebaseGroup(popup){
+ const ids=popup.hexoraTabs||[];if(!ids.length)return;
+ const host=ids[0];
+ for(const id of ids)store.setMeta('windowHost:'+id,String(host));
+ if(!popup.isDestroyed())store.setMeta('windowBounds:'+host,JSON.stringify(popup.getBounds()));
+}
 function sendGroup(popup){
  if(!popup||popup.isDestroyed())return;
  const ids=popup.hexoraTabs||[popup.hexoraTabId];
@@ -166,7 +172,7 @@ function dockTab(id){
  const view=live.get(id);if(view)popup.contentView.removeChildView(view);
  popup.hexoraTabs=(popup.hexoraTabs||[]).filter(tab=>tab!==id);
  detached.delete(id);setDetachedSaved(id,false);store.setMeta('windowHost:'+id,'');
- if(popup.hexoraTabs.length){if(popup.hexoraTabId===id)showGroupedTab(popup,popup.hexoraTabs[0]);else sendGroup(popup);}else popup.close();
+ if(popup.hexoraTabs.length){rebaseGroup(popup);if(popup.hexoraTabId===id)showGroupedTab(popup,popup.hexoraTabs[0]);else sendGroup(popup);}else popup.close();
  activate(id);return true;
 }
 function swapDetached(source,target){
@@ -185,7 +191,7 @@ function swapDetached(source,target){
   other.hexoraTabId=target;other.hexoraTabs=[target];
   detached.set(target,other);
   other.webContents.send('detached:owner',{id:target,title:store.get(target).title});
-  other.setTitle('Hexora · '+store.get(target).title);
+  other.setTitle('Hexora · '+store.get(target).title);sendGroup(other);
   const [ow,oh]=other.getContentSize();destView.setBounds({x:0,y:DETACHED_HEADER,width:ow,height:Math.max(0,oh-DETACHED_HEADER)});
  }else{
   detached.delete(target);setDetachedSaved(target,false);
@@ -194,7 +200,7 @@ function swapDetached(source,target){
  dest.hexoraTabId=source;dest.hexoraTabs=[source];
  detached.set(source,dest);setDetachedSaved(source,true);
  dest.webContents.send('detached:owner',{id:source,title:store.get(source).title});
- dest.setTitle('Hexora · '+store.get(source).title);
+ dest.setTitle('Hexora · '+store.get(source).title);sendGroup(dest);
  const [dw,dh]=dest.getContentSize();sourceView.setBounds({x:0,y:DETACHED_HEADER,width:dw,height:Math.max(0,dh-DETACHED_HEADER)});
  if(!other||other.isDestroyed()){
   // The replaced tab returns to the main workspace; avoid destroying its live browser view.
