@@ -54,7 +54,9 @@ function updateSidebar(){$('sidebar').classList.toggle('hidden',!sidebarOpen);do
 for(const id of ['new','new-rail','new-sidebar','add-tab'])$(id).onclick=()=>action('new',activeWorkspace);
 for(const id of ['back','forward','reload'])$(id).onclick=()=>action(id);
 for(const id of ['external','settings-rail'])$(id).onclick=()=>action('open-external');
-$('toggle-sidebar').onclick=()=>{sidebarOpen=!sidebarOpen;updateSidebar();};
+const toggleSidebar=()=>{sidebarOpen=!sidebarOpen;updateSidebar();};
+$('toggle-sidebar').onclick=toggleSidebar;
+$('collapse-sidebar').onclick=toggleSidebar;
 $('add-workspace').onclick=()=>{const name=prompt('Workspace name:');if(!name?.trim())return;const id='ws'+Date.now();workspaces.push({id,name:name.trim().slice(0,55),emoji:'◈'});activeWorkspace=id;offset=0;save();refresh();};
 function showSearch(){action('modal',true);$('search-overlay').classList.remove('hidden');$('search-input').value='';filterTabs();$('search-input').focus();}
 let searchSeq=0;
