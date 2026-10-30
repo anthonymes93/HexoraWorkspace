@@ -62,7 +62,7 @@ window.hexora.onState(()=>{refresh();});updateSidebar();refresh();
 
 function recoveryMessage(text){$('recovery-message').textContent=text;}
 async function recoveryStatus(){try{const st=await window.hexora.recovery.status();$('recovery-status').textContent='Destination: '+(st.directory||'Not selected')+' | '+(st.enabled?'Unlocked':'Locked')+(st.lastBackup?' | Last backup: '+st.lastBackup.time:'');}catch(e){recoveryMessage(e.message);}}
-$('recovery-rail').onclick=()=>{action('modal',true);$('recovery-overlay').classList.remove('hidden');recoveryMessage('');recoveryStatus();};
+$('recovery-rail').onclick=()=>action('recovery-window');
 $('recovery-close').onclick=()=>{$('recovery-overlay').classList.add('hidden');action('modal',false);$('recovery-password').value='';};
 $('recovery-overlay').onclick=e=>{if(e.target===$('recovery-overlay'))$('recovery-close').click();};
 async function recoveryAction(name){
