@@ -1,10 +1,12 @@
 'use strict';
-const {app,BrowserWindow,WebContentsView,ipcMain,shell}=require('electron');
+const {app,BrowserWindow,WebContentsView,ipcMain,shell,dialog}=require('electron');
 const path=require('node:path');
 const {TabStore}=require('./tab-store');
+const fs=require('node:fs');
+const {snapshot,stageRestore,applyPending}=require('./recovery');
 const HOME='https://chatgpt.com/';
 const TOP_HEIGHT=120,IDLE_MS=24*60*60*1000,MAX_LIVE=8;
-let win,store,activeId=null,sidebarWidth=330,live=new Map(),loading=new Map(),stateTimer=null;
+let win,store,activeId=null,sidebarWidth=330,live=new Map(),loading=new Map(),stateTimer=null,recoveryPassword=null,recoveryDir=null,recoveryTimer=null,recoveryBusy=false,lastBackup=null;
 function safeUrl(value){try{const u=new URL(value);return ['https:','http:'].includes(u.protocol)?u.href:HOME;}catch{return HOME;}}
 function wire(t){const view=new WebContentsView({webPreferences:{partition:'persist:hexora-chatgpt',sandbox:true,contextIsolation:true,nodeIntegration:false,webSecurity:true,javascript:true}});const wc=view.webContents;
  wc.setAudioMuted(!!t.muted);
@@ -39,11 +41,45 @@ function closeTab(id){id=Number(id);if(!store.get(id))return;discard(id);store.d
 function sweep(){const now=Date.now();for(const id of Array.from(live.keys())){if(id===activeId)continue;const t=store.get(id),v=live.get(id);if(!t){discard(id);continue;}if(t.pinned||now-t.last_active<IDLE_MS||v.webContents.isLoading()||v.webContents.isCurrentlyAudible?.())continue;discard(id);}emit();}
 function sendPage(payload){const w=typeof payload?.workspace==='string'?payload.workspace:'web';const offset=Number.isSafeInteger(payload?.offset)?payload.offset:0;return state(w,offset);}
 app.whenReady().then(()=>{
- store=new TabStore(app.getPath('userData'));
+ const dataDir=app.getPath('userData');
+ try{applyPending(dataDir);}catch(err){dialog.showErrorBox('Hexora restore could not be applied',err.message);}
+ try{const prefs=JSON.parse(fs.readFileSync(path.join(dataDir,'hexora-recovery-config.json'),'utf8'));if(prefs.directory)recoveryDir=prefs.directory;}catch{}
+ store=new TabStore(dataDir);
  store.importLegacy(path.join(app.getPath('userData'),'hexora-tabs.json'));
  win=new BrowserWindow({width:1360,height:900,minWidth:700,minHeight:400,title:'Hexora Workspace',autoHideMenuBar:true,backgroundColor:'#111215',webPreferences:{preload:path.join(__dirname,'preload.js'),contextIsolation:true,sandbox:true,nodeIntegration:false}});
  win.loadFile('toolbar.html');win.on('resize',bounds);win.webContents.on('did-finish-load',emit);
  const last=Number(store.getMeta('activeId'));if(!last||!activate(last)){const backup=store.lastActiveId();if(!backup||!activate(backup))newTab();}
+ ipcMain.handle('recovery:status',()=>({directory:recoveryDir,enabled:!!(recoveryDir&&recoveryPassword),lastBackup}));
+ ipcMain.handle('recovery:configure',async(_e,password)=>{
+  if(typeof password!=='string'||password.length<12)throw new Error('Enter a recovery password of at least 12 characters.');
+  const selection=await dialog.showOpenDialog(win,{title:'Choose an external drive or cloud-synced backup folder',properties:['openDirectory','createDirectory']});
+  if(selection.canceled||!selection.filePaths[0])return{cancelled:true};
+  recoveryDir=selection.filePaths[0];recoveryPassword=password;
+  fs.writeFileSync(path.join(dataDir,'hexora-recovery-config.json'),JSON.stringify({directory:recoveryDir}));
+  return{directory:recoveryDir};
+ });
+ async function backupNow(){
+  if(!recoveryDir||!recoveryPassword)throw new Error('Choose a backup folder and unlock recovery first.');
+  if(recoveryBusy)throw new Error('A recovery backup is already running.');
+  recoveryBusy=true;
+  try{
+   // Synchronous SQLite snapshot is fast for small workspaces; large databases may pause the UI.
+   const result=snapshot(store,recoveryDir,recoveryPassword,{});
+   lastBackup={time:new Date().toISOString(),...result};
+   return lastBackup;
+  }finally{recoveryBusy=false;}
+ }
+ ipcMain.handle('recovery:backup',()=>backupNow());
+ ipcMain.handle('recovery:unlock',(_e,password)=>{if(!recoveryDir)throw new Error('Choose a backup folder first.');if(typeof password!=='string'||password.length<12)throw new Error('Recovery password must be at least 12 characters.');recoveryPassword=password;return{enabled:true,directory:recoveryDir};});
+ ipcMain.handle('recovery:restore',async(_e,password)=>{
+  const file=await dialog.showOpenDialog(win,{title:'Select an encrypted Hexora backup',properties:['openFile'],filters:[{name:'Hexora encrypted backups',extensions:['hxb']}]});
+  if(file.canceled||!file.filePaths[0])return{cancelled:true};
+  const result=stageRestore(file.filePaths[0],password,dataDir);
+  const confirmation=await dialog.showMessageBox(win,{type:'warning',buttons:['Cancel','Restart and restore'],defaultId:0,cancelId:0,title:'Replace workspace data?',message:'Restore '+result.tabs+' saved tabs?',detail:'The current database will be archived locally. The restored backup will replace it on restart. Browser login cookies are not included.'});
+  if(confirmation.response!==1){fs.rmSync(path.join(dataDir,'hexora-restore-pending.sqlite'),{force:true});fs.rmSync(path.join(dataDir,'hexora-restore-settings.json'),{force:true});return{cancelled:true};}
+  app.relaunch();app.quit();return{restarting:true};
+ });
+ recoveryTimer=setInterval(()=>{if(recoveryPassword&&recoveryDir&&!recoveryBusy){try{backupNow();}catch(err){console.error('Hexora scheduled backup failed:',err);}}},60*60*1000);
  ipcMain.handle('tabs:page',(_e,arg)=>sendPage(arg));
  ipcMain.handle('tabs:search',(_e,term)=>store.search(term,50).map(pageRow));
  ipcMain.handle('tabs:action',(_e,action,arg)=>{
@@ -64,6 +100,6 @@ app.whenReady().then(()=>{
   emit();return true;
  });
  setInterval(sweep,60*1000).unref();
- win.on('closed',()=>{clearTimeout(stateTimer);win=null;for(const id of Array.from(live.keys()))discard(id);store.close();});
+ win.on('closed',()=>{clearInterval(recoveryTimer);recoveryPassword=null;clearTimeout(stateTimer);win=null;for(const id of Array.from(live.keys()))discard(id);store.close();});
 });
 app.on('window-all-closed',()=>{if(process.platform!=='darwin')app.quit();});
