@@ -3,7 +3,7 @@ const {app,BrowserWindow,WebContentsView,ipcMain,shell,dialog}=require('electron
 const path=require('node:path');
 const {TabStore}=require('./tab-store');
 const fs=require('node:fs');
-const {snapshot,stageRestore,applyPending}=require('./recovery');
+const {snapshot,stageRestore,applyPending,verifyBackup}=require('./recovery');
 // Prevent two Hexora instances from accessing the same Chromium profile.
 const hasSingleInstanceLock=app.requestSingleInstanceLock();
 if(!hasSingleInstanceLock){
@@ -92,6 +92,11 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
  }
  ipcMain.handle('recovery:backup',()=>backupNow());
  ipcMain.handle('recovery:unlock',(_e,password)=>{if(!recoveryDir)throw new Error('Choose a backup folder first.');if(typeof password!=='string'||password.length<12)throw new Error('Recovery password must be at least 12 characters.');recoveryPassword=password;return{enabled:true,directory:recoveryDir};});
+ ipcMain.handle('recovery:verify',async(_e,password)=>{
+  const selection=await dialog.showOpenDialog(recoveryWindow||win,{title:'Verify encrypted Hexora backup',properties:['openFile'],filters:[{name:'Hexora encrypted backups',extensions:['hxb']}]});
+  if(selection.canceled||!selection.filePaths[0])return{cancelled:true};
+  return verifyBackup(selection.filePaths[0],password);
+ });
  ipcMain.handle('recovery:restore',async(_e,password)=>{
   const file=await dialog.showOpenDialog(win,{title:'Select an encrypted Hexora backup',properties:['openFile'],filters:[{name:'Hexora encrypted backups',extensions:['hxb']}]});
   if(file.canceled||!file.filePaths[0])return{cancelled:true};
