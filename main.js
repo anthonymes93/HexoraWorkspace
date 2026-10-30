@@ -89,8 +89,8 @@ function detachTab(id){
  detached.set(id,popup);
  setDetachedSaved(id,true);
  popup.contentView.addChildView(view);
- const layout=()=>{if(!popup.isDestroyed()){const [cw,ch]=popup.getContentSize();view.setBounds({x:0,y:DETACHED_HEADER,width:cw,height:Math.max(0,ch-DETACHED_HEADER)});}};
- const saveWindow=()=>{if(!popup.isDestroyed())store.setMeta('windowBounds:'+popup.hexoraTabId,JSON.stringify(popup.getBounds()));};
+ const layout=()=>{if(!popup.isDestroyed()){const [cw,ch]=popup.getContentSize();const current=live.get(popup.hexoraTabId);if(current)current.setBounds({x:0,y:DETACHED_HEADER,width:cw,height:Math.max(0,ch-DETACHED_HEADER)});}};
+ const saveWindow=()=>{if(!popup.isDestroyed()&&Number.isSafeInteger(popup.hexoraTabId))store.setMeta('windowBounds:'+popup.hexoraTabId,JSON.stringify(popup.getBounds()));};
  popup.on('resize',()=>{layout();saveWindow();});
  popup.on('move',saveWindow);
  popup.on('close',()=>{
