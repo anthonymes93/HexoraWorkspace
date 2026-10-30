@@ -6,6 +6,7 @@ const fs=require('node:fs');
 const {snapshot,stageRestore,applyPending}=require('./recovery');
 const HOME='https://chatgpt.com/';
 const TOP_HEIGHT=120,IDLE_MS=24*60*60*1000,MAX_LIVE=8;
+let recoveryWindow=null;
 let win,store,activeId=null,sidebarWidth=330,live=new Map(),loading=new Map(),stateTimer=null,modalVisible=false,recoveryPassword=null,recoveryDir=null,recoveryTimer=null,recoveryBusy=false,lastBackup=null;
 function safeUrl(value){try{const u=new URL(value);return ['https:','http:'].includes(u.protocol)?u.href:HOME;}catch{return HOME;}}
 function wire(t){const view=new WebContentsView({webPreferences:{partition:'persist:hexora-chatgpt',sandbox:true,contextIsolation:true,nodeIntegration:false,webSecurity:true,javascript:true}});const wc=view.webContents;
@@ -39,6 +40,12 @@ function evict(){if(live.size<=MAX_LIVE)return;const candidates=Array.from(live.
 function newTab(workspace='web',url=HOME){const id=store.nextId(),t={id,title:'New tab',url:safeUrl(url),workspace:typeof workspace==='string'?workspace:'web',pinned:false,muted:false,lastActive:Date.now(),ordinal:id};store.save(t);activate(id);return id;}
 function closeTab(id){id=Number(id);if(!store.get(id))return;discard(id);store.delete(id);if(activeId===id){activeId=null;const target=store.lastActiveId();if(target)activate(target);else newTab();}emit();}
 function sweep(){const now=Date.now();for(const id of Array.from(live.keys())){if(id===activeId)continue;const t=store.get(id),v=live.get(id);if(!t){discard(id);continue;}if(t.pinned||now-t.last_active<IDLE_MS||v.webContents.isLoading()||v.webContents.isCurrentlyAudible?.())continue;discard(id);}emit();}
+function openRecoveryWindow(){
+ if(recoveryWindow&&!recoveryWindow.isDestroyed()){recoveryWindow.focus();return;}
+ recoveryWindow=new BrowserWindow({parent:win,modal:false,width:590,height:600,minWidth:480,minHeight:500,title:'Hexora Recovery',backgroundColor:'#17181c',autoHideMenuBar:true,webPreferences:{preload:path.join(__dirname,'preload.js'),contextIsolation:true,sandbox:true,nodeIntegration:false}});
+ recoveryWindow.loadFile('recovery-window.html');
+ recoveryWindow.on('closed',()=>{recoveryWindow=null;});
+}
 function sendPage(payload){const w=typeof payload?.workspace==='string'?payload.workspace:'web';const offset=Number.isSafeInteger(payload?.offset)?payload.offset:0;return state(w,offset);}
 app.whenReady().then(()=>{
  const dataDir=app.getPath('userData');
@@ -92,6 +99,7 @@ app.whenReady().then(()=>{
   else if(action==='forward'&&wc?.navigationHistory.canGoForward())wc.navigationHistory.goForward();
   else if(action==='open-external')shell.openExternal(current?.url||HOME);
   else if(action==='sidebar'){sidebarWidth=arg?64:330;bounds();}
+  else if(action==='recovery-window'){openRecoveryWindow();}
   else if(action==='modal'){
    modalVisible=!!arg;
    const view=live.get(activeId);
