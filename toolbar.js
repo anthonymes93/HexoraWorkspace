@@ -24,27 +24,27 @@ function render() {
    const el=document.createElement('button');el.className='chat-row'+(item.active?' active':'');
    const symbol=document.createElement('span');symbol.className='symbol';symbol.textContent='▤';
    const label=document.createElement('span');label.className='label';label.textContent=item.title||'ChatGPT';
-   el.append(symbol,label);el.onclick=()=>action('activate',item.id);conversations.append(el);
+   const pin=document.createElement('span');pin.className='quick-pin';pin.title=item.pinned?'Unpin tab':'Pin tab';pin.textContent=item.pinned?'◆':'◇';pin.onclick=e=>{e.stopPropagation();action('pin',item.id);};const mute=document.createElement('span');mute.className='quick-pin';mute.title=item.muted?'Unmute tab':'Mute tab';mute.textContent=item.muted?'◉':'♫';mute.onclick=e=>{e.stopPropagation();action('mute',item.id);};el.append(symbol,label,mute,pin);el.onclick=()=>action('activate',item.id);conversations.append(el);
  }
  const tabs=$('tabs');tabs.replaceChildren();
  for(const item of activeTabs) {
    const el=document.createElement('button');el.className='tab'+(item.active?' active':'');
    const name=document.createElement('span');name.className='name';name.textContent=(item.loading?'◌  ':'')+(item.title||'ChatGPT');
-   el.title=item.url||'Loading';const close=document.createElement('span');close.className='close';close.textContent='×';close.title='Close tab';
+   el.title=(item.url||'Loading')+(item.suspended?' · suspended':'');const close=document.createElement('span');close.className='close';close.textContent='×';close.title='Close tab';
    close.onclick=e=>{e.stopPropagation();action('close',item.id);};el.onclick=()=>action('activate',item.id);
-   el.append(name,close);tabs.append(el);
+   if(item.pinned){const mark=document.createElement('span');mark.title='Pinned';mark.textContent='◆';el.append(mark);} if(item.suspended){const mark=document.createElement('span');mark.title='Suspended';mark.textContent='☾';el.append(mark);} el.append(name,close);tabs.append(el);
  }
 }
 window.hexora.onState(list=>{
  activeTabs=list;
  const ids=new Set(list.map(t=>t.id));
  for(const id of Object.keys(tabWorkspace)) if(!ids.has(Number(id))) delete tabWorkspace[id];
- for(const item of list) if(!tabWorkspace[item.id]) tabWorkspace[item.id]=activeWorkspace;
+ for(const item of list) tabWorkspace[item.id]=item.workspace||tabWorkspace[item.id]||activeWorkspace;
  const active=list.find(t=>t.active);
  if(active && tabWorkspace[active.id] !== activeWorkspace) activeWorkspace=tabWorkspace[active.id];
  render();
 });
-for(const id of ['new','new-rail','new-sidebar','add-tab']) $(id).onclick=()=>action('new');
+for(const id of ['new','new-rail','new-sidebar','add-tab']) $(id).onclick=()=>action('new',activeWorkspace);
 for(const id of ['back','forward','reload']) $(id).onclick=()=>action(id);
 for(const id of ['external','settings-rail']) $(id).onclick=()=>action('open-external');
 $('toggle-sidebar').onclick=()=>{sidebarOpen=!sidebarOpen;updateSidebar();};
