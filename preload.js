@@ -4,5 +4,7 @@ contextBridge.exposeInMainWorld('hexora',{
  page:(workspace,offset=0)=>ipcRenderer.invoke('tabs:page',{workspace,offset}),
  search:term=>ipcRenderer.invoke('tabs:search',term),
  recovery:{status:()=>ipcRenderer.invoke('recovery:status'),configure:password=>ipcRenderer.invoke('recovery:configure',password),unlock:password=>ipcRenderer.invoke('recovery:unlock',password),backup:()=>ipcRenderer.invoke('recovery:backup'),restore:password=>ipcRenderer.invoke('recovery:restore',password),verify:password=>ipcRenderer.invoke('recovery:verify',password)},
+ onDetachedOwner:callback=>ipcRenderer.on('detached:owner',(_event,data)=>callback(data)),
+ onDetachedTabs:callback=>ipcRenderer.on('detached:tabs',(_event,data)=>callback(data)),
  onState:callback=>ipcRenderer.on('tabs:changed',()=>callback())
 });
