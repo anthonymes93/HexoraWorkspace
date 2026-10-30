@@ -92,16 +92,17 @@ tabStrip.addEventListener('dragover',e=>{e.preventDefault();e.dataTransfer.dropE
 tabStrip.addEventListener('drop',e=>{e.preventDefault();const match=/^hexora-tab:(\d+)$/.exec(e.dataTransfer.getData('text/plain')||'');if(match)action('dock',Number(match[1]));});
 
 // Right-click any tab to turn it into a website, or open a website in a separate tab.
-function hideTabMenu(){ $('tab-context-menu').classList.add('hidden'); contextTab=null; }
+function hideTabMenu(restore=true){ const wasOpen=!$('tab-context-menu').classList.contains('hidden');$('tab-context-menu').classList.add('hidden');contextTab=null;if(wasOpen&&restore&&!websiteTarget)action('modal',false); }
 function showTabMenu(x,y,item){
  contextTab=item;
+ action('modal',true);
  const menu=$('tab-context-menu');menu.classList.remove('hidden');
  menu.style.left=Math.max(8,Math.min(x,innerWidth-menu.offsetWidth-8))+'px';
  menu.style.top=Math.max(8,Math.min(y,innerHeight-menu.offsetHeight-8))+'px';
 }
 function showWebsiteModal(newTab){
  if(!contextTab)return;
- websiteTarget={id:contextTab.id,newTab,workspace:activeWorkspace};hideTabMenu();
+ websiteTarget={id:contextTab.id,newTab,workspace:activeWorkspace};hideTabMenu(false);
  $('website-url').value='';$('website-title').value='';$('website-error').textContent='';
  $('website-dialog-title').textContent=newTab?'Open website in new tab':'Open website in this tab';
  $('website-overlay').classList.remove('hidden');action('modal',true);$('website-url').focus();
