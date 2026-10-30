@@ -2,7 +2,8 @@ const { app, BrowserWindow, WebContentsView, ipcMain, shell } = require('electro
 const path = require('node:path');
 
 const HOME = 'https://chatgpt.com/';
-const BAR_HEIGHT = 64;
+const TOP_HEIGHT = 120;
+let sidebarWidth = 330;
 let win;
 let tabs = [];
 let activeId = null;
@@ -18,7 +19,7 @@ function resizeActive() {
   if (!win || win.isDestroyed()) return;
   const [width, height] = win.getContentSize();
   const tab = tabs.find(t => t.id === activeId);
-  if (tab) tab.view.setBounds({ x: 0, y: BAR_HEIGHT, width, height: Math.max(0, height - BAR_HEIGHT) });
+  if (tab) tab.view.setBounds({ x: sidebarWidth, y: TOP_HEIGHT, width: Math.max(0, width - sidebarWidth), height: Math.max(0, height - TOP_HEIGHT) });
 }
 function activate(id) {
   const found = tabs.find(t => t.id === id);
@@ -98,9 +99,9 @@ function currentWC() { return tabs.find(t => t.id === activeId)?.view.webContent
 app.whenReady().then(() => {
   win = new BrowserWindow({
     width: 1360, height: 900, minWidth: 700, minHeight: 400,
-    title: 'Hexora · ChatGPT Tabs Test',
+    title: 'Hexora Workspace',
     autoHideMenuBar: true,
-    backgroundColor: '#111318',
+    backgroundColor: '#111215',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -117,6 +118,7 @@ app.whenReady().then(() => {
     if (action === 'new') createTab();
     else if (action === 'activate') activate(id);
     else if (action === 'close') closeTab(id);
+    else if (action === 'sidebar') { sidebarWidth = id ? 64 : 330; resizeActive(); }
     else if (action === 'reload') currentWC()?.reload();
     else if (action === 'back' && currentWC()?.navigationHistory.canGoBack()) currentWC().navigationHistory.goBack();
     else if (action === 'forward' && currentWC()?.navigationHistory.canGoForward()) currentWC().navigationHistory.goForward();
@@ -125,4 +127,4 @@ app.whenReady().then(() => {
   });
 });
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
-app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createTab(); });
+app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) app.quit(); });

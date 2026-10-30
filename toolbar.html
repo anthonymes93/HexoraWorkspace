@@ -1,4 +1,24 @@
 <!doctype html>
-<html lang="en"><head><meta charset="UTF-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'">
-<title>Hexora · Tabs Test</title><link rel="stylesheet" href="style.css"></head>
-<body><div class="chrome"><div class="brand"><span class="mark">✦</span> HEXORA <span class="edition">TEST</span></div><div id="tabs" class="tabs"></div><button id="new" title="New ChatGPT tab">＋</button><div class="nav"><button id="back" title="Back">‹</button><button id="forward" title="Forward">›</button><button id="reload" title="Reload">↻</button><button id="external" title="Open this tab in default browser">↗</button></div></div><script src="toolbar.js"></script></body></html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'"><title>Hexora Workspace</title><link rel="stylesheet" href="style.css"></head>
+<body>
+<div class="rail">
+  <div class="logo" title="Hexora">✦</div>
+  <button id="toggle-sidebar" class="railbtn selected" title="Toggle workspaces">▦</button>
+  <button id="search-rail" class="railbtn" title="Search open tabs">⌕</button>
+  <button id="new-rail" class="railbtn" title="New ChatGPT tab">＋</button>
+  <button id="split-rail" class="railbtn" title="Split view — coming soon" disabled>◫</button>
+  <button id="settings-rail" class="railbtn bottom" title="Open ChatGPT in browser">↗</button>
+</div>
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-title"><strong>Hexora <em>Workspace</em></strong><button id="add-workspace" title="New workspace">＋</button></div>
+  <div class="eyebrow">Workspaces</div><div id="workspaces" class="workspaces"></div>
+  <div class="conversation-head"><span class="eyebrow">Open conversations</span><button id="new-sidebar" title="New tab">＋</button></div>
+  <div id="conversations" class="conversation-list"></div>
+  <div class="profile"><span class="avatar">H</span><div><strong>ChatGPT</strong><small>Live account · Electron</small></div></div>
+</aside>
+<main class="top-main">
+  <header class="top"><div><h1 id="current-workspace">◈ Web Development</h1><div class="subtitle">Your conversations, your workspace</div></div><div class="actions"><button id="search" class="pill">⌕ <span>Search</span></button><button id="split" class="pill" title="Coming soon" disabled>◫ <span>Split view</span></button><button id="new" class="pill primary">＋ <span>New chat</span></button></div></header>
+  <div class="tabsbar"><div id="tabs" class="tabs"></div><button id="add-tab" class="tab-plus" title="New tab">＋</button><div class="nav"><button id="back" title="Back">‹</button><button id="forward" title="Forward">›</button><button id="reload" title="Reload">↻</button><button id="external" title="Open in browser">↗</button></div></div>
+</main>
+<div id="search-overlay" class="overlay hidden"><div class="dialog"><div class="dialog-header"><b>Search open conversations</b><button id="search-close">×</button></div><input id="search-input" placeholder="Find a tab by title..."/><div id="search-results"></div><p class="hint">Searches currently open tabs, not your full ChatGPT history.</p></div></div>
+<script src="toolbar.js"></script></body></html>
