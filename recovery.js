@@ -44,6 +44,34 @@ function snapshot(store,directory,password,settings){
   return{file:output,tabs:count,bytes:payload.length};
  }finally{fs.rmSync(tmp,{force:true});}
 }
+
+function verifyBackup(file,password){
+ if(typeof password!=='string'||!password)throw new Error('Recovery password required.');
+ const info=fs.statSync(file);
+ if(!info.isFile()||info.size>MAX_BACKUP+65536)throw new Error('Backup is too large.');
+ const data=decrypt(fs.readFileSync(file),password);
+ if(data.length<4)throw new Error('Invalid backup payload.');
+ const size=data.readUInt32BE(0);
+ if(size>2*1024*1024||size+4>=data.length)throw new Error('Invalid backup settings.');
+ let settings;
+ try{settings=JSON.parse(data.subarray(4,4+size).toString('utf8'));}
+ catch{throw new Error('Backup settings are invalid.');}
+ const sqlite=data.subarray(4+size);
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'hexora-verify-'));
+ const temp=path.join(dir,'verified.sqlite');
+ try{
+  fs.writeFileSync(temp,sqlite,{flag:'wx'});
+  const db=new DatabaseSync(temp,{readOnly:true});
+  let count;
+  try{
+   if(db.prepare('PRAGMA integrity_check').get().integrity_check!=='ok')throw new Error('Backup database integrity check failed.');
+   if(!db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='tabs'").get())throw new Error('Not a Hexora tab database.');
+   count=db.prepare('SELECT COUNT(*) AS count FROM tabs').get().count;
+  }finally{db.close();}
+  return{valid:true,tabs:count,bytes:info.size,settingsPresent:!!(settings&&Object.keys(settings).length)};
+ }finally{fs.rmSync(dir,{recursive:true,force:true});}
+}
+
 function stageRestore(file,password,dataDir){
  if(typeof password!=='string'||!password)throw new Error('Recovery password required.');
  const info=fs.statSync(file);if(!info.isFile()||info.size>MAX_BACKUP+65536)throw new Error('Backup is too large.');
@@ -65,4 +93,4 @@ function applyPending(dataDir){
  // A separate settings file is left for UI to import once.
  return true;
 }
-module.exports={snapshot,stageRestore,applyPending};
+module.exports={snapshot,stageRestore,applyPending,verifyBackup};
