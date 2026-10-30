@@ -1,9 +1,14 @@
 {
-  "name": "hexora-chatgpt-tabs-poc",
-  "version": "0.1.0",
+  "name": "hexora-workspace",
+  "version": "0.4.0",
   "private": true,
-  "description": "Minimal tabbed ChatGPT browser proof of concept",
+  "description": "Hexora Workspace with SQLite-backed on-demand browser tabs",
   "main": "main.js",
-  "scripts": { "start": "electron ." },
-  "devDependencies": { "electron": "^38.0.0" }
+  "scripts": {
+    "start": "electron .",
+    "benchmark:tabs": "node scripts/benchmark-tabs.cjs"
+  },
+  "devDependencies": {
+    "electron": "^38.0.0"
+  }
 }
