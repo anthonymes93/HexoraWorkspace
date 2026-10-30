@@ -19,3 +19,5 @@
 #collapse-sidebar:hover{color:#fff;background:#34303e}
 
 .tab-menu-separator{height:1px;background:#42414a;margin:5px 6px}
+
+.tab-menu-heading{font-size:11px;color:#a7a0b6;padding:8px 12px 3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.tab-context-menu button:disabled{opacity:.4;cursor:not-allowed}
