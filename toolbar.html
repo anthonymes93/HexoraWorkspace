@@ -34,4 +34,20 @@
  <p class="hint">Hourly backups run only while Hexora is open and recovery is unlocked. Confirm files really sync off this computer.</p>
  </div></div>
 <div id="search-overlay" class="overlay hidden"><div class="dialog"><div class="dialog-header"><b>Search open conversations</b><button id="search-close">×</button></div><input id="search-input" placeholder="Find a tab by title..."/><div id="search-results"></div><p class="hint">Searches currently open tabs, not your full ChatGPT history.</p></div></div>
+<div id="tab-context-menu" class="tab-context-menu hidden" role="menu" aria-label="Tab actions">
+ <button id="tab-menu-replace" role="menuitem">◈ &nbsp;Open website in this tab…</button>
+ <button id="tab-menu-new" role="menuitem">＋ &nbsp;Open website in new tab…</button>
+</div>
+<div id="website-overlay" class="overlay hidden"><div class="dialog">
+ <div class="dialog-header"><b id="website-dialog-title">Open website in this tab</b><button id="website-close" aria-label="Close">×</button></div>
+ <p class="hint">Enter a URL to browse inside Hexora Workspace.</p>
+ <form id="website-form">
+  <label for="website-url">Website address</label>
+  <input id="website-url" type="text" placeholder="https://mail.proton.me" autocomplete="url" required maxlength="2048"/>
+  <label for="website-title">Tab name (optional)</label>
+  <input id="website-title" type="text" placeholder="Proton Mail" maxlength="100"/>
+  <p id="website-error" class="website-error" role="alert"></p>
+  <div class="website-actions"><button id="website-cancel" type="button" class="pill">Cancel</button><button type="submit" class="pill primary">Open website</button></div>
+ </form>
+ </div></div>
 <script src="toolbar.js"></script></body></html>
