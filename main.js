@@ -16,6 +16,7 @@ if(!hasSingleInstanceLock){
  });
 }
 const HOME='https://chatgpt.com/';
+const DETACHED_HEADER=44;
 const TOP_HEIGHT=120,IDLE_MS=24*60*60*1000,MAX_LIVE=8;
 let recoveryWindow=null;
 const detached=new Map();
@@ -79,23 +80,26 @@ function detachTab(id){
  const h=Math.max(400,Math.min(1100,valid?rectangle.height:800));
  const x=valid?Math.max(area.x,Math.min(rectangle.x,area.x+area.width-200)):area.x+60;
  const y=valid?Math.max(area.y,Math.min(rectangle.y,area.y+area.height-100)):area.y+60;
- const popup=new BrowserWindow({x,y,width:w,height:h,minWidth:400,minHeight:300,title:'Hexora · '+(row.title||'ChatGPT'),backgroundColor:'#111215',autoHideMenuBar:true});
+ const popup=new BrowserWindow({x,y,width:w,height:h,minWidth:400,minHeight:300,title:'Hexora · '+(row.title||'ChatGPT'),backgroundColor:'#111215',autoHideMenuBar:true,webPreferences:{preload:path.join(__dirname,'preload.js'),contextIsolation:true,sandbox:true,nodeIntegration:false}});
+ popup.hexoraTabId=id;
+ popup.loadFile('detached.html',{query:{tab:String(id)}});
+ popup.webContents.on('did-finish-load',()=>popup.webContents.send('detached:owner',{id:popup.hexoraTabId,title:store.get(popup.hexoraTabId)?.title||'ChatGPT'}));
  detached.set(id,popup);
  setDetachedSaved(id,true);
  popup.contentView.addChildView(view);
- const layout=()=>{if(!popup.isDestroyed()){const [cw,ch]=popup.getContentSize();view.setBounds({x:0,y:0,width:cw,height:ch});}};
- const saveWindow=()=>{if(!popup.isDestroyed())store.setMeta('windowBounds:'+id,JSON.stringify(popup.getBounds()));};
+ const layout=()=>{if(!popup.isDestroyed()){const [cw,ch]=popup.getContentSize();view.setBounds({x:0,y:DETACHED_HEADER,width:cw,height:Math.max(0,ch-DETACHED_HEADER)});}};
+ const saveWindow=()=>{if(!popup.isDestroyed())store.setMeta('windowBounds:'+popup.hexoraTabId,JSON.stringify(popup.getBounds()));};
  popup.on('resize',()=>{layout();saveWindow();});
  popup.on('move',saveWindow);
  popup.on('close',()=>{
   saveWindow();
-  popup.contentView.removeChildView(view);
+  const current=live.get(popup.hexoraTabId);if(current)popup.contentView.removeChildView(current);
  });
  popup.on('closed',()=>{
-  detached.delete(id);
-  if(!quitting)setDetachedSaved(id,false);
-  if(!quitting&&win&&!win.isDestroyed()&&store.get(id)){
-   if(activeId===id){win.contentView.addChildView(view);bounds();win.focus();}
+  const currentId=popup.hexoraTabId;detached.delete(currentId);
+  if(!quitting)setDetachedSaved(currentId,false);
+  if(!quitting&&win&&!win.isDestroyed()&&store.get(currentId)){
+   if(activeId===currentId){const current=live.get(currentId);if(current)win.contentView.addChildView(current);bounds();win.focus();}
    emit();
   }
  });
@@ -109,6 +113,49 @@ function detachTab(id){
   else newTab(row.workspace);
  }
  popup.focus();emit();return true;
+}
+
+function dockTab(id){
+ id=Number(id);const popup=detached.get(id);if(!popup||popup.isDestroyed())return false;
+ const view=live.get(id);if(view)popup.contentView.removeChildView(view);
+ popup.close();
+ activate(id);return true;
+}
+function swapDetached(source,target){
+ source=Number(source);target=Number(target);
+ if(!Number.isSafeInteger(source)||!Number.isSafeInteger(target)||source===target||!store.get(source)||!store.get(target))return false;
+ const dest=detached.get(target);if(!dest||dest.isDestroyed())return false;
+ const other=detached.get(source);
+ const destView=live.get(target);if(!destView)return false;
+ let sourceView=live.get(source);
+ if(!sourceView){sourceView=wire(toModel(store.get(source)));live.set(source,sourceView);}
+ dest.contentView.removeChildView(destView);
+ if(other&&!other.isDestroyed()){
+  other.contentView.removeChildView(sourceView);
+  other.contentView.addChildView(destView);
+  other.hexoraTabId=target;
+  detached.set(target,other);
+  other.webContents.send('detached:owner',{id:target,title:store.get(target).title});
+  other.setTitle('Hexora · '+store.get(target).title);
+  const [ow,oh]=other.getContentSize();destView.setBounds({x:0,y:DETACHED_HEADER,width:ow,height:Math.max(0,oh-DETACHED_HEADER)});
+ }else{
+  detached.delete(target);setDetachedSaved(target,false);
+ }
+ dest.contentView.addChildView(sourceView);
+ dest.hexoraTabId=source;
+ detached.set(source,dest);setDetachedSaved(source,true);
+ dest.webContents.send('detached:owner',{id:source,title:store.get(source).title});
+ dest.setTitle('Hexora · '+store.get(source).title);
+ const [dw,dh]=dest.getContentSize();sourceView.setBounds({x:0,y:DETACHED_HEADER,width:dw,height:Math.max(0,dh-DETACHED_HEADER)});
+ if(!other||other.isDestroyed()){
+  // The replaced tab returns to the main workspace; avoid destroying its live browser view.
+  if(activeId===source){activeId=null;const candidate=store.page(store.get(source).workspace,0,50).find(r=>r.id!==source&&!detached.has(r.id));if(candidate)activate(candidate.id);else newTab(store.get(source).workspace);}
+  activate(target);
+ }else{
+  setDetachedSaved(target,true);
+  if(activeId===source){activeId=null;const candidate=store.page('web',0,50).find(r=>!detached.has(r.id));if(candidate)activate(candidate.id);else newTab();}
+ }
+ emit();return true;
 }
 function openRecoveryWindow(){
  if(recoveryWindow&&!recoveryWindow.isDestroyed()){recoveryWindow.focus();return;}
@@ -186,6 +233,9 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
   else if(action==='sidebar'){sidebarWidth=arg?64:330;bounds();}
   else if(action==='recovery-window'){openRecoveryWindow();}
   else if(action==='detach'){detachTab(arg||activeId);}
+  else if(action==='dock'){dockTab(arg);}
+  else if(action==='swap-detached'){swapDetached(arg?.source,arg?.target);}
+  else if(action==='detached-info'){return {title:store.get(Number(arg))?.title||'ChatGPT'};}
   else if(action==='modal'){
    modalVisible=!!arg;
    const view=live.get(activeId);
