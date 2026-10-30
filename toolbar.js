@@ -27,8 +27,9 @@ function render(p){
   const symbol=document.createElement('span');symbol.className='symbol';symbol.textContent=item.suspended?'☾':'▤';
   const name=document.createElement('span');name.className='label';name.textContent=item.title||'New tab';
   const mute=document.createElement('span');mute.className='quick-pin';mute.title=item.muted?'Unmute':'Mute';mute.textContent=item.muted?'◉':'♫';mute.onclick=e=>{e.stopPropagation();action('mute',item.id);};
+  const detach=document.createElement('span');detach.className='quick-pin';detach.title='Detach into another window';detach.textContent='↗';detach.onclick=e=>{e.stopPropagation();action('detach',item.id);};
   const pin=document.createElement('span');pin.className='quick-pin';pin.title=item.pinned?'Unpin':'Pin';pin.textContent=item.pinned?'◆':'◇';pin.onclick=e=>{e.stopPropagation();action('pin',item.id);};
-  el.append(symbol,name,mute,pin);el.onclick=()=>action('activate',item.id);conversations.append(el);
+  el.append(symbol,name,mute,pin,detach);el.onclick=()=>action('activate',item.id);conversations.append(el);
  }
  const nav=document.createElement('div');nav.className='page-controls';
  const prev=document.createElement('button');prev.textContent='‹ Previous';prev.disabled=offset===0;prev.onclick=()=>{offset=Math.max(0,offset-50);refresh();};
@@ -42,7 +43,9 @@ function render(p){
   const el=document.createElement('button');el.className='tab'+(item.id===p.activeId?' active':'');
   const name=document.createElement('span');name.className='name';name.textContent=(item.pinned?'◆ ':'')+(item.title||'ChatGPT');
   const close=document.createElement('span');close.className='close';close.textContent='×';close.onclick=e=>{e.stopPropagation();action('close',item.id);};
-  el.title=item.url;el.onclick=()=>action('activate',item.id);el.append(name,close);tabs.append(el);
+  el.title=item.url;el.onclick=()=>action('activate',item.id);
+  const pop=document.createElement('span');pop.className='close';pop.title='Detach tab into new window';pop.textContent='↗';pop.onclick=e=>{e.stopPropagation();action('detach',item.id);};
+  el.append(name,pop,close);tabs.append(el);
  }
 }
 function updateSidebar(){$('sidebar').classList.toggle('hidden',!sidebarOpen);document.querySelector('.top-main').classList.toggle('expanded',!sidebarOpen);action('sidebar',!sidebarOpen);save();}
