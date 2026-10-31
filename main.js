@@ -65,7 +65,7 @@ function setSidebarWidth(collapsed){
  const start=sidebarWidth,target=collapsed?64:330;
  if(sidebarAnimation){clearInterval(sidebarAnimation);sidebarAnimation=null;}
  if(start===target){bounds();return;}
- const began=performance.now(),duration=720;
+ const began=performance.now(),duration=792;
  // Limit native WebContentsView relayouts to ~30fps; CSS interpolates the chrome.
  const ease=t=>t*t*(3-2*t);
  function frame(){
