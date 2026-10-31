@@ -29,12 +29,18 @@ let mainViewport=null,win,store,activeId=null,sidebarWidth=330,live=new Map(),lo
 const extensionPartition='persist:hexora-chatgpt';
 let extensionRecords=[],extensionLoaded=new Map(),extensionSession=null,extensionConfigFile=null;
 const extensionPopups=new Map();
+const extensionRegistrations=new Map();
 const extensionDiagnostics=new Map();
 function diagnostic(folder,kind,message){
  const records=extensionDiagnostics.get(folder)||[];
  records.push({time:Date.now(),kind,message:String(message).slice(0,500)});
  if(records.length>40)records.shift();
  extensionDiagnostics.set(folder,records);
+}
+function extensionWorkerManifest(folder){
+ try{const manifest=JSON.parse(fs.readFileSync(path.join(folder,'manifest.json'),'utf8'));
+  return {manifestVersion:manifest.manifest_version,script:manifest.background?.service_worker||null,type:manifest.background?.type||'classic'};
+ }catch(err){return {error:err.message};}
 }
 function extensionWorkerStatus(folder){
  const ext=extensionLoaded.get(folder);
@@ -47,7 +53,7 @@ function extensionWorkerStatus(folder){
 function getExtensionDiagnostics(folder){
  const record=extensionRecords.find(x=>x.path===folder);
  if(!record)throw new Error('Extension not found.');
- return {name:record.name,events:extensionDiagnostics.get(folder)||[],popupOpen:!!extensionPopups.get(folder)&&!extensionPopups.get(folder).isDestroyed(),worker:extensionWorkerStatus(folder)};
+ return {name:record.name,events:extensionDiagnostics.get(folder)||[],popupOpen:!!extensionPopups.get(folder)&&!extensionPopups.get(folder).isDestroyed(),worker:extensionWorkerStatus(folder),manifest:extensionWorkerManifest(folder),registrations:extensionRegistrations.get(folder)||[]};
 }
 function extensionPopupPath(folder){
  const manifest=JSON.parse(fs.readFileSync(path.join(folder,'manifest.json'),'utf8'));
@@ -95,6 +101,7 @@ function persistExtensions(){if(extensionConfigFile)fs.writeFileSync(extensionCo
 async function loadUnpacked(record){
  const ext=await extensionSession.extensions.loadExtension(record.path,{allowFileAccess:false});
  extensionLoaded.set(record.path,ext);record.name=ext.name;record.version=ext.version;record.error=null;
+ diagnostic(record.path,'extension','Extension loaded; checking background worker manifest');
  return ext;
 }
 async function restoreExtensions(){
@@ -298,6 +305,16 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
  try{const prefs=JSON.parse(fs.readFileSync(path.join(dataDir,'hexora-recovery-config.json'),'utf8'));if(prefs.directory)recoveryDir=prefs.directory;}catch{}
  extensionConfigFile=path.join(dataDir,'hexora-extensions.json');
  extensionSession=session.fromPartition(extensionPartition);
+ extensionSession.serviceWorkers.on('registration-completed',(_event,details)=>{
+  const scope=String(details.scope||'');
+  for(const [folder,ext] of extensionLoaded){
+   if(scope.includes(ext.id)){
+    const entries=extensionRegistrations.get(folder)||[];
+    entries.push({time:Date.now(),scope});extensionRegistrations.set(folder,entries.slice(-10));
+    diagnostic(folder,'registration','Service worker registered');
+   }
+  }
+ });
  extensionSession.serviceWorkers.on('console-message',(_event,details)=>{
   let info;try{info=extensionSession.serviceWorkers.getInfoFromVersionID(details.versionId);}catch{return;}
   const url=String(info?.scope||info?.scriptUrl||details.sourceUrl||'');
@@ -358,6 +375,20 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
  recoveryTimer=setInterval(()=>{if(recoveryPassword&&recoveryDir&&!recoveryBusy){try{backupNow();}catch(err){console.error('Hexora scheduled backup failed:',err);}}},60*60*1000);
  ipcMain.handle('extensions:list',()=>extensionList());
  ipcMain.handle('extensions:diagnostics',(_e,folder)=>getExtensionDiagnostics(folder));
+ ipcMain.handle('extensions:probe-worker',async(_e,folder)=>{
+  const ext=extensionLoaded.get(folder),record=extensionRecords.find(r=>r.path===folder);
+  if(!record||!ext)throw new Error('Enable extension first.');
+  const manifest=extensionWorkerManifest(folder);
+  if(!manifest.script){diagnostic(folder,'probe','No background service worker declared in manifest');return getExtensionDiagnostics(folder);}
+  const scope='chrome-extension://'+ext.id+'/';
+  diagnostic(folder,'probe','Attempting registered worker startup');
+  try{
+   if(typeof extensionSession.serviceWorkers.startWorkerForScope!=='function')throw new Error('This Electron version has no startWorkerForScope API.');
+   await extensionSession.serviceWorkers.startWorkerForScope(scope);
+   diagnostic(folder,'probe','Worker startup request succeeded');
+  }catch(err){diagnostic(folder,'probe-error',err.message);}
+  return getExtensionDiagnostics(folder);
+ });
  ipcMain.handle('extensions:clear-diagnostics',(_e,folder)=>{extensionDiagnostics.delete(folder);return true;});
  ipcMain.handle('extensions:open',(_e,folder)=>openExtensionPopup(folder));
  ipcMain.handle('extensions:install',async()=>{
