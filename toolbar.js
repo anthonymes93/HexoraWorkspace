@@ -285,6 +285,11 @@ async function renderExtensionDiagnostics(){
   const heading=document.createElement('strong');heading.textContent='Background worker: '+data.worker.status;
   const detail=document.createElement('span');detail.textContent=data.worker.workers.length?data.worker.workers.map(w=>w.scope||w.scriptUrl||w.version).join(', '):(data.worker.error||'No currently running extension worker detected; idle workers may stop normally.');
   status.append(heading,detail);host.append(status);
+  const manifest=document.createElement('div');manifest.className='diagnostic-event';
+  const manifestHeading=document.createElement('strong');manifestHeading.textContent='Manifest worker configuration';
+  const manifestText=document.createElement('span');manifestText.textContent=data.manifest?.script?('MV'+data.manifest.manifestVersion+' · '+data.manifest.script+' · '+data.manifest.type):'No background worker declared';
+  const registration=document.createElement('span');registration.textContent='Registrations observed: '+data.registrations.length;
+  manifest.append(manifestHeading,manifestText,registration);host.append(manifest);
   if(!data.events.length){const p=document.createElement('p');p.className='hint';p.textContent='No diagnostic events yet. Open the extension popup to capture its startup.';host.append(p);}
   for(const event of [...data.events].reverse()){
    const line=document.createElement('div');line.className='diagnostic-event';
@@ -306,5 +311,6 @@ function showExtensionDiagnostics(folder,name){
 }
 $('extension-diagnostics-close').onclick=closeExtensionDiagnostics;
 $('extension-diagnostics-clear').onclick=async()=>{if(diagnosticFolder){await window.hexora.extensions.clearDiagnostics(diagnosticFolder);renderExtensionDiagnostics();}};
+$('extension-diagnostics-probe').onclick=async()=>{if(diagnosticFolder)try{await window.hexora.extensions.probeWorker(diagnosticFolder);renderExtensionDiagnostics();}catch(e){$('extension-diagnostic-events').textContent=e.message;}};
 $('extension-diagnostics-popup').onclick=async()=>{if(diagnosticFolder)try{await window.hexora.extensions.open(diagnosticFolder);renderExtensionDiagnostics();}catch(e){$('extension-diagnostic-events').textContent=e.message;}};
 $('extension-diagnostics-overlay').onclick=e=>{if(e.target===$('extension-diagnostics-overlay'))closeExtensionDiagnostics();};
