@@ -2,6 +2,54 @@ const $=id=>document.getElementById(id);
 const workspaces=[{id:'web',name:'Web Development',emoji:'◈'},{id:'business',name:'Business',emoji:'▤'},{id:'personal',name:'Personal',emoji:'☼'},{id:'ideas',name:'Ideas Lab',emoji:'✦'}];
 let activeWorkspace='web',sidebarOpen=true,offset=0,currentPage=null,refreshing=false,refreshPending=false;
 let contextTab=null,websiteTarget=null,workspaceEditing=null;
+const quickJumpsKey='hexora-quick-jumps';
+let quickJumps=[];
+try{const items=JSON.parse(localStorage.getItem(quickJumpsKey)||'[]');if(Array.isArray(items))quickJumps=items.filter(x=>Number.isSafeInteger(x.id)&&x.id>0).slice(0,20);}catch{}
+function saveQuickJumps(){localStorage.setItem(quickJumpsKey,JSON.stringify(quickJumps));}
+function addQuickJump(tab){
+ if(!tab||!Number.isSafeInteger(tab.id))return;
+ if(quickJumps.some(x=>x.id===tab.id)){alert('This tab is already in Quick Jump.');return;}
+ const workspace=workspaces.find(w=>w.id===tab.workspace);
+ const icon=prompt('Shortcut icon (emoji or symbol):',workspace?.emoji||'✦');
+ if(icon===null)return;
+ quickJumps.push({id:tab.id,icon:icon.trim().slice(0,8)||'✦',title:tab.title||'Tab'});
+ saveQuickJumps();renderQuickJumps();
+}
+async function jumpToTab(id){
+ try{
+  const tab=await window.hexora.lookupTab(id);
+  if(!tab){quickJumps=quickJumps.filter(x=>x.id!==id);saveQuickJumps();renderQuickJumps();alert('That tab was closed, so its shortcut was removed.');return;}
+  activeWorkspace=tab.workspace;offset=0;save();
+  const ok=await action('activate',tab.id);
+  if(ok===false)throw new Error('Tab could not be opened.');
+  refresh();
+ }catch(e){alert('Quick Jump: '+e.message);}
+}
+function renderQuickJumps(){
+ const host=$('quick-jumps');if(!host)return;host.replaceChildren();
+ for(const item of quickJumps){
+  const button=document.createElement('button');button.className='quick-jump'+(currentPage?.activeId===item.id?' current':'');
+  button.textContent=item.icon||'✦';button.title=item.title+' · Click to jump; right-click to edit or remove';
+  button.setAttribute('aria-label','Jump to '+item.title);
+  button.onclick=()=>jumpToTab(item.id);
+  button.oncontextmenu=e=>{
+   e.preventDefault();
+   const value=prompt('Shortcut icon (clear the field to remove this shortcut):',item.icon);
+   if(value===null)return;
+   if(!value.trim())quickJumps=quickJumps.filter(x=>x.id!==item.id);
+   else item.icon=value.trim().slice(0,8);
+   saveQuickJumps();renderQuickJumps();
+  };
+  host.append(button);
+ }
+ const add=document.createElement('button');add.className='quick-jump add';add.textContent='＋';
+ add.title='Pin the active tab to Quick Jump';add.setAttribute('aria-label','Add current tab to Quick Jump');
+ add.onclick=async()=>{
+  const tab=await window.hexora.lookupTab(currentPage?.activeId);
+  if(tab)addQuickJump(tab);else alert('Select a tab to pin first.');
+ };
+ host.append(add);
+}
 try{const s=JSON.parse(localStorage.getItem('hexora-workspace-settings')||'{}');if(s.workspaces?.length)workspaces.splice(0,workspaces.length,...s.workspaces);if(s.selected)activeWorkspace=s.selected;if(s.sidebarOpen===false)sidebarOpen=false;}catch{}
 const save=()=>localStorage.setItem('hexora-workspace-settings',JSON.stringify({workspaces,selected:activeWorkspace,sidebarOpen}));
 if(!workspaces.some(w=>w.id===activeWorkspace))activeWorkspace=workspaces[0].id;
@@ -39,6 +87,8 @@ function render(p){
  const prev=document.createElement('button');prev.textContent='‹ Previous';prev.disabled=offset===0;prev.onclick=()=>{offset=Math.max(0,offset-50);refresh();};
  const next=document.createElement('button');next.textContent='Next ›';next.disabled=p.tabs.length<50;next.onclick=()=>{offset+=50;refresh();};
  const pos=document.createElement('span');pos.textContent=p.tabs.length?(offset+1)+'–'+(offset+p.tabs.length):'No tabs';nav.append(prev,pos,next);conversations.append(nav);
+ let shortcuts=$('quick-jumps');if(!shortcuts){shortcuts=document.createElement('div');shortcuts.id='quick-jumps';shortcuts.className='quick-jumps';conversations.append(shortcuts);}
+ renderQuickJumps();
  const tabs=$('tabs');tabs.replaceChildren();
  // Tab strip is deliberately bounded: the current page plus the active tab.
  const shown=[...p.tabs.slice(0,16)];
@@ -133,6 +183,7 @@ for(const mode of ['wide','thin']){
 }
 $('tab-menu-panel-inherit').onclick=async()=>{if(!contextTab)return;const id=contextTab.id;hideTabMenu();try{await action('panel-tab-inherit',id);refresh();}catch(err){alert(err.message);}};
 $('tab-menu-move').onclick=async()=>{if(!contextTab)return;const id=contextTab.id;hideTabMenu();const list=workspaces.map((w,i)=>(i+1)+': '+w.name).join('\n');const answer=prompt('Move tab to which workspace?\n'+list);if(answer===null)return;const idx=Number(answer)-1;if(!Number.isInteger(idx)||!workspaces[idx])return alert('Choose a workspace number from the list.');try{await action('move-tab',{id,workspace:workspaces[idx].id});if(id===currentPage?.activeId&&workspaces[idx].id!==activeWorkspace){activeWorkspace=workspaces[idx].id;offset=0;save();}refresh();}catch(err){alert(err.message);}};
+$('tab-menu-quick-jump').onclick=()=>{const tab=contextTab;hideTabMenu();if(tab)addQuickJump(tab);};
 $('tab-menu-chrome').onclick=async()=>{
  if(!contextTab)return;
  const id=contextTab.id;hideTabMenu();
