@@ -67,3 +67,5 @@
 
 /* One-click cross-workspace tab shortcuts, directly beneath pagination */
 .quick-jumps{display:flex;flex-wrap:wrap;gap:7px;padding:11px 3px 8px;margin-top:1px;border-top:1px solid #303039}.quick-jump{width:32px;height:32px;flex-shrink:0;border:1px solid #3b3948!important;border-radius:9px!important;background:#24232d!important;display:grid;place-items:center;color:#d6caff!important;font-size:18px;line-height:1}.quick-jump:hover{background:#3d354f!important;border-color:#a991ed!important}.quick-jump.current{border-color:#ac91ff!important;background:#3a304d!important}.quick-jump.add{font-size:23px;color:#9693a4!important;border-style:dashed!important;background:transparent!important}
+
+#quick-jump-form{display:flex;flex-direction:column;gap:9px}#quick-jump-form label{font-size:12px;color:#c9c7d1}#quick-jump-tab{width:100%;border:1px solid #42434d;border-radius:9px;background:#15161b;color:white;padding:12px}
