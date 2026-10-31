@@ -8,6 +8,7 @@
   <button id="new-rail" class="railbtn" title="New ChatGPT tab">＋</button>
   <button id="split-rail" class="railbtn" title="Split view — coming soon" disabled>◫</button>
   <button id="recovery-rail" class="railbtn" title="Encrypted backups">⛨</button>
+  <button id="statistics-rail" class="railbtn" title="Statistics and task manager">▥</button>
   <button id="settings-rail" class="railbtn bottom" title="Open ChatGPT in browser">↗</button>
 </div>
 <aside class="sidebar" id="sidebar">
@@ -68,4 +69,12 @@
  <p id="workspace-error" class="website-error" role="alert"></p>
  <div class="website-actions"><button type="button" id="workspace-delete" class="pill hidden">Delete workspace</button><button type="button" id="workspace-cancel" class="pill">Cancel</button><button type="submit" class="pill primary">Save workspace</button></div></form>
  </div></div>
+<div id="statistics-overlay" class="overlay hidden"><section class="stats-dialog" role="dialog" aria-modal="true" aria-label="Hexora statistics">
+ <div class="dialog-header"><b>Hexora Statistics</b><button id="statistics-close" aria-label="Close statistics">×</button></div>
+ <p class="hint">Live process measurements, updated every 2 seconds while open. Memory is the process working set; a renderer process may be shared by multiple tabs.</p>
+ <div id="statistics-summary" class="stats-summary"></div>
+ <div class="stats-controls"><b>Browser processes</b><button id="statistics-refresh" class="pill">Refresh</button></div>
+ <div class="stats-scroll"><table class="stats-table"><thead><tr><th>Process / tabs</th><th>PID</th><th>CPU</th><th>RAM</th></tr></thead><tbody id="statistics-rows"></tbody></table></div>
+ <p id="statistics-message" class="hint"></p>
+ </section></div>
 <script src="toolbar.js"></script></body></html>
