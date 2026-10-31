@@ -68,7 +68,8 @@ function setSidebarWidth(collapsed){
  // Size the site once at its destination width; during motion only move its native view.
  sidebarStableWidth=target;
  const began=performance.now(),duration=792;
- // Limit native WebContentsView relayouts to ~30fps; CSS interpolates the chrome.
+ // Only the native view's position changes during the transition (not its layout width).
+ // Animate at approximately display refresh rate for smoother text movement.
  const ease=t=>t*t*(3-2*t);
  function frame(){
   const progress=Math.min(1,(performance.now()-began)/duration);
@@ -76,7 +77,7 @@ function setSidebarWidth(collapsed){
   if(next!==sidebarWidth){sidebarWidth=next;bounds();}
   if(progress===1){clearInterval(sidebarAnimation);sidebarAnimation=null;sidebarWidth=target;sidebarStableWidth=null;bounds();}
  }
- sidebarAnimation=setInterval(frame,33);
+ sidebarAnimation=setInterval(frame,16);
  frame();
 }
 
