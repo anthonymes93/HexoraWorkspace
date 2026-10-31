@@ -28,7 +28,31 @@ function setDetachedSaved(id,present){const ids=new Set(savedDetachedIds());if(p
 let mainViewport=null,win,store,activeId=null,sidebarWidth=330,live=new Map(),loading=new Map(),stateTimer=null,modalVisible=false,recoveryPassword=null,recoveryDir=null,recoveryTimer=null,recoveryBusy=false,lastBackup=null;
 const extensionPartition='persist:hexora-chatgpt';
 let extensionRecords=[],extensionLoaded=new Map(),extensionSession=null,extensionConfigFile=null;
-function extensionList(){return extensionRecords.map(r=>({name:r.name,version:r.version,path:r.path,enabled:r.enabled,id:extensionLoaded.get(r.path)?.id||null,error:r.error||null}));}
+const extensionPopups=new Map();
+function extensionPopupPath(folder){
+ const manifest=JSON.parse(fs.readFileSync(path.join(folder,'manifest.json'),'utf8'));
+ const value=manifest.action?.default_popup||manifest.browser_action?.default_popup||manifest.page_action?.default_popup;
+ if(typeof value!=='string'||!value.trim())return null;
+ const relative=value.replace(/^\/+/,''),absolute=path.resolve(folder,relative);
+ if(!absolute.startsWith(path.resolve(folder)+path.sep)||!fs.statSync(absolute).isFile())throw new Error('Extension popup file is unavailable.');
+ return relative.split(/[\\/]/).map(encodeURIComponent).join('/');
+}
+function closeExtensionPopup(folder){const popup=extensionPopups.get(folder);if(popup&&!popup.isDestroyed())popup.close();extensionPopups.delete(folder);}
+function openExtensionPopup(folder){
+ const record=extensionRecords.find(r=>r.path===folder&&r.enabled),ext=extensionLoaded.get(folder);
+ if(!record||!ext)throw new Error('Extension is not enabled or loaded.');
+ const previous=extensionPopups.get(folder);if(previous&&!previous.isDestroyed()){previous.focus();return true;}
+ const relative=extensionPopupPath(folder);if(!relative)throw new Error('This extension does not define a popup.');
+ const popup=new BrowserWindow({parent:win,width:410,height:590,minWidth:320,minHeight:350,
+  title:record.name+' · Hexora',backgroundColor:'#18191e',autoHideMenuBar:true,
+  webPreferences:{partition:extensionPartition,contextIsolation:true,sandbox:true,nodeIntegration:false,webSecurity:true}});
+ extensionPopups.set(folder,popup);
+ popup.on('closed',()=>extensionPopups.delete(folder));
+ popup.webContents.setWindowOpenHandler(({url})=>/^https:\/\//.test(url)?{action:'allow'}:{action:'deny'});
+ popup.loadURL('chrome-extension://'+ext.id+'/'+relative).catch(err=>console.error('Extension popup load failed:',err));
+ return true;
+}
+function extensionList(){return extensionRecords.map(r=>({name:r.name,version:r.version,path:r.path,enabled:r.enabled,id:extensionLoaded.get(r.path)?.id||null,error:r.error||null,popup:(()=>{try{return !!extensionPopupPath(r.path);}catch{return false;}})()}));}
 function persistExtensions(){if(extensionConfigFile)fs.writeFileSync(extensionConfigFile,JSON.stringify(extensionRecords.map(({path,name,version,enabled})=>({path,name,version,enabled})),null,2));}
 async function loadUnpacked(record){
  const ext=await extensionSession.extensions.loadExtension(record.path,{allowFileAccess:false});
@@ -286,6 +310,7 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
  });
  recoveryTimer=setInterval(()=>{if(recoveryPassword&&recoveryDir&&!recoveryBusy){try{backupNow();}catch(err){console.error('Hexora scheduled backup failed:',err);}}},60*60*1000);
  ipcMain.handle('extensions:list',()=>extensionList());
+ ipcMain.handle('extensions:open',(_e,folder)=>openExtensionPopup(folder));
  ipcMain.handle('extensions:install',async()=>{
   const pick=await dialog.showOpenDialog(win,{title:'Select unpacked Chrome extension folder',properties:['openDirectory']});
   if(pick.canceled||!pick.filePaths[0])return {cancelled:true};
@@ -299,13 +324,13 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
  });
  ipcMain.handle('extensions:toggle',async(_e,folder)=>{
   const record=extensionRecords.find(x=>x.path===folder);if(!record)throw new Error('Extension not found.');
-  if(record.enabled){const loaded=extensionLoaded.get(folder);if(loaded)extensionSession.extensions.removeExtension(loaded.id);extensionLoaded.delete(folder);record.enabled=false;record.error=null;}
+  if(record.enabled){closeExtensionPopup(folder);const loaded=extensionLoaded.get(folder);if(loaded)extensionSession.extensions.removeExtension(loaded.id);extensionLoaded.delete(folder);record.enabled=false;record.error=null;}
   else{await loadUnpacked(record);record.enabled=true;}
   persistExtensions();return extensionList();
  });
  ipcMain.handle('extensions:remove',(_e,folder)=>{
   const index=extensionRecords.findIndex(x=>x.path===folder);if(index<0)throw new Error('Extension not found.');
-  const loaded=extensionLoaded.get(folder);if(loaded)extensionSession.extensions.removeExtension(loaded.id);
+  closeExtensionPopup(folder);const loaded=extensionLoaded.get(folder);if(loaded)extensionSession.extensions.removeExtension(loaded.id);
   extensionLoaded.delete(folder);extensionRecords.splice(index,1);persistExtensions();return extensionList();
  });
  ipcMain.handle('statistics:snapshot',()=>{
@@ -410,6 +435,6 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
   emit();return true;
  });
  setInterval(sweep,60*1000).unref();
- win.on('closed',()=>{quitting=true;if(sidebarAnimation)clearInterval(sidebarAnimation);for(const popup of detached.values())if(!popup.isDestroyed())popup.close();detached.clear();clearInterval(recoveryTimer);recoveryPassword=null;clearTimeout(stateTimer);win=null;for(const id of Array.from(live.keys()))discard(id);store.close();});
+ win.on('closed',()=>{quitting=true;for(const folder of [...extensionPopups.keys()])closeExtensionPopup(folder);if(sidebarAnimation)clearInterval(sidebarAnimation);for(const popup of detached.values())if(!popup.isDestroyed())popup.close();detached.clear();clearInterval(recoveryTimer);recoveryPassword=null;clearTimeout(stateTimer);win=null;for(const id of Array.from(live.keys()))discard(id);store.close();});
 });
 app.on('window-all-closed',()=>{if(process.platform!=='darwin')app.quit();});
