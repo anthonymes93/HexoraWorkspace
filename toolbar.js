@@ -6,15 +6,37 @@ const quickJumpsKey='hexora-quick-jumps';
 let quickJumps=[];
 try{const items=JSON.parse(localStorage.getItem(quickJumpsKey)||'[]');if(Array.isArray(items))quickJumps=items.filter(x=>Number.isSafeInteger(x.id)&&x.id>0).slice(0,20);}catch{}
 function saveQuickJumps(){localStorage.setItem(quickJumpsKey,JSON.stringify(quickJumps));}
-function addQuickJump(tab){
- if(!tab||!Number.isSafeInteger(tab.id))return;
- if(quickJumps.some(x=>x.id===tab.id)){alert('This tab is already in Quick Jump.');return;}
- const workspace=workspaces.find(w=>w.id===tab.workspace);
- const icon=prompt('Shortcut icon (emoji or symbol):',workspace?.emoji||'✦');
- if(icon===null)return;
- quickJumps.push({id:tab.id,icon:icon.trim().slice(0,8)||'✦',title:tab.title||'Tab'});
- saveQuickJumps();renderQuickJumps();
+let quickJumpTarget=null;
+async function showQuickJumpEditor(tab=null){
+ quickJumpTarget=tab?.id||null;
+ const select=$('quick-jump-tab');select.replaceChildren();
+ const items=await Promise.all(workspaces.map(async w=>({w,tabs:await window.hexora.page(w.id,0)})));
+ for(const {w,tabs} of items)for(const t of tabs.tabs){
+  const option=document.createElement('option');option.value=String(t.id);
+  option.textContent=w.name+' — '+(t.title||t.url||'Tab');
+  select.append(option);
+ }
+ if(!select.options.length){alert('No tabs available to add.');return;}
+ const preferred=tab?.id||currentPage?.activeId;
+ if([...select.options].some(o=>Number(o.value)===preferred))select.value=String(preferred);
+ const selected=items.flatMap(x=>x.tabs.tabs).find(t=>t.id===Number(select.value));
+ $('quick-jump-icon').value=workspaces.find(w=>w.id===selected?.workspace)?.emoji||'✦';
+ $('quick-jump-error').textContent='';
+ $('quick-jump-overlay').classList.remove('hidden');action('modal',true);
 }
+function closeQuickJumpEditor(){$('quick-jump-overlay').classList.add('hidden');quickJumpTarget=null;action('modal',false);}
+$('quick-jump-cancel').onclick=closeQuickJumpEditor;
+$('quick-jump-close').onclick=closeQuickJumpEditor;
+$('quick-jump-overlay').onclick=e=>{if(e.target===$('quick-jump-overlay'))closeQuickJumpEditor();};
+$('quick-jump-form').onsubmit=async e=>{
+ e.preventDefault();const id=Number($('quick-jump-tab').value);
+ const tab=await window.hexora.lookupTab(id);
+ if(!tab){$('quick-jump-error').textContent='Tab no longer exists.';return;}
+ if(quickJumps.some(x=>x.id===id)){$('quick-jump-error').textContent='This tab already has a shortcut.';return;}
+ quickJumps.push({id,icon:$('quick-jump-icon').value.trim().slice(0,8)||'✦',title:tab.title||'Tab'});
+ saveQuickJumps();closeQuickJumpEditor();renderQuickJumps();
+};
+function addQuickJump(tab){showQuickJumpEditor(tab).catch(err=>alert('Quick Jump: '+err.message));}
 async function jumpToTab(id){
  try{
   const tab=await window.hexora.lookupTab(id);
@@ -34,7 +56,7 @@ function renderQuickJumps(){
   button.onclick=()=>jumpToTab(item.id);
   button.oncontextmenu=e=>{
    e.preventDefault();
-   const value=prompt('Shortcut icon (clear the field to remove this shortcut):',item.icon);
+   const value=window.prompt?.('Shortcut icon (leave blank to remove):',item.icon);
    if(value===null)return;
    if(!value.trim())quickJumps=quickJumps.filter(x=>x.id!==item.id);
    else item.icon=value.trim().slice(0,8);
@@ -44,10 +66,7 @@ function renderQuickJumps(){
  }
  const add=document.createElement('button');add.className='quick-jump add';add.textContent='＋';
  add.title='Pin the active tab to Quick Jump';add.setAttribute('aria-label','Add current tab to Quick Jump');
- add.onclick=async()=>{
-  const tab=await window.hexora.lookupTab(currentPage?.activeId);
-  if(tab)addQuickJump(tab);else alert('Select a tab to pin first.');
- };
+ add.onclick=()=>showQuickJumpEditor().catch(err=>alert('Quick Jump: '+err.message));
  host.append(add);
 }
 try{const s=JSON.parse(localStorage.getItem('hexora-workspace-settings')||'{}');if(s.workspaces?.length)workspaces.splice(0,workspaces.length,...s.workspaces);if(s.selected)activeWorkspace=s.selected;if(s.sidebarOpen===false)sidebarOpen=false;}catch{}
