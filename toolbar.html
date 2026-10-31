@@ -38,6 +38,7 @@
  <button id="tab-menu-replace" role="menuitem">◈ &nbsp;Open website in this tab…</button>
  <button id="tab-menu-new" role="menuitem">＋ &nbsp;Open website in new tab…</button>
  <button id="tab-menu-chrome" role="menuitem">◉ Enable Chrome compatibility</button>
+ <button id="tab-menu-move" role="menuitem">Move tab to workspace…</button>
  <div class="tab-menu-separator"></div>
  <div class="tab-menu-heading">This tab</div>
  <button id="tab-menu-panel-wide" role="menuitem">This tab: Wide</button>
@@ -59,5 +60,12 @@
   <p id="website-error" class="website-error" role="alert"></p>
   <div class="website-actions"><button id="website-cancel" type="button" class="pill">Cancel</button><button type="submit" class="pill primary">Open website</button></div>
  </form>
+ </div></div>
+<div id="workspace-overlay" class="overlay hidden"><div class="dialog">
+ <div class="dialog-header"><b id="workspace-editor-title">Edit workspace</b><button id="workspace-close" aria-label="Close">×</button></div>
+ <form id="workspace-form"><label for="workspace-name">Workspace name</label><input id="workspace-name" maxlength="55" required placeholder="My workspace"/>
+ <label for="workspace-icon">Icon or emoji</label><input id="workspace-icon" maxlength="8" placeholder="◈"/>
+ <p id="workspace-error" class="website-error" role="alert"></p>
+ <div class="website-actions"><button type="button" id="workspace-delete" class="pill hidden">Delete workspace</button><button type="button" id="workspace-cancel" class="pill">Cancel</button><button type="submit" class="pill primary">Save workspace</button></div></form>
  </div></div>
 <script src="toolbar.js"></script></body></html>
