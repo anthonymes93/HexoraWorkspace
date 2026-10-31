@@ -51,7 +51,7 @@ function render(p){
   el.append(name,pop,close);tabs.append(el);
  }
 }
-function updateSidebar(persist=true){$('sidebar').classList.toggle('hidden',!sidebarOpen);document.querySelector('.top-main').classList.toggle('expanded',!sidebarOpen);action('sidebar',!sidebarOpen);if(persist&&currentPage?.activeId)action('panel-mode',{id:currentPage.activeId,mode:sidebarOpen?'wide':'thin'});save();}
+function updateSidebar(persist=true){action('sidebar',!sidebarOpen);if(persist&&currentPage?.activeId)action('panel-mode',{id:currentPage.activeId,mode:sidebarOpen?'wide':'thin'});save();}
 for(const id of ['new','new-rail','new-sidebar','add-tab'])$(id).onclick=()=>action('new',activeWorkspace);
 for(const id of ['back','forward','reload'])$(id).onclick=()=>action(id);
 for(const id of ['external','settings-rail'])$(id).onclick=()=>action('open-external');
@@ -152,3 +152,6 @@ $('website-form').onsubmit=async e=>{
 document.addEventListener('click',e=>{if(!e.target.closest('#tab-context-menu'))hideTabMenu();});
 document.addEventListener('contextmenu',e=>{if(!e.target.closest('.tab, .chat-row'))hideTabMenu();});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){hideTabMenu();if(websiteTarget)hideWebsiteModal();}});
+
+// The main process owns one animation timeline for both the native browser view and the toolbar layout.
+window.hexora.onSidebarFrame(width=>{const value=Math.max(64,Math.min(330,width));document.documentElement.style.setProperty('--hexora-panel-width',(value-64)+'px');document.documentElement.style.setProperty('--hexora-content-left',value+'px');document.body.classList.toggle('panel-collapsed',value<=65);});
