@@ -237,6 +237,7 @@ function closeExtensions(){$('extensions-overlay').classList.add('hidden');actio
 async function refreshExtensions(){
  try{
   const extensions=await window.hexora.extensions.list(),list=$('extensions-list');list.replaceChildren();
+  refreshExtensionActions();
   if(!extensions.length){const empty=document.createElement('p');empty.className='hint';empty.textContent='No extensions installed yet.';list.append(empty);}
   for(const ext of extensions){
    const row=document.createElement('div');row.className='extension-row';
@@ -258,3 +259,16 @@ $('extensions-rail').onclick=()=>{$('extensions-error').textContent='';$('extens
 $('extensions-close').onclick=closeExtensions;
 $('extensions-overlay').onclick=e=>{if(e.target===$('extensions-overlay'))closeExtensions();};
 $('extensions-install').onclick=async()=>{try{$('extensions-error').textContent='';await window.hexora.extensions.install();await refreshExtensions();}catch(e){$('extensions-error').textContent=e.message;}};
+
+async function refreshExtensionActions(){
+ try{
+  const list=await window.hexora.extensions.list(),host=$('extension-actions');host.replaceChildren();
+  for(const ext of list.filter(x=>x.enabled&&x.popup)){
+   const button=document.createElement('button');button.className='extension-action';
+   button.title='Open '+ext.name;button.textContent=/proton pass/i.test(ext.name)?'🔐':'🧩';
+   button.onclick=async()=>{try{await window.hexora.extensions.open(ext.path);}catch(e){alert('Extension popup: '+e.message);}};
+   host.append(button);
+  }
+ }catch(e){console.error('Cannot show extension toolbar',e);}
+}
+refreshExtensionActions();
