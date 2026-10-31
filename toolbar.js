@@ -251,7 +251,9 @@ async function refreshExtensions(){
    toggle.onclick=async()=>{try{await window.hexora.extensions.toggle(ext.path);await refreshExtensions();}catch(e){$('extensions-error').textContent=e.message;}};
    const remove=document.createElement('button');remove.className='pill';remove.textContent='Remove';
    remove.onclick=async()=>{if(!confirm('Remove '+ext.name+' from Hexora? The source folder will not be deleted.'))return;try{await window.hexora.extensions.remove(ext.path);await refreshExtensions();}catch(e){$('extensions-error').textContent=e.message;}};
-   row.append(details,toggle,remove);list.append(row);
+   const diagnose=document.createElement('button');diagnose.className='pill';diagnose.textContent='Diagnostics';
+   diagnose.onclick=()=>showExtensionDiagnostics(ext.path,ext.name);
+   row.append(details,diagnose,toggle,remove);list.append(row);
   }
  }catch(e){$('extensions-error').textContent=e.message;}
 }
@@ -272,3 +274,33 @@ async function refreshExtensionActions(){
  }catch(e){console.error('Cannot show extension toolbar',e);}
 }
 refreshExtensionActions();
+
+let diagnosticFolder=null,diagnosticTimer=null;
+async function renderExtensionDiagnostics(){
+ if(!diagnosticFolder)return;
+ try{
+  const data=await window.hexora.extensions.diagnostics(diagnosticFolder);
+  const host=$('extension-diagnostic-events');host.replaceChildren();
+  if(!data.events.length){const p=document.createElement('p');p.className='hint';p.textContent='No diagnostic events yet. Open the extension popup to capture its startup.';host.append(p);}
+  for(const event of [...data.events].reverse()){
+   const line=document.createElement('div');line.className='diagnostic-event';
+   const tag=document.createElement('strong');tag.textContent='['+new Date(event.time).toLocaleTimeString()+'] '+event.kind;
+   const msg=document.createElement('span');msg.textContent=event.message;
+   line.append(tag,msg);host.append(line);
+  }
+ }catch(e){$('extension-diagnostic-events').textContent=e.message;}
+}
+function closeExtensionDiagnostics(){
+ clearInterval(diagnosticTimer);diagnosticTimer=null;diagnosticFolder=null;
+ $('extension-diagnostics-overlay').classList.add('hidden');action('modal',false);
+}
+function showExtensionDiagnostics(folder,name){
+ diagnosticFolder=folder;$('extension-diagnostic-name').textContent=name+' diagnostics';
+ $('extensions-overlay').classList.add('hidden');
+ $('extension-diagnostics-overlay').classList.remove('hidden');action('modal',true);
+ clearInterval(diagnosticTimer);diagnosticTimer=setInterval(renderExtensionDiagnostics,1500);renderExtensionDiagnostics();
+}
+$('extension-diagnostics-close').onclick=closeExtensionDiagnostics;
+$('extension-diagnostics-clear').onclick=async()=>{if(diagnosticFolder){await window.hexora.extensions.clearDiagnostics(diagnosticFolder);renderExtensionDiagnostics();}};
+$('extension-diagnostics-popup').onclick=async()=>{if(diagnosticFolder)try{await window.hexora.extensions.open(diagnosticFolder);renderExtensionDiagnostics();}catch(e){$('extension-diagnostic-events').textContent=e.message;}};
+$('extension-diagnostics-overlay').onclick=e=>{if(e.target===$('extension-diagnostics-overlay'))closeExtensionDiagnostics();};
