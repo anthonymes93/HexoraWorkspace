@@ -62,3 +62,5 @@
 .extensions-dialog{max-width:760px}.extensions-list{display:flex;flex-direction:column;gap:10px;margin-top:18px}.extension-row{display:flex;align-items:center;gap:9px;padding:14px;background:#18191e;border:1px solid #393945;border-radius:11px}.extension-details{display:flex;flex:1;flex-direction:column;min-width:0;gap:5px}.extension-details strong{font-size:13px}.extension-details small{font-size:11px;color:#aaa6b6;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.extension-row .pill{flex-shrink:0}
 
 .extension-actions{display:flex;gap:3px;align-self:center;flex-shrink:0}.extension-action{width:31px;height:31px;border:1px solid #34343d;border-radius:8px;background:#22232a;font-size:16px;display:grid;place-items:center}.extension-action:hover{background:#373440}
+
+.diagnostic-events{max-height:54vh;overflow:auto;display:flex;flex-direction:column;gap:7px}.diagnostic-event{display:flex;flex-direction:column;gap:4px;padding:10px;background:#18191e;border:1px solid #34353e;border-radius:8px;font-size:12px;overflow-wrap:anywhere}.diagnostic-event strong{color:#c2b1fd;font-size:11px}.diagnostic-event span{color:#d8d6df}
