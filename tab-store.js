@@ -43,6 +43,7 @@ class TabStore {
  counts(){return this.q.counts.all();}
  search(term,limit=40){const value='%'+String(term).replace(/[\\%_]/g,m=>'\\'+m)+'%';return this.q.search.all(value,value,Math.min(100,Math.max(1,limit)));}
  lastActiveId(){return this.q.latest.get()?.id||null;}
+ moveWorkspace(source,destination){this.db.prepare('UPDATE tabs SET workspace=? WHERE workspace=?').run(destination,source);}
  getMeta(key){return this.q.metaGet.get(key)?.value||null;}
  setMeta(key,value){this.q.metaSet.run(key,String(value));}
  importLegacy(jsonFile) {
