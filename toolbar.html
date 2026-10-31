@@ -10,6 +10,7 @@
   <button id="recovery-rail" class="railbtn" title="Encrypted backups">⛨</button>
   <button id="statistics-rail" class="railbtn" title="Statistics and task manager">▥</button>
   <button id="extensions-rail" class="railbtn" title="Chrome extensions">🧩</button>
+  <button id="theme-rail" class="railbtn" title="Appearance / themes">◐</button>
   <button id="settings-rail" class="railbtn bottom" title="Open ChatGPT in browser">↗</button>
 </div>
 <aside class="sidebar" id="sidebar">
@@ -101,4 +102,14 @@
   <p id="quick-jump-error" class="website-error" role="alert"></p>
   <div class="website-actions"><button id="quick-jump-cancel" class="pill" type="button">Cancel</button><button class="pill primary" type="submit">Add shortcut</button></div>
  </form></div></div>
+<div id="appearance-overlay" class="overlay hidden"><section class="dialog theme-dialog" role="dialog" aria-modal="true" aria-label="Appearance settings">
+ <div class="dialog-header"><b>Appearance</b><button id="appearance-close" aria-label="Close">×</button></div>
+ <p class="hint">Choose how Hexora looks. Your selection is saved and restored automatically.</p>
+ <div class="theme-options">
+  <button class="theme-choice" data-theme-choice="classic" type="button"><span class="theme-preview theme-preview-classic"><i></i><i></i><i></i></span><strong>Classic</strong><small>Original Hexora interface — preserved</small></button>
+  <button class="theme-choice" data-theme-choice="obsidian" type="button"><span class="theme-preview theme-preview-obsidian"><i></i><i></i><i></i></span><strong>Obsidian</strong><small>Inspired by your uploaded Concept #2</small></button>
+ </div>
+ <p id="appearance-status" class="hint" role="status"></p>
+ </section></div>
+<script src="theme.js"></script>
 <script src="toolbar.js"></script></body></html>

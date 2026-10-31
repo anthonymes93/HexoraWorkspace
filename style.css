@@ -69,3 +69,80 @@
 .quick-jumps{display:flex;flex-wrap:wrap;gap:7px;padding:11px 3px 8px;margin-top:1px;border-top:1px solid #303039}.quick-jump{width:32px;height:32px;flex-shrink:0;border:1px solid #3b3948!important;border-radius:9px!important;background:#24232d!important;display:grid;place-items:center;color:#d6caff!important;font-size:18px;line-height:1}.quick-jump:hover{background:#3d354f!important;border-color:#a991ed!important}.quick-jump.current{border-color:#ac91ff!important;background:#3a304d!important}.quick-jump.add{font-size:23px;color:#9693a4!important;border-style:dashed!important;background:transparent!important}
 
 #quick-jump-form{display:flex;flex-direction:column;gap:9px}#quick-jump-form label{font-size:12px;color:#c9c7d1}#quick-jump-tab{width:100%;border:1px solid #42434d;border-radius:9px;background:#15161b;color:white;padding:12px}
+
+
+/* Appearance picker: Classic remains the unmodified default theme. */
+.theme-dialog{width:min(520px,calc(100vw - 40px))}
+.theme-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:20px 0 12px}
+.theme-choice{background:#191b22;border:1px solid #3a3c49;border-radius:14px;padding:12px;text-align:left;display:flex;flex-direction:column;gap:7px;min-width:0}
+.theme-choice:hover{border-color:#a8a1ff}
+.theme-choice.selected{border-color:#aaa2ff;box-shadow:0 0 0 2px #aaa2ff28;background:#262533}
+.theme-choice strong{font-size:14px}
+.theme-choice small{color:#9c9ca8;font-size:11px;line-height:1.4}
+.theme-preview{height:77px;width:100%;border:1px solid #444650;border-radius:9px;display:flex;gap:6px;padding:9px;align-items:flex-start;background:#111215}
+.theme-preview i{display:block;background:#292932;border-radius:5px;width:27%;height:26px}
+.theme-preview i:first-child{width:15%;height:56px;background:#4a3d66}
+.theme-preview-classic{background:#17181c}
+.theme-preview-obsidian{background:#0a0c10}
+.theme-preview-obsidian i{background:#252832;border:1px solid #404652;border-radius:5px 5px 0 0}
+.theme-preview-obsidian i:first-child{background:#171a21;border:1px solid #333842}
+@media(max-width:450px){.theme-options{grid-template-columns:1fr}}
+
+/* Obsidian — adapted from the user's attached Concept 02.
+   Theme-specific overrides only: Classic selectors stay untouched. */
+:root[data-hexora-theme="obsidian"]{
+ color-scheme:dark;
+ font-family:Inter,'Segoe UI',system-ui,sans-serif;
+ color:#edf0f5;background:#0a0c10;
+ --hexora-obsidian-bg:#0a0c10;
+ --hexora-obsidian-panel:#11141a;
+ --hexora-obsidian-top:#171a21;
+ --hexora-obsidian-line:#2b3039;
+ --hexora-obsidian-accent:#a8a1ff;
+}
+:root[data-hexora-theme="obsidian"] body{background:#0a0c10;color:#edf0f5}
+:root[data-hexora-theme="obsidian"] .rail{background:#0e1116;border-color:#272d35;gap:12px}
+:root[data-hexora-theme="obsidian"] .logo{background:#a8a1ff;color:#12141c;border-radius:9px;box-shadow:none}
+:root[data-hexora-theme="obsidian"] .railbtn{color:#7e8795;border-radius:9px}
+:root[data-hexora-theme="obsidian"] .railbtn:hover{background:#282c35;color:#e4e7ef}
+:root[data-hexora-theme="obsidian"] .railbtn.selected{background:#a9a0ff1b;color:#b5acff}
+:root[data-hexora-theme="obsidian"] .sidebar,
+:root[data-hexora-theme="obsidian"] .sidebar.hidden{background:#11141a;border-color:#2b3039}
+:root[data-hexora-theme="obsidian"] .sidebar-title strong{letter-spacing:1px;text-transform:uppercase;font-size:14px}
+:root[data-hexora-theme="obsidian"] .sidebar-title em{color:#aaa3ff}
+:root[data-hexora-theme="obsidian"] .eyebrow{color:#808999;letter-spacing:1.7px}
+:root[data-hexora-theme="obsidian"] .workspace,
+:root[data-hexora-theme="obsidian"] .chat-row{border-radius:8px;color:#a9b0bc}
+:root[data-hexora-theme="obsidian"] .workspace:hover,
+:root[data-hexora-theme="obsidian"] .chat-row:hover{background:#262a33}
+:root[data-hexora-theme="obsidian"] .workspace.selected,
+:root[data-hexora-theme="obsidian"] .chat-row.active{background:#aaa2ff16;color:#f1efff;box-shadow:inset 2px 0 #a8a1ff}
+:root[data-hexora-theme="obsidian"] .top-main,
+:root[data-hexora-theme="obsidian"] .top-main.expanded{background:#171a21}
+:root[data-hexora-theme="obsidian"] .top{background:linear-gradient(180deg,#1a1d25,#13161c);border-bottom-color:#333842}
+:root[data-hexora-theme="obsidian"] .top h1{font-size:14px;letter-spacing:.25px}
+:root[data-hexora-theme="obsidian"] .subtitle{color:#818b9a}
+:root[data-hexora-theme="obsidian"] .tabsbar{background:#171a21;border-bottom-color:#343a44;gap:5px}
+:root[data-hexora-theme="obsidian"] .tabs{gap:3px;scrollbar-width:none}
+:root[data-hexora-theme="obsidian"] .tab{height:39px;min-width:145px;max-width:245px;border-radius:9px 9px 0 0;background:#1d2028;color:#949da9;padding:0 10px}
+:root[data-hexora-theme="obsidian"] .tab:hover{background:#282c35;color:#d9dce5}
+:root[data-hexora-theme="obsidian"] .tab.active{background:#0a0c10;color:#f6f5ff;border-color:#383f49;box-shadow:inset 0 2px #aea4ff}
+:root[data-hexora-theme="obsidian"] .tab .close{color:#8e94a2}
+:root[data-hexora-theme="obsidian"] .tab .close:hover{background:#393c46;color:#fff}
+:root[data-hexora-theme="obsidian"] .tab-plus{height:32px;width:32px;align-self:center;border:1px dashed #444a56;border-radius:8px;color:#a7acb6}
+:root[data-hexora-theme="obsidian"] .tab-plus:hover{border-color:#b0a5ff;color:#b0a5ff}
+:root[data-hexora-theme="obsidian"] .pill{background:#20242c;border:1px solid #3a404b;color:#cdd2dc;border-radius:7px}
+:root[data-hexora-theme="obsidian"] .pill:hover:not(:disabled){background:#303441}
+:root[data-hexora-theme="obsidian"] .pill.primary{background:#aaa2ff16;border-color:#7e78af;color:#c7bfff}
+:root[data-hexora-theme="obsidian"] .nav button{color:#9da4af;border-radius:7px}
+:root[data-hexora-theme="obsidian"] .nav button:hover{background:#2d313b;color:#fff}
+:root[data-hexora-theme="obsidian"] .profile{border-color:#2b3039}
+:root[data-hexora-theme="obsidian"] .avatar{background:#aaa2ff19;color:#c7bfff}
+:root[data-hexora-theme="obsidian"] .dialog,
+:root[data-hexora-theme="obsidian"] .stats-dialog{background:#171a21;border-color:#333842;color:#edf0f5}
+:root[data-hexora-theme="obsidian"] .dialog input,
+:root[data-hexora-theme="obsidian"] .dialog select{background:#0a0c10;border-color:#3b404a;color:#edf0f5}
+:root[data-hexora-theme="obsidian"] .tab-context-menu{background:#171a21;border-color:#3b404a}
+:root[data-hexora-theme="obsidian"] .tab-context-menu button:hover{background:#282c35}
+:root[data-hexora-theme="obsidian"] .quick-jump{background:#20242c!important;border-color:#3b404a!important}
+:root[data-hexora-theme="obsidian"] button:focus-visible{outline-color:#a8a1ff}
