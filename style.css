@@ -23,7 +23,7 @@
 .tab-menu-heading{font-size:11px;color:#a7a0b6;padding:8px 12px 3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.tab-context-menu button:disabled{opacity:.4;cursor:not-allowed}
 
 /* Smooth wide/thin transitions. Keep the sidebar mounted so it can animate. */
-.sidebar{transition:transform 380ms cubic-bezier(.4,0,.6,1),opacity 300ms ease;will-change:transform,opacity}
+.sidebar{transition:transform 440ms cubic-bezier(.5,0,.5,1),opacity 350ms ease-in-out;will-change:transform,opacity}
 .sidebar.hidden{display:flex;transform:translateX(calc(-100% - 1px));opacity:0;pointer-events:none}
-.top-main{transition:left 380ms cubic-bezier(.4,0,.6,1)}
+.top-main{transition:left 440ms cubic-bezier(.5,0,.5,1)}
 @media (prefers-reduced-motion:reduce){.sidebar,.top-main{transition:none}}
