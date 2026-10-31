@@ -108,9 +108,9 @@ function evict(){if(live.size<=MAX_LIVE)return;const candidates=Array.from(live.
  candidates.sort((a,b)=>(store.get(a)?.last_active||0)-(store.get(b)?.last_active||0));
  while(live.size>MAX_LIVE&&candidates.length)discard(candidates.shift());}
 function newTab(workspace='web',url=HOME){const id=store.nextId(),t={id,title:'New tab',url:safeUrl(url),workspace:typeof workspace==='string'?workspace:'web',pinned:false,muted:false,lastActive:Date.now(),ordinal:id};store.save(t);activate(id);return id;}
-function closeTab(id){id=Number(id);if(!store.get(id))return;
+function closeTab(id){id=Number(id);const closing=store.get(id);if(!closing)return;
  if(detached.has(id)){const popup=detached.get(id);setDetachedSaved(id,false);detached.delete(id);if(!popup.isDestroyed())popup.close();}
- discard(id);store.delete(id);if(activeId===id){activeId=null;const target=store.lastActiveId();if(target)activate(target);else newTab();}emit();}
+ discard(id);store.delete(id);if(activeId===id){activeId=null;const sameWorkspace=store.page(closing.workspace,0,50).find(t=>!detached.has(t.id));const target=sameWorkspace?.id||store.lastActiveId();if(target)activate(target);else newTab(closing.workspace);}emit();}
 function sweep(){const now=Date.now();for(const id of Array.from(live.keys())){if(id===activeId)continue;const t=store.get(id),v=live.get(id);if(!t){discard(id);continue;}if(detached.has(id)||t.pinned||now-t.last_active<IDLE_MS||v.webContents.isLoading()||v.webContents.isCurrentlyAudible?.())continue;discard(id);}emit();}
 function detachTab(id){
  id=Number(id);const row=store.get(id);
