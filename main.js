@@ -29,6 +29,18 @@ let mainViewport=null,win,store,activeId=null,sidebarWidth=330,live=new Map(),lo
 const extensionPartition='persist:hexora-chatgpt';
 let extensionRecords=[],extensionLoaded=new Map(),extensionSession=null,extensionConfigFile=null;
 const extensionPopups=new Map();
+const extensionDiagnostics=new Map();
+function diagnostic(folder,kind,message){
+ const records=extensionDiagnostics.get(folder)||[];
+ records.push({time:Date.now(),kind,message:String(message).slice(0,500)});
+ if(records.length>40)records.shift();
+ extensionDiagnostics.set(folder,records);
+}
+function getExtensionDiagnostics(folder){
+ const record=extensionRecords.find(x=>x.path===folder);
+ if(!record)throw new Error('Extension not found.');
+ return {name:record.name,events:extensionDiagnostics.get(folder)||[],popupOpen:!!extensionPopups.get(folder)&&!extensionPopups.get(folder).isDestroyed()};
+}
 function extensionPopupPath(folder){
  const manifest=JSON.parse(fs.readFileSync(path.join(folder,'manifest.json'),'utf8'));
  const value=manifest.action?.default_popup||manifest.browser_action?.default_popup||manifest.page_action?.default_popup;
@@ -47,9 +59,27 @@ function openExtensionPopup(folder){
   title:record.name+' · Hexora',backgroundColor:'#18191e',autoHideMenuBar:true,
   webPreferences:{partition:extensionPartition,contextIsolation:true,sandbox:true,nodeIntegration:false,webSecurity:true}});
  extensionPopups.set(folder,popup);
- popup.on('closed',()=>extensionPopups.delete(folder));
+ popup.on('closed',()=>{extensionPopups.delete(folder);diagnostic(folder,'info','Popup closed');});
+ const wc=popup.webContents;
+ wc.on('console-message',(_event,detailsOrLevel,message)=>{
+  const details=typeof detailsOrLevel==='object'?detailsOrLevel:{level:detailsOrLevel,message};
+  if(['error','warning'].includes(details.level)||details.level===2||details.level===3)diagnostic(folder,'console',details.message||message||'Console warning or error');
+ });
+ wc.on('did-fail-load',(_e,code,description,_url,isMainFrame)=>{
+  if(isMainFrame)diagnostic(folder,'load-error',description+' ('+code+')');
+ });
+ wc.on('render-process-gone',(_e,details)=>diagnostic(folder,'crash','Renderer terminated: '+details.reason));
+ wc.on('did-finish-load',async()=>{
+  diagnostic(folder,'info','Popup document loaded');
+  try{
+   const result=await wc.executeJavaScript("({ready:document.readyState,bodyTextLength:document.body?.innerText?.length||0,elementCount:document.body?.querySelectorAll('*').length||0})",true);
+   diagnostic(folder,'dom','DOM state: '+result.ready+'; visible text characters: '+result.bodyTextLength+'; elements: '+result.elementCount);
+   if(result.bodyTextLength===0)diagnostic(folder,'warning','Popup loaded with no visible text. Extension may be stalled or incompatible.');
+  }catch(err){diagnostic(folder,'inspect-error',err.message);}
+ });
+ diagnostic(folder,'info','Opening extension popup');
  popup.webContents.setWindowOpenHandler(({url})=>/^https:\/\//.test(url)?{action:'allow'}:{action:'deny'});
- popup.loadURL('chrome-extension://'+ext.id+'/'+relative).catch(err=>console.error('Extension popup load failed:',err));
+ popup.loadURL('chrome-extension://'+ext.id+'/'+relative).catch(err=>{diagnostic(folder,'load-error',err.message);console.error('Extension popup load failed:',err);});
  return true;
 }
 function extensionList(){return extensionRecords.map(r=>({name:r.name,version:r.version,path:r.path,enabled:r.enabled,id:extensionLoaded.get(r.path)?.id||null,error:r.error||null,popup:(()=>{try{return !!extensionPopupPath(r.path);}catch{return false;}})()}));}
@@ -310,6 +340,8 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
  });
  recoveryTimer=setInterval(()=>{if(recoveryPassword&&recoveryDir&&!recoveryBusy){try{backupNow();}catch(err){console.error('Hexora scheduled backup failed:',err);}}},60*60*1000);
  ipcMain.handle('extensions:list',()=>extensionList());
+ ipcMain.handle('extensions:diagnostics',(_e,folder)=>getExtensionDiagnostics(folder));
+ ipcMain.handle('extensions:clear-diagnostics',(_e,folder)=>{extensionDiagnostics.delete(folder);return true;});
  ipcMain.handle('extensions:open',(_e,folder)=>openExtensionPopup(folder));
  ipcMain.handle('extensions:install',async()=>{
   const pick=await dialog.showOpenDialog(win,{title:'Select unpacked Chrome extension folder',properties:['openDirectory']});
