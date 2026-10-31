@@ -65,19 +65,17 @@ function setSidebarWidth(collapsed){
  const start=sidebarWidth,target=collapsed?64:330;
  if(sidebarAnimation){clearInterval(sidebarAnimation);sidebarAnimation=null;}
  if(start===target){bounds();return;}
- const began=performance.now(),duration=440;
- // Match CSS cubic-bezier(.5,0,.5,1) using a binary solve for its X axis.
- function easing(t){
-  let lo=0,hi=1;
-  for(let i=0;i<10;i++){const p=(lo+hi)/2;const x=3*(1-p)*(1-p)*p*.5+3*(1-p)*p*p*.5+p*p*p;if(x<t)lo=p;else hi=p;}
-  const p=(lo+hi)/2;return 3*(1-p)*p*p+p*p*p;
- }
- sidebarAnimation=setInterval(()=>{
+ const began=performance.now(),duration=480;
+ // Limit native WebContentsView relayouts to ~30fps; CSS interpolates the chrome.
+ const ease=t=>t*t*(3-2*t);
+ function frame(){
   const progress=Math.min(1,(performance.now()-began)/duration);
-  const next=Math.round(start+(target-start)*easing(progress));
+  const next=progress===1?target:Math.round(start+(target-start)*ease(progress));
   if(next!==sidebarWidth){sidebarWidth=next;bounds();}
-  if(progress>=1){clearInterval(sidebarAnimation);sidebarAnimation=null;sidebarWidth=target;bounds();}
- },16);
+  if(progress===1){clearInterval(sidebarAnimation);sidebarAnimation=null;sidebarWidth=target;bounds();}
+ }
+ sidebarAnimation=setInterval(frame,33);
+ frame();
 }
 
 function pageRow(r){return{id:r.id,url:r.url,title:r.title,workspace:r.workspace,pinned:!!r.pinned,muted:!!r.muted,lastActive:r.last_active,active:r.id===activeId,detached:detached.has(r.id),loading:!!loading.get(r.id),suspended:!live.has(r.id),chromeMode:chromeMode(r.id),panelMode:panelMode(r.id),panelPreference:panelPreference(r.id)};}
