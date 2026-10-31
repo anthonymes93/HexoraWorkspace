@@ -4,6 +4,7 @@ const path=require('node:path');
 const {screen}=require('electron');
 const {TabStore}=require('./tab-store');
 const fs=require('node:fs');
+const os=require('node:os');
 const {snapshot,stageRestore,applyPending,verifyBackup}=require('./recovery');
 // Prevent two Hexora instances from accessing the same Chromium profile.
 const hasSingleInstanceLock=app.requestSingleInstanceLock();
@@ -268,6 +269,21 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
   app.relaunch();app.quit();return{restarting:true};
  });
  recoveryTimer=setInterval(()=>{if(recoveryPassword&&recoveryDir&&!recoveryBusy){try{backupNow();}catch(err){console.error('Hexora scheduled backup failed:',err);}}},60*60*1000);
+ ipcMain.handle('statistics:snapshot',()=>{
+  const processes=app.getAppMetrics().map(item=>({
+   pid:item.pid,type:item.type,cpu:Number(item.cpu?.percentCPUUsage)||0,
+   memoryBytes:Math.max(0,(Number(item.memory?.workingSetSize)||0)*1024),
+   privateBytes:Math.max(0,(Number(item.memory?.privateBytes)||0)*1024)
+  }));
+  const byPid=new Map(processes.map(item=>[item.pid,item]));
+  const tabs=Array.from(live.entries()).map(([id,view])=>{
+   const row=store.get(id),pid=view.webContents.getOSProcessId();
+   return {id,title:row?.title||'Tab',workspace:row?.workspace||'web',
+    pid,process:byPid.get(pid)||null,detached:detached.has(id)};
+  });
+  return {time:Date.now(),system:{totalMemory:os.totalmem(),freeMemory:os.freemem(),logicalCores:os.cpus().length},
+   processes,tabs,liveTabs:live.size,savedTabs:store.total()};
+ });
  ipcMain.handle('tabs:page',(_e,arg)=>sendPage(arg));
  ipcMain.handle('tabs:search',(_e,term)=>store.search(term,50).map(pageRow));
  ipcMain.handle('tabs:action',(_e,action,arg)=>{
