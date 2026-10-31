@@ -40,3 +40,5 @@
 /* Match the tab strip to the native web view on each sidebar frame; no trailing 33ms interpolation. */
 .top-main,.top-main.expanded{transition:none!important}
 @media(prefers-reduced-motion:reduce){.sidebar,.sidebar.hidden,.top-main,.top-main.expanded{transition:none!important}}
+
+.workspace-edit{opacity:.55;padding:2px 6px;border-radius:6px;font-size:20px}.workspace:hover .workspace-edit,.workspace-edit:hover{opacity:1;background:#34303f}#workspace-form{display:flex;flex-direction:column;gap:9px}#workspace-form label{font-size:12px;color:#c9c7d1}#workspace-delete{margin-right:auto;color:#ffaaa8}
