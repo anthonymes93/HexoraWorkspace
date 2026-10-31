@@ -65,12 +65,13 @@ function setSidebarWidth(collapsed){
  const start=sidebarWidth,target=collapsed?64:330;
  if(sidebarAnimation){clearInterval(sidebarAnimation);sidebarAnimation=null;}
  if(start===target){bounds();return;}
- const began=performance.now(),duration=240;
+ const began=performance.now(),duration=380;
  sidebarAnimation=setInterval(()=>{
   const progress=Math.min(1,(performance.now()-began)/duration);
-  const eased=1-Math.pow(1-progress,3);
-  sidebarWidth=Math.round(start+(target-start)*eased);
-  bounds();
+  // Smooth start AND finish; unlike cubic ease-out this avoids an abrupt initial lurch.
+  const eased=progress*progress*(3-2*progress);
+  const next=Math.round(start+(target-start)*eased);
+  if(next!==sidebarWidth){sidebarWidth=next;bounds();}
   if(progress>=1){clearInterval(sidebarAnimation);sidebarAnimation=null;sidebarWidth=target;bounds();}
  },16);
 }
