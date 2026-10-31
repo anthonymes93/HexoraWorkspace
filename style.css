@@ -30,7 +30,7 @@
 
 /* Single coordinated layout: panel shrinks in place instead of sliding away. */
 :root{--hexora-panel-width:266px;--hexora-content-left:330px}
-.sidebar,.sidebar.hidden{display:flex;left:64px;width:var(--hexora-panel-width);transform:none;transition:none;opacity:1;overflow:hidden;pointer-events:auto;padding-left:clamp(0px,calc(var(--hexora-panel-width) - 250px),12px);padding-right:clamp(0px,calc(var(--hexora-panel-width) - 250px),12px)}
+.sidebar,.sidebar.hidden{display:flex!important;left:64px;width:var(--hexora-panel-width);transform:none;transition:none;opacity:1;overflow:hidden;pointer-events:auto;padding-left:clamp(0px,calc(var(--hexora-panel-width) - 250px),12px);padding-right:clamp(0px,calc(var(--hexora-panel-width) - 250px),12px)}
 .sidebar>*{min-width:242px;flex-shrink:0}
 .sidebar.hidden{pointer-events:none}
 .top-main,.top-main.expanded{left:var(--hexora-content-left);transition:none}
