@@ -78,19 +78,15 @@ function setSidebarWidth(collapsed){
  const start=sidebarWidth,target=collapsed?64:330;
  if(sidebarAnimation){clearInterval(sidebarAnimation);sidebarAnimation=null;}
  if(start===target){sidebarStableWidth=null;bounds();return;}
- // Keep the web content at the wide width and clip its left edge while the panel expands.
- sidebarStableWidth=Math.min(start,target);
+ // Lay out the page at its destination width once, then reveal it through the
+ // clipping viewport. There is no final resize to cause a second reflow.
+ sidebarStableWidth=target;
  bounds();
  const began=performance.now(),duration=792;
  const ease=t=>t*t*(3-2*t);
  function frame(){
   const progress=Math.min(1,(performance.now()-began)/duration);
   const next=progress===1?target:Math.round(start+(target-start)*ease(progress));
-  // Settle the page's layout over the final quarter of the motion rather than
-  // applying a single abrupt resize on the very last frame.
-  const settle=Math.max(0,Math.min(1,(progress-.75)/.25));
-  const smoothSettle=settle*settle*(3-2*settle);
-  sidebarStableWidth=Math.round(Math.min(start,target)+(target-Math.min(start,target))*smoothSettle);
   if(next!==sidebarWidth){sidebarWidth=next;}
   bounds();
   if(progress===1){clearInterval(sidebarAnimation);sidebarAnimation=null;sidebarWidth=target;sidebarStableWidth=null;bounds();}
