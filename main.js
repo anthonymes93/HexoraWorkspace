@@ -95,12 +95,12 @@ function setSidebarWidth(collapsed){
 }
 
 function pageRow(r){return{id:r.id,url:r.url,title:r.title,workspace:r.workspace,pinned:!!r.pinned,muted:!!r.muted,lastActive:r.last_active,active:r.id===activeId,detached:detached.has(r.id),loading:!!loading.get(r.id),suspended:!live.has(r.id),chromeMode:chromeMode(r.id),panelMode:panelMode(r.id),panelPreference:panelPreference(r.id)};}
-function state(workspace='web',offset=0){return{activeId,total:store.total(),counts:store.counts(),tabs:store.page(workspace,offset,50).map(pageRow),active:activeId?store.get(activeId):null,activePanelMode:activeId?panelMode(activeId):'wide',offset};}
+function state(workspace='web',offset=0){const active=activeId?store.get(activeId):null;return{activeId,total:store.total(),counts:store.counts(),tabs:store.page(workspace,offset,50).map(pageRow),active:active?.workspace===workspace?active:null,activePanelMode:activeId?panelMode(activeId):'wide',offset};}
 function emit(){if(!win||win.isDestroyed())return;clearTimeout(stateTimer);stateTimer=setTimeout(()=>{if(!win||win.isDestroyed())return;win.webContents.send('tabs:changed');},70);}
 function activate(id){const raw=store.get(Number(id));if(!raw)return false;
  if(detached.has(raw.id)){const popup=detached.get(raw.id);if(!popup.isDestroyed()){if(popup.isMinimized())popup.restore();popup.focus();return true;}}
  for(const [otherId,view] of live)if(otherId!==id&&!detached.has(otherId))mainViewport.removeChildView(view);
- activeId=raw.id;const t=toModel(raw);t.lastActive=Date.now();store.save(t);store.setMeta('activeId',String(activeId));
+ activeId=raw.id;store.setMeta('workspaceActive:'+raw.workspace,String(activeId));const t=toModel(raw);t.lastActive=Date.now();store.save(t);store.setMeta('activeId',String(activeId));
  let view=live.get(id);if(!view){view=wire(t);live.set(id,view);}
  if(!modalVisible){mainViewport.addChildView(view);bounds();view.webContents.focus();}evict();emit();return true;
 }
@@ -274,6 +274,28 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
   const current=store.get(activeId);const wc=live.get(activeId)?.webContents;
   if(action==='new')newTab(typeof arg==='string'?arg:'web');
   else if(action==='activate')activate(Number(arg));
+  else if(action==='switch-workspace'){
+   const workspace=typeof arg==='string'?arg:'web';
+   const selected=Number(store.getMeta('workspaceActive:'+workspace));
+   const candidate=(selected&&store.get(selected)?.workspace===workspace?selected:null)||store.page(workspace,0,1)[0]?.id;
+   if(candidate)activate(candidate);else newTab(workspace);
+   return true;
+  }
+  else if(action==='move-tab'){
+   const id=Number(arg?.id),workspace=arg?.workspace,raw=store.get(id);
+   if(!raw||typeof workspace!=='string'||workspace.length>80)throw new Error('Invalid tab or workspace');
+   const tab=toModel(raw);tab.workspace=workspace;store.save(tab);
+   if(id===activeId)store.setMeta('workspaceActive:'+workspace,String(id));
+   emit();return true;
+  }
+  else if(action==='delete-workspace'){
+   const workspace=arg?.id,destination=arg?.destination||'web';
+   if(typeof workspace!=='string'||workspace==='web'||workspace===destination)throw new Error('Cannot delete this workspace.');
+   // Preserve all tabs by moving them into the main workspace.
+   store.moveWorkspace(workspace,destination);
+   if(store.get(activeId)?.workspace===destination)store.setMeta('workspaceActive:'+destination,String(activeId));
+   emit();return true;
+  }
   else if(action==='open-website'){
    const url=userWebsiteUrl(arg?.url);
    const title=typeof arg?.title==='string'&&arg.title.trim()?arg.title.trim().slice(0,100):new URL(url).hostname;
