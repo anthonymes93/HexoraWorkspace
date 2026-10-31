@@ -30,6 +30,7 @@ const extensionPartition='persist:hexora-chatgpt';
 let extensionRecords=[],extensionLoaded=new Map(),extensionSession=null,extensionConfigFile=null;
 const extensionPopups=new Map();
 const extensionRegistrations=new Map();
+const workerRegistrationByScope=new Map();
 const extensionDiagnostics=new Map();
 function diagnostic(folder,kind,message){
  const records=extensionDiagnostics.get(folder)||[];
@@ -42,6 +43,12 @@ function extensionWorkerManifest(folder){
   return {manifestVersion:manifest.manifest_version,script:manifest.background?.service_worker||null,type:manifest.background?.type||'classic'};
  }catch(err){return {error:err.message};}
 }
+function extensionRegistrationInfo(folder){
+ const ext=extensionLoaded.get(folder);
+ const scope=ext?'chrome-extension://'+ext.id+'/':null;
+ const found=scope?workerRegistrationByScope.get(scope):null;
+ return {scope,observed:!!found,time:found?.time||null};
+}
 function extensionWorkerStatus(folder){
  const ext=extensionLoaded.get(folder);
  if(!ext||!extensionSession)return {status:'not loaded',workers:[]};
@@ -53,7 +60,7 @@ function extensionWorkerStatus(folder){
 function getExtensionDiagnostics(folder){
  const record=extensionRecords.find(x=>x.path===folder);
  if(!record)throw new Error('Extension not found.');
- return {name:record.name,events:extensionDiagnostics.get(folder)||[],popupOpen:!!extensionPopups.get(folder)&&!extensionPopups.get(folder).isDestroyed(),worker:extensionWorkerStatus(folder),manifest:extensionWorkerManifest(folder),registrations:extensionRegistrations.get(folder)||[]};
+ return {name:record.name,events:extensionDiagnostics.get(folder)||[],popupOpen:!!extensionPopups.get(folder)&&!extensionPopups.get(folder).isDestroyed(),worker:extensionWorkerStatus(folder),manifest:extensionWorkerManifest(folder),registrations:extensionRegistrations.get(folder)||[],registrationInfo:extensionRegistrationInfo(folder)};
 }
 function extensionPopupPath(folder){
  const manifest=JSON.parse(fs.readFileSync(path.join(folder,'manifest.json'),'utf8'));
@@ -102,6 +109,12 @@ async function loadUnpacked(record){
  const ext=await extensionSession.extensions.loadExtension(record.path,{allowFileAccess:false});
  extensionLoaded.set(record.path,ext);record.name=ext.name;record.version=ext.version;record.error=null;
  diagnostic(record.path,'extension','Extension loaded; checking background worker manifest');
+ const scope='chrome-extension://'+ext.id+'/';
+ const registration=workerRegistrationByScope.get(scope);
+ if(registration){
+  extensionRegistrations.set(record.path,[registration]);
+  diagnostic(record.path,'registration','Registration observed during extension loading');
+ }else diagnostic(record.path,'registration-info','No registration-completed event observed so far (event may be delayed or not emitted).');
  return ext;
 }
 async function restoreExtensions(){
@@ -307,6 +320,7 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
  extensionSession=session.fromPartition(extensionPartition);
  extensionSession.serviceWorkers.on('registration-completed',(_event,details)=>{
   const scope=String(details.scope||'');
+  if(scope)workerRegistrationByScope.set(scope,{scope,time:Date.now()});
   for(const [folder,ext] of extensionLoaded){
    if(scope.includes(ext.id)){
     const entries=extensionRegistrations.get(folder)||[];
@@ -381,12 +395,15 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
   const manifest=extensionWorkerManifest(folder);
   if(!manifest.script){diagnostic(folder,'probe','No background service worker declared in manifest');return getExtensionDiagnostics(folder);}
   const scope='chrome-extension://'+ext.id+'/';
-  diagnostic(folder,'probe','Attempting registered worker startup');
+  const known=workerRegistrationByScope.has(scope);
+  diagnostic(folder,'probe','Extension scope: '+scope+'; registration event observed: '+known);
+  diagnostic(folder,'probe','Requesting worker startup (may fail if unregistered)');
   try{
    if(typeof extensionSession.serviceWorkers.startWorkerForScope!=='function')throw new Error('This Electron version has no startWorkerForScope API.');
    await extensionSession.serviceWorkers.startWorkerForScope(scope);
    diagnostic(folder,'probe','Worker startup request succeeded');
-  }catch(err){diagnostic(folder,'probe-error',err.message);}
+  }catch(err){diagnostic(folder,'probe-error',String(err.stack||err.message||err).slice(0,500));}
+  diagnostic(folder,'probe-status',JSON.stringify(extensionWorkerStatus(folder)));
   return getExtensionDiagnostics(folder);
  });
  ipcMain.handle('extensions:clear-diagnostics',(_e,folder)=>{extensionDiagnostics.delete(folder);return true;});
