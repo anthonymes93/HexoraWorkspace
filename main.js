@@ -1,5 +1,5 @@
 'use strict';
-const {app,BrowserWindow,WebContentsView,ipcMain,shell,dialog}=require('electron');
+const {app,BrowserWindow,WebContentsView,View,ipcMain,shell,dialog}=require('electron');
 const path=require('node:path');
 const {screen}=require('electron');
 const {TabStore}=require('./tab-store');
@@ -24,7 +24,7 @@ let quitting=false;
 const LAYOUT_KEY='detachedWindowIds';
 function savedDetachedIds(){try{const values=JSON.parse(store.getMeta(LAYOUT_KEY)||'[]');return Array.isArray(values)?values.filter(x=>Number.isSafeInteger(x)&&x>0).slice(0,32):[];}catch{return [];}}
 function setDetachedSaved(id,present){const ids=new Set(savedDetachedIds());if(present)ids.add(id);else ids.delete(id);store.setMeta(LAYOUT_KEY,JSON.stringify([...ids]));}
-let win,store,activeId=null,sidebarWidth=330,live=new Map(),loading=new Map(),stateTimer=null,modalVisible=false,recoveryPassword=null,recoveryDir=null,recoveryTimer=null,recoveryBusy=false,lastBackup=null;
+let mainViewport=null,win,store,activeId=null,sidebarWidth=330,live=new Map(),loading=new Map(),stateTimer=null,modalVisible=false,recoveryPassword=null,recoveryDir=null,recoveryTimer=null,recoveryBusy=false,lastBackup=null;
 function userWebsiteUrl(value){
  if(typeof value!=='string'||!value.trim()||value.length>2048)throw new Error('Enter a valid website URL.');
  const candidate=value.trim();const url=new URL(/^[a-zA-Z][\w+.-]*:\/\//.test(candidate)?candidate:'https://'+candidate);
@@ -57,22 +57,31 @@ function wire(t){const view=new WebContentsView({webPreferences:{partition:'pers
  return view;
 }
 function toModel(r){return{id:r.id,url:safeUrl(r.url),title:r.title||'ChatGPT',workspace:r.workspace||'web',pinned:!!r.pinned,muted:!!r.muted,lastActive:r.last_active??r.lastActive??Date.now(),ordinal:r.ordinal||r.id};}
-function discard(id){const view=live.get(id);if(!view)return;live.delete(id);const pop=detached.get(id);if(pop&&!pop.isDestroyed())pop.contentView.removeChildView(view);else if(win&&!win.isDestroyed())win.contentView.removeChildView(view);loading.delete(id);view.webContents.close();}
-function bounds(){if(!win||win.isDestroyed())return;const v=live.get(activeId);if(v){const [w,h]=win.getContentSize();const layoutWidth=sidebarStableWidth??sidebarWidth;v.setBounds({x:sidebarWidth,y:TOP_HEIGHT,width:Math.max(0,w-layoutWidth),height:Math.max(0,h-TOP_HEIGHT)});}win.webContents.send('sidebar:frame',sidebarWidth);}
-// Animate the native Electron view alongside the CSS workspace panel.
+function discard(id){const view=live.get(id);if(!view)return;live.delete(id);const pop=detached.get(id);if(pop&&!pop.isDestroyed())pop.contentView.removeChildView(view);else if(mainViewport)mainViewport.removeChildView(view);loading.delete(id);view.webContents.close();}
+// Clip the native web view to the available viewport while keeping its internal layout stable.
+// The right edge stays anchored to the window; the left portion is revealed/hidden by the panel.
+function bounds(){
+ if(!win||win.isDestroyed()||!mainViewport)return;
+ const [w,h]=win.getContentSize();
+ const visibleWidth=Math.max(0,w-sidebarWidth),visibleHeight=Math.max(0,h-TOP_HEIGHT);
+ mainViewport.setBounds({x:sidebarWidth,y:TOP_HEIGHT,width:visibleWidth,height:visibleHeight});
+ const view=live.get(activeId);
+ if(view){
+  const stableLeft=sidebarStableWidth??sidebarWidth;
+  const stableWidth=Math.max(0,w-stableLeft);
+  view.setBounds({x:visibleWidth-stableWidth,y:0,width:stableWidth,height:visibleHeight});
+ }
+ win.webContents.send('sidebar:frame',sidebarWidth);
+}
 let sidebarAnimation=null,sidebarStableWidth=null;
 function setSidebarWidth(collapsed){
  const start=sidebarWidth,target=collapsed?64:330;
  if(sidebarAnimation){clearInterval(sidebarAnimation);sidebarAnimation=null;}
  if(start===target){sidebarStableWidth=null;bounds();return;}
- // Size the site once at its destination width; during motion only move its native view.
- // Keep the view wide enough to cover the right edge for the entire motion.
- // The content is resized once up front and once at the end, never every frame.
+ // Keep the web content at the wide width and clip its left edge while the panel expands.
  sidebarStableWidth=Math.min(start,target);
  bounds();
  const began=performance.now(),duration=792;
- // Only the native view's position changes during the transition (not its layout width).
- // Animate at approximately display refresh rate for smoother text movement.
  const ease=t=>t*t*(3-2*t);
  function frame(){
   const progress=Math.min(1,(performance.now()-began)/duration);
@@ -89,10 +98,10 @@ function state(workspace='web',offset=0){return{activeId,total:store.total(),cou
 function emit(){if(!win||win.isDestroyed())return;clearTimeout(stateTimer);stateTimer=setTimeout(()=>{if(!win||win.isDestroyed())return;win.webContents.send('tabs:changed');},70);}
 function activate(id){const raw=store.get(Number(id));if(!raw)return false;
  if(detached.has(raw.id)){const popup=detached.get(raw.id);if(!popup.isDestroyed()){if(popup.isMinimized())popup.restore();popup.focus();return true;}}
- for(const [otherId,view] of live)if(otherId!==id&&!detached.has(otherId))win.contentView.removeChildView(view);
+ for(const [otherId,view] of live)if(otherId!==id&&!detached.has(otherId))mainViewport.removeChildView(view);
  activeId=raw.id;const t=toModel(raw);t.lastActive=Date.now();store.save(t);store.setMeta('activeId',String(activeId));
  let view=live.get(id);if(!view){view=wire(t);live.set(id,view);}
- if(!modalVisible){win.contentView.addChildView(view);bounds();view.webContents.focus();}evict();emit();return true;
+ if(!modalVisible){mainViewport.addChildView(view);bounds();view.webContents.focus();}evict();emit();return true;
 }
 function evict(){if(live.size<=MAX_LIVE)return;const candidates=Array.from(live.keys()).filter(id=>id!==activeId&&!detached.has(id)&&!store.get(id)?.pinned);
  candidates.sort((a,b)=>(store.get(a)?.last_active||0)-(store.get(b)?.last_active||0));
@@ -109,7 +118,7 @@ function detachTab(id){
  if(existing&&!existing.isDestroyed()){existing.focus();return true;}
  let view=live.get(id);
  if(!view){view=wire(toModel(row));live.set(id,view);}
- win.contentView.removeChildView(view);
+ mainViewport.removeChildView(view);
  const saved=store.getMeta('windowBounds:'+id);
  let rectangle;
  try{rectangle=JSON.parse(saved);}catch{}
@@ -139,7 +148,7 @@ function detachTab(id){
   const currentId=popup.hexoraTabId;detached.delete(currentId);
   if(!quitting)setDetachedSaved(currentId,false);
   if(!quitting&&win&&!win.isDestroyed()&&store.get(currentId)){
-   if(activeId===currentId){const current=live.get(currentId);if(current)win.contentView.addChildView(current);bounds();win.focus();}
+   if(activeId===currentId){const current=live.get(currentId);if(current)mainViewport.addChildView(current);bounds();win.focus();}
    emit();
   }
  });
@@ -213,6 +222,7 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
  store=new TabStore(dataDir);
  store.importLegacy(path.join(app.getPath('userData'),'hexora-tabs.json'));
  win=new BrowserWindow({width:1360,height:900,minWidth:700,minHeight:400,title:'Hexora Workspace',autoHideMenuBar:true,backgroundColor:'#111215',webPreferences:{preload:path.join(__dirname,'preload.js'),contextIsolation:true,sandbox:true,nodeIntegration:false}});
+ mainViewport=new View();win.contentView.addChildView(mainViewport);
  win.loadFile('toolbar.html');win.on('resize',bounds);win.webContents.on('did-finish-load',emit);
  const last=Number(store.getMeta('activeId'));if(!last||!activate(last)){const backup=store.lastActiveId();if(!backup||!activate(backup))newTab();}
  // Reopen each detached tab at its saved screen position after the primary workspace starts.
@@ -295,7 +305,7 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
   }
   else if(action==='close')closeTab(arg);
   else if(action==='reload'){
-   if(wc){const view=live.get(activeId);win.contentView.removeChildView(view);win.contentView.addChildView(view);bounds();wc.reloadIgnoringCache();}
+   if(wc){const view=live.get(activeId);mainViewport.removeChildView(view);mainViewport.addChildView(view);bounds();wc.reloadIgnoringCache();}
   }
   else if(action==='back'&&wc?.navigationHistory.canGoBack())wc.navigationHistory.goBack();
   else if(action==='forward'&&wc?.navigationHistory.canGoForward())wc.navigationHistory.goForward();
@@ -310,8 +320,8 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
    modalVisible=!!arg;
    const view=live.get(activeId);
    if(view){
-    if(modalVisible){win.contentView.removeChildView(view);win.webContents.focus();}
-    else {win.contentView.addChildView(view);bounds();view.webContents.focus();}
+    if(modalVisible){mainViewport.removeChildView(view);win.webContents.focus();}
+    else {mainViewport.addChildView(view);bounds();view.webContents.focus();}
    }
   }
   else if(['pin','mute','workspace'].includes(action)){
