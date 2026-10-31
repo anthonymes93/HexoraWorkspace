@@ -245,7 +245,7 @@ async function refreshExtensions(){
    const title=document.createElement('strong');title.textContent=ext.name||'Extension';
    const info=document.createElement('small');info.textContent='Version '+(ext.version||'?')+' · '+(ext.enabled?'Enabled':'Disabled');
    const folder=document.createElement('small');folder.textContent=ext.path;folder.title=ext.path;
-   details.append(title,info,folder);
+   details.append(title,info,folder);const compatibility=document.createElement('small');compatibility.className='extension-compatibility';compatibility.textContent=ext.compatibilityNote||'Compatibility unverified';details.append(compatibility);
    if(ext.error){const err=document.createElement('small');err.className='website-error';err.textContent=ext.error;details.append(err);}
    const toggle=document.createElement('button');toggle.className='pill';toggle.textContent=ext.enabled?'Disable':'Enable';
    toggle.onclick=async()=>{try{await window.hexora.extensions.toggle(ext.path);await refreshExtensions();}catch(e){$('extensions-error').textContent=e.message;}};
