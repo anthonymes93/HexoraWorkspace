@@ -31,6 +31,12 @@ let extensionRecords=[],extensionLoaded=new Map(),extensionSession=null,extensio
 const extensionPopups=new Map();
 const extensionRegistrations=new Map();
 const workerRegistrationByScope=new Map();
+const extensionLifecycle=new Map();
+function extensionLifecycleEvent(kind,ext){
+ if(!ext?.id)return;
+ extensionLifecycle.set(ext.id,{...(extensionLifecycle.get(ext.id)||{}),[kind]:Date.now()});
+ for(const [folder,loaded] of extensionLoaded)if(loaded.id===ext.id)diagnostic(folder,'lifecycle','Extension '+kind);
+}
 const extensionDiagnostics=new Map();
 function diagnostic(folder,kind,message){
  const records=extensionDiagnostics.get(folder)||[];
@@ -60,7 +66,7 @@ function extensionWorkerStatus(folder){
 function getExtensionDiagnostics(folder){
  const record=extensionRecords.find(x=>x.path===folder);
  if(!record)throw new Error('Extension not found.');
- return {name:record.name,events:extensionDiagnostics.get(folder)||[],popupOpen:!!extensionPopups.get(folder)&&!extensionPopups.get(folder).isDestroyed(),worker:extensionWorkerStatus(folder),manifest:extensionWorkerManifest(folder),registrations:extensionRegistrations.get(folder)||[],registrationInfo:extensionRegistrationInfo(folder)};
+ return {name:record.name,events:extensionDiagnostics.get(folder)||[],popupOpen:!!extensionPopups.get(folder)&&!extensionPopups.get(folder).isDestroyed(),worker:extensionWorkerStatus(folder),manifest:extensionWorkerManifest(folder),registrations:extensionRegistrations.get(folder)||[],registrationInfo:extensionRegistrationInfo(folder),lifecycle:extensionLifecycle.get(extensionLoaded.get(folder)?.id)||null};
 }
 function extensionPopupPath(folder){
  const manifest=JSON.parse(fs.readFileSync(path.join(folder,'manifest.json'),'utf8'));
@@ -109,6 +115,9 @@ async function loadUnpacked(record){
  const ext=await extensionSession.extensions.loadExtension(record.path,{allowFileAccess:false});
  extensionLoaded.set(record.path,ext);record.name=ext.name;record.version=ext.version;record.error=null;
  diagnostic(record.path,'extension','Extension loaded; checking background worker manifest');
+ const lifecycle=extensionLifecycle.get(ext.id);
+ if(lifecycle)diagnostic(record.path,'lifecycle','Observed extension lifecycle: '+Object.keys(lifecycle).join(', '));
+ else diagnostic(record.path,'lifecycle','Extension readiness not yet observed');
  const scope='chrome-extension://'+ext.id+'/';
  const registration=workerRegistrationByScope.get(scope);
  if(registration){
@@ -318,6 +327,9 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
  try{const prefs=JSON.parse(fs.readFileSync(path.join(dataDir,'hexora-recovery-config.json'),'utf8'));if(prefs.directory)recoveryDir=prefs.directory;}catch{}
  extensionConfigFile=path.join(dataDir,'hexora-extensions.json');
  extensionSession=session.fromPartition(extensionPartition);
+ extensionSession.extensions.on('extension-loaded',(_e,ext)=>extensionLifecycleEvent('loaded',ext));
+ extensionSession.extensions.on('extension-ready',(_e,ext)=>extensionLifecycleEvent('ready',ext));
+ extensionSession.extensions.on('extension-unloaded',(_e,ext)=>extensionLifecycleEvent('unloaded',ext));
  extensionSession.serviceWorkers.on('registration-completed',(_event,details)=>{
   const scope=String(details.scope||'');
   if(scope)workerRegistrationByScope.set(scope,{scope,time:Date.now()});
@@ -397,6 +409,9 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
   const scope='chrome-extension://'+ext.id+'/';
   const known=workerRegistrationByScope.has(scope);
   diagnostic(folder,'probe','Extension scope: '+scope+'; registration event observed: '+known);
+  const lifecycle=extensionLifecycle.get(ext.id);
+  diagnostic(folder,'probe','Electron lifecycle: '+(lifecycle?Object.keys(lifecycle).join(', '):'not observed'));
+  if(!known)diagnostic(folder,'compatibility','No worker registration event observed. Electron does not guarantee support for arbitrary Manifest V3 extensions; startup may fail because no registered worker exists.');
   diagnostic(folder,'probe','Requesting worker startup (may fail if unregistered)');
   try{
    if(typeof extensionSession.serviceWorkers.startWorkerForScope!=='function')throw new Error('This Electron version has no startWorkerForScope API.');
