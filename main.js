@@ -86,7 +86,13 @@ function setSidebarWidth(collapsed){
  function frame(){
   const progress=Math.min(1,(performance.now()-began)/duration);
   const next=progress===1?target:Math.round(start+(target-start)*ease(progress));
-  if(next!==sidebarWidth){sidebarWidth=next;bounds();}
+  // Settle the page's layout over the final quarter of the motion rather than
+  // applying a single abrupt resize on the very last frame.
+  const settle=Math.max(0,Math.min(1,(progress-.75)/.25));
+  const smoothSettle=settle*settle*(3-2*settle);
+  sidebarStableWidth=Math.round(Math.min(start,target)+(target-Math.min(start,target))*smoothSettle);
+  if(next!==sidebarWidth){sidebarWidth=next;}
+  bounds();
   if(progress===1){clearInterval(sidebarAnimation);sidebarAnimation=null;sidebarWidth=target;sidebarStableWidth=null;bounds();}
  }
  sidebarAnimation=setInterval(frame,16);
