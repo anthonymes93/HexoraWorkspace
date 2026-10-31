@@ -64,3 +64,6 @@
 .extension-actions{display:flex;gap:3px;align-self:center;flex-shrink:0}.extension-action{width:31px;height:31px;border:1px solid #34343d;border-radius:8px;background:#22232a;font-size:16px;display:grid;place-items:center}.extension-action:hover{background:#373440}
 
 .diagnostic-events{max-height:54vh;overflow:auto;display:flex;flex-direction:column;gap:7px}.diagnostic-event{display:flex;flex-direction:column;gap:4px;padding:10px;background:#18191e;border:1px solid #34353e;border-radius:8px;font-size:12px;overflow-wrap:anywhere}.diagnostic-event strong{color:#c2b1fd;font-size:11px}.diagnostic-event span{color:#d8d6df}
+
+/* One-click cross-workspace tab shortcuts, directly beneath pagination */
+.quick-jumps{display:flex;flex-wrap:wrap;gap:7px;padding:11px 3px 8px;margin-top:1px;border-top:1px solid #303039}.quick-jump{width:32px;height:32px;flex-shrink:0;border:1px solid #3b3948!important;border-radius:9px!important;background:#24232d!important;display:grid;place-items:center;color:#d6caff!important;font-size:18px;line-height:1}.quick-jump:hover{background:#3d354f!important;border-color:#a991ed!important}.quick-jump.current{border-color:#ac91ff!important;background:#3a304d!important}.quick-jump.add{font-size:23px;color:#9693a4!important;border-style:dashed!important;background:transparent!important}
