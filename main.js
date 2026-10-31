@@ -66,7 +66,10 @@ function setSidebarWidth(collapsed){
  if(sidebarAnimation){clearInterval(sidebarAnimation);sidebarAnimation=null;}
  if(start===target){sidebarStableWidth=null;bounds();return;}
  // Size the site once at its destination width; during motion only move its native view.
- sidebarStableWidth=target;
+ // Keep the view wide enough to cover the right edge for the entire motion.
+ // The content is resized once up front and once at the end, never every frame.
+ sidebarStableWidth=Math.min(start,target);
+ bounds();
  const began=performance.now(),duration=792;
  // Only the native view's position changes during the transition (not its layout width).
  // Animate at approximately display refresh rate for smoother text movement.
