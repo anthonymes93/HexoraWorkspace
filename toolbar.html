@@ -9,6 +9,7 @@
   <button id="split-rail" class="railbtn" title="Split view — coming soon" disabled>◫</button>
   <button id="recovery-rail" class="railbtn" title="Encrypted backups">⛨</button>
   <button id="statistics-rail" class="railbtn" title="Statistics and task manager">▥</button>
+  <button id="extensions-rail" class="railbtn" title="Chrome extensions">🧩</button>
   <button id="settings-rail" class="railbtn bottom" title="Open ChatGPT in browser">↗</button>
 </div>
 <aside class="sidebar" id="sidebar">
@@ -76,5 +77,12 @@
  <div class="stats-controls"><b>Browser processes</b><button id="statistics-refresh" class="pill">Refresh</button></div>
  <div class="stats-scroll"><table class="stats-table"><thead><tr><th>Process / tabs</th><th>PID</th><th>CPU</th><th>RAM</th></tr></thead><tbody id="statistics-rows"></tbody></table></div>
  <p id="statistics-message" class="hint"></p>
+ </section></div>
+<div id="extensions-overlay" class="overlay hidden"><section class="stats-dialog extensions-dialog" role="dialog" aria-modal="true" aria-label="Chrome extensions">
+ <div class="dialog-header"><b>Hexora Extensions</b><button id="extensions-close" aria-label="Close">×</button></div>
+ <p class="hint">Install unpacked Chrome extensions from trusted folders. Electron supports only some extension APIs. Chrome Web Store one-click installs and .crx packages are not supported.</p>
+ <button id="extensions-install" class="pill primary">＋ Install unpacked extension</button>
+ <div id="extensions-list" class="extensions-list"></div>
+ <p id="extensions-error" class="website-error" role="alert"></p>
  </section></div>
 <script src="toolbar.js"></script></body></html>
