@@ -37,5 +37,6 @@
 
 /* Short interpolation hides the 30fps native resize stepping without lagging behind. */
 .sidebar,.sidebar.hidden{transition:width 33ms linear,padding 33ms linear!important}
-.top-main,.top-main.expanded{transition:left 33ms linear!important}
+/* Match the tab strip to the native web view on each sidebar frame; no trailing 33ms interpolation. */
+.top-main,.top-main.expanded{transition:none!important}
 @media(prefers-reduced-motion:reduce){.sidebar,.sidebar.hidden,.top-main,.top-main.expanded{transition:none!important}}
