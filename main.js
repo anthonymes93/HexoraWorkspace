@@ -109,7 +109,7 @@ function openExtensionPopup(folder){
  popup.loadURL('chrome-extension://'+ext.id+'/'+relative).catch(err=>{diagnostic(folder,'load-error',err.message);console.error('Extension popup load failed:',err);});
  return true;
 }
-function extensionList(){return extensionRecords.map(r=>({name:r.name,version:r.version,path:r.path,enabled:r.enabled,id:extensionLoaded.get(r.path)?.id||null,error:r.error||null,popup:(()=>{try{return !!extensionPopupPath(r.path);}catch{return false;}})()}));}
+function extensionList(){return extensionRecords.map(r=>{const manifest=extensionWorkerManifest(r.path);const worker=manifest.manifestVersion===3&&!!manifest.script;return {name:r.name,version:r.version,path:r.path,enabled:r.enabled,id:extensionLoaded.get(r.path)?.id||null,error:r.error||null,popup:(()=>{try{return !!extensionPopupPath(r.path);}catch{return false;}})(),compatibilityNote:worker?'Uses a Manifest V3 service worker. Electron may load it without supporting its functionality.':'Extension functionality has not been verified.'};});}
 function persistExtensions(){if(extensionConfigFile)fs.writeFileSync(extensionConfigFile,JSON.stringify(extensionRecords.map(({path,name,version,enabled})=>({path,name,version,enabled})),null,2));}
 async function loadUnpacked(record){
  const ext=await extensionSession.extensions.loadExtension(record.path,{allowFileAccess:false});
