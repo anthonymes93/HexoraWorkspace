@@ -189,3 +189,46 @@ $('workspace-delete').onclick=async()=>{
  workspaces.splice(workspaces.indexOf(w),1);if(activeWorkspace===w.id){activeWorkspace='web';offset=0;}
  save();closeWorkspaceEditor();await action('switch-workspace',activeWorkspace);refresh();
 };
+
+let statisticsTimer=null,statisticsBusy=false;
+const statsFormatBytes=n=>n>=1073741824?(n/1073741824).toFixed(2)+' GB':(n/1048576).toFixed(1)+' MB';
+function statisticsClose(){
+ $('statistics-overlay').classList.add('hidden');clearInterval(statisticsTimer);statisticsTimer=null;action('modal',false);
+}
+async function statisticsRefresh(){
+ if(statisticsBusy||$('statistics-overlay').classList.contains('hidden'))return;
+ statisticsBusy=true;
+ try{
+  const data=await window.hexora.statistics();
+  const total=data.processes.reduce((n,p)=>n+p.memoryBytes,0);
+  const cpu=data.processes.reduce((n,p)=>n+p.cpu,0);
+  const summary=$('statistics-summary');summary.replaceChildren();
+  for(const [label,value] of [['Hexora RAM',statsFormatBytes(total)],['Hexora CPU',cpu.toFixed(1)+'%'],['System RAM used',statsFormatBytes(data.system.totalMemory-data.system.freeMemory)+' / '+statsFormatBytes(data.system.totalMemory)],['Tabs',data.liveTabs+' live / '+data.savedTabs+' saved']]){
+   const card=document.createElement('div');card.className='stats-metric';
+   const k=document.createElement('small');k.textContent=label;const v=document.createElement('strong');v.textContent=value;card.append(k,v);summary.append(card);
+  }
+  const tbody=$('statistics-rows');tbody.replaceChildren();
+  const tabsByPid=new Map();
+  for(const tab of data.tabs){if(!tabsByPid.has(tab.pid))tabsByPid.set(tab.pid,[]);tabsByPid.get(tab.pid).push(tab);}
+  const sorted=[...data.processes].sort((a,b)=>b.memoryBytes-a.memoryBytes);
+  for(const process of sorted){
+   const tr=document.createElement('tr'),names=tabsByPid.get(process.pid)||[];
+   const title=document.createElement('td');title.textContent=(names.length?names.map(x=>x.title).join(', '):process.type)+(names.length?' ('+process.type+')':'');
+   title.title=names.length?names.map(x=>x.title).join(' • '):process.type;
+   for(const value of [process.pid,process.cpu.toFixed(1)+'%',statsFormatBytes(process.memoryBytes)]){
+    const td=document.createElement('td');td.textContent=String(value);tr.append(td);
+   }
+   tr.prepend(title);tbody.append(tr);
+  }
+  $('statistics-message').textContent='Process CPU figures are provided by Electron; multiple tabs sharing a process cannot be measured independently. Last updated '+new Date(data.time).toLocaleTimeString();
+ }catch(err){$('statistics-message').textContent='Could not load statistics: '+err.message;}
+ finally{statisticsBusy=false;}
+}
+$('statistics-rail').onclick=()=>{
+ $('statistics-overlay').classList.remove('hidden');action('modal',true);
+ clearInterval(statisticsTimer);statisticsTimer=setInterval(statisticsRefresh,2000);statisticsRefresh();
+};
+$('statistics-close').onclick=statisticsClose;
+$('statistics-refresh').onclick=statisticsRefresh;
+$('statistics-overlay').onclick=e=>{if(e.target===$('statistics-overlay'))statisticsClose();};
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('statistics-overlay').classList.contains('hidden'))statisticsClose();});
