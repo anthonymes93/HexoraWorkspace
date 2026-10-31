@@ -58,13 +58,15 @@ function wire(t){const view=new WebContentsView({webPreferences:{partition:'pers
 }
 function toModel(r){return{id:r.id,url:safeUrl(r.url),title:r.title||'ChatGPT',workspace:r.workspace||'web',pinned:!!r.pinned,muted:!!r.muted,lastActive:r.last_active??r.lastActive??Date.now(),ordinal:r.ordinal||r.id};}
 function discard(id){const view=live.get(id);if(!view)return;live.delete(id);const pop=detached.get(id);if(pop&&!pop.isDestroyed())pop.contentView.removeChildView(view);else if(win&&!win.isDestroyed())win.contentView.removeChildView(view);loading.delete(id);view.webContents.close();}
-function bounds(){if(!win||win.isDestroyed())return;const v=live.get(activeId);if(v){const [w,h]=win.getContentSize();v.setBounds({x:sidebarWidth,y:TOP_HEIGHT,width:Math.max(0,w-sidebarWidth),height:Math.max(0,h-TOP_HEIGHT)});}win.webContents.send('sidebar:frame',sidebarWidth);}
+function bounds(){if(!win||win.isDestroyed())return;const v=live.get(activeId);if(v){const [w,h]=win.getContentSize();const layoutWidth=sidebarStableWidth??sidebarWidth;v.setBounds({x:sidebarWidth,y:TOP_HEIGHT,width:Math.max(0,w-layoutWidth),height:Math.max(0,h-TOP_HEIGHT)});}win.webContents.send('sidebar:frame',sidebarWidth);}
 // Animate the native Electron view alongside the CSS workspace panel.
-let sidebarAnimation=null;
+let sidebarAnimation=null,sidebarStableWidth=null;
 function setSidebarWidth(collapsed){
  const start=sidebarWidth,target=collapsed?64:330;
  if(sidebarAnimation){clearInterval(sidebarAnimation);sidebarAnimation=null;}
- if(start===target){bounds();return;}
+ if(start===target){sidebarStableWidth=null;bounds();return;}
+ // Size the site once at its destination width; during motion only move its native view.
+ sidebarStableWidth=target;
  const began=performance.now(),duration=792;
  // Limit native WebContentsView relayouts to ~30fps; CSS interpolates the chrome.
  const ease=t=>t*t*(3-2*t);
@@ -72,7 +74,7 @@ function setSidebarWidth(collapsed){
   const progress=Math.min(1,(performance.now()-began)/duration);
   const next=progress===1?target:Math.round(start+(target-start)*ease(progress));
   if(next!==sidebarWidth){sidebarWidth=next;bounds();}
-  if(progress===1){clearInterval(sidebarAnimation);sidebarAnimation=null;sidebarWidth=target;bounds();}
+  if(progress===1){clearInterval(sidebarAnimation);sidebarAnimation=null;sidebarWidth=target;sidebarStableWidth=null;bounds();}
  }
  sidebarAnimation=setInterval(frame,33);
  frame();
