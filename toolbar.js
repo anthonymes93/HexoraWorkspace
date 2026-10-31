@@ -281,6 +281,10 @@ async function renderExtensionDiagnostics(){
  try{
   const data=await window.hexora.extensions.diagnostics(diagnosticFolder);
   const host=$('extension-diagnostic-events');host.replaceChildren();
+  const status=document.createElement('div');status.className='diagnostic-event';
+  const heading=document.createElement('strong');heading.textContent='Background worker: '+data.worker.status;
+  const detail=document.createElement('span');detail.textContent=data.worker.workers.length?data.worker.workers.map(w=>w.scope||w.scriptUrl||w.version).join(', '):(data.worker.error||'No currently running extension worker detected; idle workers may stop normally.');
+  status.append(heading,detail);host.append(status);
   if(!data.events.length){const p=document.createElement('p');p.className='hint';p.textContent='No diagnostic events yet. Open the extension popup to capture its startup.';host.append(p);}
   for(const event of [...data.events].reverse()){
    const line=document.createElement('div');line.className='diagnostic-event';
