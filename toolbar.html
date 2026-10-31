@@ -92,4 +92,13 @@
  <div class="stats-controls"><button id="extension-diagnostics-popup" class="pill primary">Open popup</button><button id="extension-diagnostics-probe" class="pill">Test worker startup</button><button id="extension-diagnostics-clear" class="pill">Clear log</button></div>
  <div id="extension-diagnostic-events" class="diagnostic-events"></div>
  </section></div>
+<div id="quick-jump-overlay" class="overlay hidden"><div class="dialog">
+ <div class="dialog-header"><b>New Quick Jump</b><button id="quick-jump-close" aria-label="Close">×</button></div>
+ <p class="hint">Choose any workspace tab and jump to it from anywhere with one click.</p>
+ <form id="quick-jump-form">
+  <label for="quick-jump-tab">Destination tab</label><select id="quick-jump-tab" required></select>
+  <label for="quick-jump-icon">Shortcut icon</label><input id="quick-jump-icon" maxlength="8" placeholder="✦"/>
+  <p id="quick-jump-error" class="website-error" role="alert"></p>
+  <div class="website-actions"><button id="quick-jump-cancel" class="pill" type="button">Cancel</button><button class="pill primary" type="submit">Add shortcut</button></div>
+ </form></div></div>
 <script src="toolbar.js"></script></body></html>
