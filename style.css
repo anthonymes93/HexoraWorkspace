@@ -58,3 +58,5 @@
 .stats-table td:first-child{max-width:480px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .stats-table td:not(:first-child){white-space:nowrap;font-variant-numeric:tabular-nums}
 @media(max-width:680px){.stats-summary{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+.extensions-dialog{max-width:760px}.extensions-list{display:flex;flex-direction:column;gap:10px;margin-top:18px}.extension-row{display:flex;align-items:center;gap:9px;padding:14px;background:#18191e;border:1px solid #393945;border-radius:11px}.extension-details{display:flex;flex:1;flex-direction:column;min-width:0;gap:5px}.extension-details strong{font-size:13px}.extension-details small{font-size:11px;color:#aaa6b6;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.extension-row .pill{flex-shrink:0}
