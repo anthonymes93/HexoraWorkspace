@@ -67,20 +67,19 @@ function bounds(){
  mainViewport.setBounds({x:sidebarWidth,y:TOP_HEIGHT,width:visibleWidth,height:visibleHeight});
  const view=live.get(activeId);
  if(view){
-  const stableLeft=sidebarStableWidth??sidebarWidth;
-  const stableWidth=Math.max(0,w-stableLeft);
-  view.setBounds({x:visibleWidth-stableWidth,y:0,width:stableWidth,height:visibleHeight});
+  // Fill the visible viewport exactly: no negative offsets, clipped gray gaps,
+  // or late correction when the workspace panel finishes moving.
+  view.setBounds({x:0,y:0,width:visibleWidth,height:visibleHeight});
  }
  win.webContents.send('sidebar:frame',sidebarWidth);
 }
-let sidebarAnimation=null,sidebarStableWidth=null;
+let sidebarAnimation=null;
 function setSidebarWidth(collapsed){
  const start=sidebarWidth,target=collapsed?64:330;
  if(sidebarAnimation){clearInterval(sidebarAnimation);sidebarAnimation=null;}
- if(start===target){sidebarStableWidth=null;bounds();return;}
- // Lay out the page at its destination width once, then reveal it through the
- // clipping viewport. There is no final resize to cause a second reflow.
- sidebarStableWidth=target;
+ if(start===target){bounds();return;}
+ // Resize the embedded browser together with the panel on every frame.
+ // Geometry is contiguous: viewport and web content always share the same edges.
  bounds();
  const began=performance.now(),duration=792;
  const ease=t=>t*t*(3-2*t);
@@ -89,7 +88,7 @@ function setSidebarWidth(collapsed){
   const next=progress===1?target:Math.round(start+(target-start)*ease(progress));
   if(next!==sidebarWidth){sidebarWidth=next;}
   bounds();
-  if(progress===1){clearInterval(sidebarAnimation);sidebarAnimation=null;sidebarWidth=target;sidebarStableWidth=null;bounds();}
+  if(progress===1){clearInterval(sidebarAnimation);sidebarAnimation=null;sidebarWidth=target;bounds();}
  }
  sidebarAnimation=setInterval(frame,16);
  frame();
