@@ -1,5 +1,5 @@
 'use strict';
-const {app,BrowserWindow,WebContentsView,View,ipcMain,shell,dialog}=require('electron');
+const {app,BrowserWindow,WebContentsView,View,session,ipcMain,shell,dialog}=require('electron');
 const path=require('node:path');
 const {screen}=require('electron');
 const {TabStore}=require('./tab-store');
@@ -26,6 +26,19 @@ const LAYOUT_KEY='detachedWindowIds';
 function savedDetachedIds(){try{const values=JSON.parse(store.getMeta(LAYOUT_KEY)||'[]');return Array.isArray(values)?values.filter(x=>Number.isSafeInteger(x)&&x>0).slice(0,32):[];}catch{return [];}}
 function setDetachedSaved(id,present){const ids=new Set(savedDetachedIds());if(present)ids.add(id);else ids.delete(id);store.setMeta(LAYOUT_KEY,JSON.stringify([...ids]));}
 let mainViewport=null,win,store,activeId=null,sidebarWidth=330,live=new Map(),loading=new Map(),stateTimer=null,modalVisible=false,recoveryPassword=null,recoveryDir=null,recoveryTimer=null,recoveryBusy=false,lastBackup=null;
+const extensionPartition='persist:hexora-chatgpt';
+let extensionRecords=[],extensionLoaded=new Map(),extensionSession=null,extensionConfigFile=null;
+function extensionList(){return extensionRecords.map(r=>({name:r.name,version:r.version,path:r.path,enabled:r.enabled,id:extensionLoaded.get(r.path)?.id||null,error:r.error||null}));}
+function persistExtensions(){if(extensionConfigFile)fs.writeFileSync(extensionConfigFile,JSON.stringify(extensionRecords.map(({path,name,version,enabled})=>({path,name,version,enabled})),null,2));}
+async function loadUnpacked(record){
+ const ext=await extensionSession.extensions.loadExtension(record.path,{allowFileAccess:false});
+ extensionLoaded.set(record.path,ext);record.name=ext.name;record.version=ext.version;record.error=null;
+ return ext;
+}
+async function restoreExtensions(){
+ try{const data=JSON.parse(fs.readFileSync(extensionConfigFile,'utf8'));extensionRecords=Array.isArray(data)?data.filter(r=>typeof r.path==='string'&&path.isAbsolute(r.path)).map(r=>({...r,enabled:!!r.enabled})):[];}catch{extensionRecords=[];}
+ for(const r of extensionRecords)if(r.enabled){try{await loadUnpacked(r);}catch(err){r.error=err.message;console.error('Extension restore failed',r.path,err);}}
+}
 function userWebsiteUrl(value){
  if(typeof value!=='string'||!value.trim()||value.length>2048)throw new Error('Enter a valid website URL.');
  const candidate=value.trim();const url=new URL(/^[a-zA-Z][\w+.-]*:\/\//.test(candidate)?candidate:'https://'+candidate);
@@ -221,6 +234,9 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
  const dataDir=app.getPath('userData');
  try{applyPending(dataDir);}catch(err){dialog.showErrorBox('Hexora restore could not be applied',err.message);}
  try{const prefs=JSON.parse(fs.readFileSync(path.join(dataDir,'hexora-recovery-config.json'),'utf8'));if(prefs.directory)recoveryDir=prefs.directory;}catch{}
+ extensionConfigFile=path.join(dataDir,'hexora-extensions.json');
+ extensionSession=session.fromPartition(extensionPartition);
+ restoreExtensions().catch(err=>console.error('Extension initialization failed:',err));
  store=new TabStore(dataDir);
  store.importLegacy(path.join(app.getPath('userData'),'hexora-tabs.json'));
  win=new BrowserWindow({width:1360,height:900,minWidth:700,minHeight:400,title:'Hexora Workspace',autoHideMenuBar:true,backgroundColor:'#111215',webPreferences:{preload:path.join(__dirname,'preload.js'),contextIsolation:true,sandbox:true,nodeIntegration:false}});
@@ -269,6 +285,29 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
   app.relaunch();app.quit();return{restarting:true};
  });
  recoveryTimer=setInterval(()=>{if(recoveryPassword&&recoveryDir&&!recoveryBusy){try{backupNow();}catch(err){console.error('Hexora scheduled backup failed:',err);}}},60*60*1000);
+ ipcMain.handle('extensions:list',()=>extensionList());
+ ipcMain.handle('extensions:install',async()=>{
+  const pick=await dialog.showOpenDialog(win,{title:'Select unpacked Chrome extension folder',properties:['openDirectory']});
+  if(pick.canceled||!pick.filePaths[0])return {cancelled:true};
+  const folder=path.resolve(pick.filePaths[0]),manifestPath=path.join(folder,'manifest.json');
+  let manifest;
+  try{manifest=JSON.parse(fs.readFileSync(manifestPath,'utf8'));}catch{throw new Error('Choose a folder containing a valid manifest.json file.');}
+  if(!manifest.name||![2,3].includes(manifest.manifest_version))throw new Error('This folder is not a supported unpacked Chrome extension.');
+  if(extensionRecords.some(x=>x.path===folder))throw new Error('This extension folder has already been added.');
+  const record={path:folder,name:String(manifest.name).slice(0,150),version:String(manifest.version||''),enabled:true};
+  await loadUnpacked(record);extensionRecords.push(record);persistExtensions();return extensionList();
+ });
+ ipcMain.handle('extensions:toggle',async(_e,folder)=>{
+  const record=extensionRecords.find(x=>x.path===folder);if(!record)throw new Error('Extension not found.');
+  if(record.enabled){const loaded=extensionLoaded.get(folder);if(loaded)extensionSession.extensions.removeExtension(loaded.id);extensionLoaded.delete(folder);record.enabled=false;record.error=null;}
+  else{await loadUnpacked(record);record.enabled=true;}
+  persistExtensions();return extensionList();
+ });
+ ipcMain.handle('extensions:remove',(_e,folder)=>{
+  const index=extensionRecords.findIndex(x=>x.path===folder);if(index<0)throw new Error('Extension not found.');
+  const loaded=extensionLoaded.get(folder);if(loaded)extensionSession.extensions.removeExtension(loaded.id);
+  extensionLoaded.delete(folder);extensionRecords.splice(index,1);persistExtensions();return extensionList();
+ });
  ipcMain.handle('statistics:snapshot',()=>{
   const processes=app.getAppMetrics().map(item=>({
    pid:item.pid,type:item.type,cpu:Number(item.cpu?.percentCPUUsage)||0,
