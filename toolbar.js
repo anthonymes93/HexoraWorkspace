@@ -232,3 +232,29 @@ $('statistics-close').onclick=statisticsClose;
 $('statistics-refresh').onclick=statisticsRefresh;
 $('statistics-overlay').onclick=e=>{if(e.target===$('statistics-overlay'))statisticsClose();};
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('statistics-overlay').classList.contains('hidden'))statisticsClose();});
+
+function closeExtensions(){$('extensions-overlay').classList.add('hidden');action('modal',false);}
+async function refreshExtensions(){
+ try{
+  const extensions=await window.hexora.extensions.list(),list=$('extensions-list');list.replaceChildren();
+  if(!extensions.length){const empty=document.createElement('p');empty.className='hint';empty.textContent='No extensions installed yet.';list.append(empty);}
+  for(const ext of extensions){
+   const row=document.createElement('div');row.className='extension-row';
+   const details=document.createElement('div');details.className='extension-details';
+   const title=document.createElement('strong');title.textContent=ext.name||'Extension';
+   const info=document.createElement('small');info.textContent='Version '+(ext.version||'?')+' · '+(ext.enabled?'Enabled':'Disabled');
+   const folder=document.createElement('small');folder.textContent=ext.path;folder.title=ext.path;
+   details.append(title,info,folder);
+   if(ext.error){const err=document.createElement('small');err.className='website-error';err.textContent=ext.error;details.append(err);}
+   const toggle=document.createElement('button');toggle.className='pill';toggle.textContent=ext.enabled?'Disable':'Enable';
+   toggle.onclick=async()=>{try{await window.hexora.extensions.toggle(ext.path);await refreshExtensions();}catch(e){$('extensions-error').textContent=e.message;}};
+   const remove=document.createElement('button');remove.className='pill';remove.textContent='Remove';
+   remove.onclick=async()=>{if(!confirm('Remove '+ext.name+' from Hexora? The source folder will not be deleted.'))return;try{await window.hexora.extensions.remove(ext.path);await refreshExtensions();}catch(e){$('extensions-error').textContent=e.message;}};
+   row.append(details,toggle,remove);list.append(row);
+  }
+ }catch(e){$('extensions-error').textContent=e.message;}
+}
+$('extensions-rail').onclick=()=>{$('extensions-error').textContent='';$('extensions-overlay').classList.remove('hidden');action('modal',true);refreshExtensions();};
+$('extensions-close').onclick=closeExtensions;
+$('extensions-overlay').onclick=e=>{if(e.target===$('extensions-overlay'))closeExtensions();};
+$('extensions-install').onclick=async()=>{try{$('extensions-error').textContent='';await window.hexora.extensions.install();await refreshExtensions();}catch(e){$('extensions-error').textContent=e.message;}};
