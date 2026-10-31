@@ -36,10 +36,18 @@ function diagnostic(folder,kind,message){
  if(records.length>40)records.shift();
  extensionDiagnostics.set(folder,records);
 }
+function extensionWorkerStatus(folder){
+ const ext=extensionLoaded.get(folder);
+ if(!ext||!extensionSession)return {status:'not loaded',workers:[]};
+ try{
+  const workers=Object.entries(extensionSession.serviceWorkers.getAllRunning()).filter(([,info])=>String(info.scope||info.scriptUrl||'').includes(ext.id));
+  return {status:workers.length?'running':'not currently running',workers:workers.map(([version,info])=>({version,scope:info.scope||'',scriptUrl:info.scriptUrl||''}))};
+ }catch(err){return {status:'unavailable',workers:[],error:err.message};}
+}
 function getExtensionDiagnostics(folder){
  const record=extensionRecords.find(x=>x.path===folder);
  if(!record)throw new Error('Extension not found.');
- return {name:record.name,events:extensionDiagnostics.get(folder)||[],popupOpen:!!extensionPopups.get(folder)&&!extensionPopups.get(folder).isDestroyed()};
+ return {name:record.name,events:extensionDiagnostics.get(folder)||[],popupOpen:!!extensionPopups.get(folder)&&!extensionPopups.get(folder).isDestroyed(),worker:extensionWorkerStatus(folder)};
 }
 function extensionPopupPath(folder){
  const manifest=JSON.parse(fs.readFileSync(path.join(folder,'manifest.json'),'utf8'));
@@ -290,6 +298,15 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
  try{const prefs=JSON.parse(fs.readFileSync(path.join(dataDir,'hexora-recovery-config.json'),'utf8'));if(prefs.directory)recoveryDir=prefs.directory;}catch{}
  extensionConfigFile=path.join(dataDir,'hexora-extensions.json');
  extensionSession=session.fromPartition(extensionPartition);
+ extensionSession.serviceWorkers.on('console-message',(_event,details)=>{
+  let info;try{info=extensionSession.serviceWorkers.getInfoFromVersionID(details.versionId);}catch{return;}
+  const url=String(info?.scope||info?.scriptUrl||details.sourceUrl||'');
+  for(const [folder,ext] of extensionLoaded){if(url.includes(ext.id)&&details.level>=2)diagnostic(folder,'worker',details.message||'Worker warning or error');}
+ });
+ extensionSession.serviceWorkers.on('running-status-changed',details=>{
+  let info;try{info=extensionSession.serviceWorkers.getInfoFromVersionID(details.versionId);}catch{return;}
+  for(const [folder,ext] of extensionLoaded)if(String(info?.scope||info?.scriptUrl||'').includes(ext.id))diagnostic(folder,'worker-status',details.runningStatus);
+ });
  restoreExtensions().catch(err=>console.error('Extension initialization failed:',err));
  store=new TabStore(dataDir);
  store.importLegacy(path.join(app.getPath('userData'),'hexora-tabs.json'));
