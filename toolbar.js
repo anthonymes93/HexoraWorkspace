@@ -1,9 +1,10 @@
 const $=id=>document.getElementById(id);
 const workspaces=[{id:'web',name:'Web Development',emoji:'◈'},{id:'business',name:'Business',emoji:'▤'},{id:'personal',name:'Personal',emoji:'☼'},{id:'ideas',name:'Ideas Lab',emoji:'✦'}];
 let activeWorkspace='web',sidebarOpen=true,offset=0,currentPage=null,refreshing=false,refreshPending=false;
-let contextTab=null,websiteTarget=null;
+let contextTab=null,websiteTarget=null,workspaceEditing=null;
 try{const s=JSON.parse(localStorage.getItem('hexora-workspace-settings')||'{}');if(s.workspaces?.length)workspaces.splice(0,workspaces.length,...s.workspaces);if(s.selected)activeWorkspace=s.selected;if(s.sidebarOpen===false)sidebarOpen=false;}catch{}
 const save=()=>localStorage.setItem('hexora-workspace-settings',JSON.stringify({workspaces,selected:activeWorkspace,sidebarOpen}));
+if(!workspaces.some(w=>w.id===activeWorkspace))activeWorkspace=workspaces[0].id;
 const action=(name,arg)=>window.hexora.action(name,arg);
 async function refresh(){
  if(refreshing){refreshPending=true;return;}refreshing=true;
@@ -21,7 +22,8 @@ function render(p){
   const symbol=document.createElement('span');symbol.className='emoji';symbol.textContent=w.emoji;
   const label=document.createElement('span');label.className='name';label.textContent=w.name;
   const count=document.createElement('span');count.className='count';count.textContent=p.counts.find(x=>x.workspace===w.id)?.count||0;
-  el.append(symbol,label,count);el.onclick=()=>{activeWorkspace=w.id;offset=0;save();refresh();};container.append(el);
+  const edit=document.createElement('span');edit.className='workspace-edit';edit.title='Edit workspace';edit.textContent='⋯';edit.onclick=e=>{e.stopPropagation();openWorkspaceEditor(w.id);};
+  el.append(symbol,label,count,edit);el.onclick=async()=>{activeWorkspace=w.id;offset=0;save();await action('switch-workspace',w.id);refresh();};container.append(el);
  }
  const conversations=$('conversations');conversations.replaceChildren();
  for(const item of p.tabs){
@@ -58,7 +60,7 @@ for(const id of ['external','settings-rail'])$(id).onclick=()=>action('open-exte
 const toggleSidebar=()=>{sidebarOpen=!sidebarOpen;updateSidebar();};
 $('toggle-sidebar').onclick=toggleSidebar;
 $('collapse-sidebar').onclick=toggleSidebar;
-$('add-workspace').onclick=()=>{const name=prompt('Workspace name:');if(!name?.trim())return;const id='ws'+Date.now();workspaces.push({id,name:name.trim().slice(0,55),emoji:'◈'});activeWorkspace=id;offset=0;save();refresh();};
+$('add-workspace').onclick=()=>openWorkspaceEditor(null);
 function showSearch(){action('modal',true);$('search-overlay').classList.remove('hidden');$('search-input').value='';filterTabs();$('search-input').focus();}
 let searchSeq=0;
 async function filterTabs(){const seq=++searchSeq;const items=await window.hexora.search($('search-input').value);if(seq!==searchSeq)return;const el=$('search-results');el.replaceChildren();for(const item of items){const b=document.createElement('button');b.className='result';b.textContent=item.title||item.url;b.onclick=()=>{hideSearch();action('activate',item.id);};el.append(b);}if(!items.length)el.textContent='No matches.';}
@@ -66,7 +68,7 @@ function hideSearch(){$('search-overlay').classList.add('hidden');action('modal'
 $('search').onclick=showSearch;$('search-rail').onclick=showSearch;$('search-close').onclick=hideSearch;$('search-input').oninput=filterTabs;
 $('search-overlay').onclick=e=>{if(e.target===$('search-overlay'))hideSearch();};
 document.addEventListener('keydown',e=>{if(e.key==='Escape')hideSearch();if(e.ctrlKey&&e.key.toLowerCase()==='k'){e.preventDefault();showSearch();}if(e.ctrlKey&&e.key.toLowerCase()==='t'){e.preventDefault();action('new',activeWorkspace);}});
-window.hexora.onState(()=>{refresh();});updateSidebar();refresh();
+window.hexora.onState(()=>{refresh();});updateSidebar();action('switch-workspace',activeWorkspace).then(refresh);
 
 function recoveryMessage(text){$('recovery-message').textContent=text;}
 async function recoveryStatus(){try{const st=await window.hexora.recovery.status();$('recovery-status').textContent='Destination: '+(st.directory||'Not selected')+' | '+(st.enabled?'Unlocked':'Locked')+(st.lastBackup?' | Last backup: '+st.lastBackup.time:'');}catch(e){recoveryMessage(e.message);}}
@@ -130,6 +132,7 @@ for(const mode of ['wide','thin']){
  $('tab-menu-domain-'+mode).onclick=async()=>{if(!contextTab)return;const id=contextTab.id;hideTabMenu();try{await action('panel-domain-mode',{id,mode});refresh();}catch(err){alert(err.message);}};
 }
 $('tab-menu-panel-inherit').onclick=async()=>{if(!contextTab)return;const id=contextTab.id;hideTabMenu();try{await action('panel-tab-inherit',id);refresh();}catch(err){alert(err.message);}};
+$('tab-menu-move').onclick=async()=>{if(!contextTab)return;const id=contextTab.id;hideTabMenu();const list=workspaces.map((w,i)=>(i+1)+': '+w.name).join('\n');const answer=prompt('Move tab to which workspace?\n'+list);if(answer===null)return;const idx=Number(answer)-1;if(!Number.isInteger(idx)||!workspaces[idx])return alert('Choose a workspace number from the list.');try{await action('move-tab',{id,workspace:workspaces[idx].id});if(id===currentPage?.activeId&&workspaces[idx].id!==activeWorkspace){activeWorkspace=workspaces[idx].id;offset=0;save();}refresh();}catch(err){alert(err.message);}};
 $('tab-menu-chrome').onclick=async()=>{
  if(!contextTab)return;
  const id=contextTab.id;hideTabMenu();
@@ -155,3 +158,34 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'){hideTabMenu();if(we
 
 // The main process owns one animation timeline for both the native browser view and the toolbar layout.
 window.hexora.onSidebarFrame(width=>{const value=Math.max(64,Math.min(330,width));document.documentElement.style.setProperty('--hexora-panel-width',(value-64)+'px');document.documentElement.style.setProperty('--hexora-content-left',value+'px');document.body.classList.toggle('panel-collapsed',value<=65);});
+
+function openWorkspaceEditor(id){
+ const workspace=id?workspaces.find(w=>w.id===id):null;workspaceEditing=id||null;
+ $('workspace-editor-title').textContent=workspace?'Edit workspace':'New workspace';
+ $('workspace-name').value=workspace?.name||'';
+ $('workspace-icon').value=workspace?.emoji||'◈';
+ $('workspace-delete').classList.toggle('hidden',!workspace||workspace.id==='web');
+ $('workspace-error').textContent='';
+ $('workspace-overlay').classList.remove('hidden');action('modal',true);$('workspace-name').focus();
+}
+function closeWorkspaceEditor(){$('workspace-overlay').classList.add('hidden');workspaceEditing=null;action('modal',false);}
+$('workspace-cancel').onclick=closeWorkspaceEditor;
+$('workspace-close').onclick=closeWorkspaceEditor;
+$('workspace-overlay').onclick=e=>{if(e.target===$('workspace-overlay'))closeWorkspaceEditor();};
+$('workspace-form').onsubmit=async e=>{
+ e.preventDefault();
+ const name=$('workspace-name').value.trim().slice(0,55),emoji=$('workspace-icon').value.trim().slice(0,8);
+ if(!name){$('workspace-error').textContent='Enter a workspace name.';return;}
+ if(workspaces.some(w=>w.id!==workspaceEditing&&w.name.toLowerCase()===name.toLowerCase())){$('workspace-error').textContent='A workspace with this name already exists.';return;}
+ if(workspaceEditing){const w=workspaces.find(w=>w.id===workspaceEditing);if(!w)return;w.name=name;w.emoji=emoji||'◈';}
+ else{const id='ws'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);workspaces.push({id,name,emoji:emoji||'◈'});activeWorkspace=id;offset=0;}
+ save();closeWorkspaceEditor();await action('switch-workspace',activeWorkspace);refresh();
+};
+$('workspace-delete').onclick=async()=>{
+ if(!workspaceEditing||workspaceEditing==='web')return;
+ const w=workspaces.find(x=>x.id===workspaceEditing);if(!w)return;
+ if(!confirm('Delete '+w.name+'? All its tabs will be moved to Web Development. No tabs will be deleted.'))return;
+ await action('delete-workspace',{id:w.id,destination:'web'});
+ workspaces.splice(workspaces.indexOf(w),1);if(activeWorkspace===w.id){activeWorkspace='web';offset=0;}
+ save();closeWorkspaceEditor();await action('switch-workspace',activeWorkspace);refresh();
+};
