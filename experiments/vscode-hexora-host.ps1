@@ -100,21 +100,34 @@ public static class HexoraNative {
    }catch(Exception error){Console.WriteLine("MOUSE_PROBE_ERROR "+error.Message);}
   });
  }
- public static long[] Windows() {var found=new List<long>();EnumWindows((h,lp)=>{if(!IsWindowVisible(h))return true;var title=new StringBuilder(512);GetWindowText(h,title,512);uint pid;GetWindowThreadProcessId(h,out pid);try{if(title.Length>0&&System.Diagnostics.Process.GetProcessById((int)pid).ProcessName.Equals("Code",StringComparison.OrdinalIgnoreCase))found.Add(h.ToInt64());}catch{}return true;},IntPtr.Zero);return found.ToArray();}
+ public static long[] Windows() {var found=new List<long>();EnumWindows((h,lp)=>{var title=new StringBuilder(512);GetWindowText(h,title,512);uint pid;GetWindowThreadProcessId(h,out pid);try{if(title.Length>0&&System.Diagnostics.Process.GetProcessById((int)pid).ProcessName.Equals("Code",StringComparison.OrdinalIgnoreCase))found.Add(h.ToInt64());}catch{}return true;},IntPtr.Zero);return found.ToArray();}
 }
 '@
 $parent=[IntPtr]([long]::Parse($ParentHwnd))
+# Resolve the desktop executable directly. Starting code.cmd spawns a visible
+# cmd.exe window and adds a second launcher hop before VS Code can be captured.
 $cmd=Get-Command code.cmd -ErrorAction Stop
+$codeBin=Split-Path -Path $cmd.Source -Parent
+$exe=Join-Path -Path (Split-Path -Path $codeBin -Parent) -ChildPath 'Code.exe'
+if(-not (Test-Path -LiteralPath $exe -PathType Leaf)){
+ throw ('VS Code executable not found at '+$exe+'. Install VS Code with its standard bin folder.')
+}
 $existing=@([HexoraNative]::Windows())
-Start-Process -FilePath $cmd.Source -ArgumentList '--new-window' | Out-Null
+$launchBegan=[DateTime]::UtcNow
+Write-Output 'LAUNCH_CODE_EXE'
+Start-Process -FilePath $exe -ArgumentList '--new-window' -WindowStyle Hidden | Out-Null
 $deadline=[DateTime]::UtcNow.AddSeconds(25)
 $child=[IntPtr]::Zero
 do {
- Start-Sleep -Milliseconds 250
+ Start-Sleep -Milliseconds 40
  $candidate=[HexoraNative]::Windows() | Where-Object {$_ -notin $existing} | Select-Object -First 1
  if($candidate){$child=[IntPtr]([long]$candidate)}
 } until ($child -ne [IntPtr]::Zero -or [DateTime]::UtcNow -gt $deadline)
 if($child -eq [IntPtr]::Zero){throw 'No new VS Code window detected'}
+Write-Output ('WINDOW_CAPTURED hwnd='+$child.ToInt64()+' elapsedMs='+[int]([DateTime]::UtcNow-$launchBegan).TotalMilliseconds)
+# Hide the newly created desktop window before changing styles / parenting.
+# It must not briefly cover Hexora or steal input from the tab host.
+[void][HexoraNative]::ShowWindow($child,0)
 $oldStyle=[HexoraNative]::GetWindowLong($child,-16)
 $newStyle=($oldStyle -band (-bnot ([int]0x80000000 -bor 0x00C00000 -bor 0x00040000))) -bor 0x40000000
 $attached=$false
@@ -124,9 +137,7 @@ try {
  [void][HexoraNative]::SetWindowLong($child,-16,$newStyle)
  [void][HexoraNative]::SetParent($child,$parent)
  $attached=$true
- # The parent may switch to a different VS Code tab while this window launches.
- # Hide first; only the owner tab's READY handler is allowed to show and focus it.
- [void][HexoraNative]::ShowWindow($child,0)
+ # Only the owner tab's READY handler is allowed to show / focus the window.
  Write-Output ('DIAG READY '+[HexoraNative]::Diagnostic($child))
  Write-Output ('FOCUS_TRACE READY '+[HexoraNative]::FocusTrace($parent,$child))
  Write-Output 'READY'
