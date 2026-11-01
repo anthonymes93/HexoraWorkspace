@@ -192,7 +192,7 @@ function render(p){
 // Sidebar grip: one serialized resize stream, without competing layout updates.
 const sidebarGrip=$('sidebar-resize-handle');
 let sidebarDrag=null,sidebarDesired=null,sidebarWorker=null;
-const clampSidebarWidth=x=>Math.round(Math.max(240,Math.min(560,Math.max(240,window.innerWidth-420),x)));
+const clampSidebarWidth=x=>Math.round(Math.max(64,Math.min(560,Math.max(64,window.innerWidth-420),x)));
 function queueSidebarResize(width){
  sidebarDesired=clampSidebarWidth(width);
  if(!sidebarWorker)sidebarWorker=(async()=>{
@@ -207,7 +207,7 @@ function queueSidebarResize(width){
  return sidebarWorker;
 }
 sidebarGrip.addEventListener('pointerdown',event=>{
- if(event.button!==0||!sidebarOpen)return;
+ if(event.button!==0)return;
  event.preventDefault();
  sidebarDrag={pointerId:event.pointerId,last:clampSidebarWidth(event.clientX)};
  sidebarGrip.setPointerCapture(event.pointerId);
@@ -226,16 +226,18 @@ async function endSidebarResize(event){
  if(sidebarGrip.hasPointerCapture(event.pointerId))sidebarGrip.releasePointerCapture(event.pointerId);
  await queueSidebarResize(last);
  await action('sidebar-resize-save');
+ sidebarOpen=last>65;
 }
 sidebarGrip.addEventListener('pointerup',endSidebarResize);
 sidebarGrip.addEventListener('pointercancel',endSidebarResize);
 sidebarGrip.addEventListener('keydown',async event=>{
- if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key)||!sidebarOpen)return;
+ if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;
  event.preventDefault();
  const current=parseInt(getComputedStyle(document.documentElement).getPropertyValue('--hexora-content-left'),10)||330;
- const next=event.key==='Home'?240:event.key==='End'?560:current+(event.key==='ArrowRight'?20:-20);
+ const next=event.key==='Home'?64:event.key==='End'?560:current+(event.key==='ArrowRight'?20:-20);
  await queueSidebarResize(next);
  await action('sidebar-resize-save');
+ sidebarOpen=next>65;
 });
 function updateSidebar(persist=true){action('sidebar',!sidebarOpen);if(persist&&currentPage?.activeId)action('panel-mode',{id:currentPage.activeId,mode:sidebarOpen?'wide':'thin'});save();}
 for(const id of ['new','new-rail','new-sidebar','add-tab'])$(id).onclick=()=>action('new',activeWorkspace);
@@ -886,7 +888,7 @@ document.addEventListener('contextmenu',e=>{if(!e.target.closest('.tab, .chat-ro
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){hideTabRowMenu();hideTabMenu();if(websiteTarget)hideWebsiteModal();}});
 
 // The main process owns one animation timeline for both the native browser view and the toolbar layout.
-window.hexora.onSidebarFrame(width=>{const value=Math.max(64,Math.min(560,width));document.documentElement.style.setProperty('--hexora-panel-width',(value-64)+'px');document.documentElement.style.setProperty('--hexora-content-left',value+'px');document.body.classList.toggle('panel-collapsed',value<=65);document.documentElement.style.setProperty('--hexora-sidebar-fluid',String(Math.max(0,Math.min(1,(value-240)/95))));});
+window.hexora.onSidebarFrame(width=>{const value=Math.max(64,Math.min(560,width));document.documentElement.style.setProperty('--hexora-panel-width',(value-64)+'px');document.documentElement.style.setProperty('--hexora-content-left',value+'px');document.body.classList.toggle('panel-collapsed',value<=65);document.body.classList.toggle('sidebar-icons-only',value>65&&value<=184);document.documentElement.style.setProperty('--hexora-sidebar-fluid',String(Math.max(0,Math.min(1,(value-240)/95))));});
 
 function openWorkspaceEditor(id){
  const workspace=id?workspaces.find(w=>w.id===id):null;workspaceEditing=id||null;
