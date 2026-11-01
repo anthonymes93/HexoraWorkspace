@@ -286,7 +286,10 @@ function rememberFavicon(tabId,pageUrl,iconUrl){
 function wire(t){const view=new WebContentsView({webPreferences:{partition:'persist:hexora-chatgpt',preload:path.join(__dirname,'site-vault-preload.js'),sandbox:true,contextIsolation:true,nodeIntegration:false,webSecurity:true,javascript:true}});const wc=view.webContents;
  wc.setAudioMuted(!!t.muted);
  if(chromeMode(t.id))wc.setUserAgent(chromeUserAgent(wc));
- view.setBackgroundColor('#111215');
+ // WebContentsView background is visible through transparent website regions.
+ // Do not force Hexora's dark chrome color behind third-party page content.
+ // Use a neutral white backing; sites with their own dark backgrounds still render normally.
+ view.setBackgroundColor('#ffffff');
  wc.on('did-fail-load',(_event,code,description,url,isMainFrame)=>{if(isMainFrame)console.error('[Hexora] Page load failed:',code,description,url);});
  const update=(title=false)=>{if(tabStoreClosing||quitting)return;const row=store.get(t.id);if(!row)return;if(title)row.title=wc.getTitle()?.slice(0,100)||row.title;const url=wc.getURL();if(/^https?:/.test(url))row.url=url;store.save(toModel(row));emit();};
  wc.on('page-favicon-updated',(_event,icons)=>{
