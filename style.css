@@ -730,3 +730,11 @@ body.sidebar-trim-workspace-details:not(.sidebar-icons-only) .workspace{gap:6px}
 .header-favorites-manage-row button{background:transparent;border:0;color:#baa3db;cursor:pointer;font-size:17px}
 
 #header-favorites-form[hidden]{display:none!important}
+
+/* Electron WebContentsView is a native layer: CSS z-index alone cannot cover it.
+   The favorites popover temporarily invokes the same modal view-hiding mechanism
+   used by other Hexora overlays, so its full form stays accessible. */
+.top-main:has(.header-favorites-popover:not([hidden])){z-index:30}
+.top-main:has(.header-favorites-popover:not([hidden])) .top{position:relative;z-index:31}
+.top-main:has(.header-favorites-popover:not([hidden])) .tabsbar{position:relative;z-index:1}
+.header-favorites-popover:not([hidden]){z-index:40}
