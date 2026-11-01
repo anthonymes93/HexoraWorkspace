@@ -451,7 +451,7 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
  sidebarWidth=Math.max(64,Math.min(560,Number(store.getMeta('sidebarCustomWidth'))||330));
  win=new BrowserWindow({width:1360,height:900,minWidth:700,minHeight:400,title:'Hexora Workspace',autoHideMenuBar:true,backgroundColor:'#111215',webPreferences:{preload:path.join(__dirname,'preload.js'),contextIsolation:true,sandbox:true,nodeIntegration:false}});
  mainViewport=new View();win.contentView.addChildView(mainViewport);
- win.loadFile('toolbar.html');win.on('focus',()=>{if(nativeCodeHost){nativeCodeCommand('TRACE HEXORA_FOCUS_BEFORE');if(nativeCodeActive&&!nativeCodeDetached){nativeCodeCommand('FOCUS');nativeCodeCommand('TRACE HEXORA_FOCUS_AFTER');}}});win.on('blur',()=>{if(nativeCodeHost)nativeCodeCommand('DIAG HEXORA_BLUR');});win.on('resize',bounds);win.webContents.on('did-finish-load',emit);
+ win.loadFile('toolbar.html');win.on('focus',()=>{if(nativeCodeHost){nativeCodeCommand('TRACE HEXORA_FOCUS_BEFORE');if(nativeCodeActive&&!nativeCodeDetached){nativeCodeCommand('RESTORE');}}});win.on('blur',()=>{if(nativeCodeHost)nativeCodeCommand('DIAG HEXORA_BLUR');});win.on('resize',bounds);win.webContents.on('did-finish-load',emit);
  const last=Number(store.getMeta('activeId'));if(!last||!activate(last)){const backup=store.lastActiveId();if(!backup||!activate(backup))newTab();}
  // Reopen each detached tab at its saved screen position after the primary workspace starts.
  // Missing/deleted tab IDs are cleaned up, and one bad window cannot prevent startup.
