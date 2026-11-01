@@ -1015,6 +1015,16 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
    if(!current||!['notion.so','www.notion.so','notion.com','www.notion.com','app.notion.com'].includes(notionHost))return {ok:false,reason:'Select a Notion tab first.'};
    if(!wc||wc.isDestroyed())return {ok:false,reason:'Notion tab is not loaded.'};
    const result=awaitNotionSidebarDemo(wc);
+   if(result?.ok)return result;
+   // Notion's collapsed sidebar can be an unlabeled icon. Use Notion's
+   // documented Ctrl+\\ sidebar shortcut in the active webContents only.
+   // Electron input events are trusted; synthetic DOM KeyboardEvents are not.
+   if(result?.reason==='Notion sidebar control not found. Notion may have changed its UI.'){
+    wc.focus();
+    wc.sendInputEvent({type:'keyDown',keyCode:'\\',modifiers:['control']});
+    wc.sendInputEvent({type:'keyUp',keyCode:'\\',modifiers:['control']});
+    return {ok:true,action:'toggled via shortcut (verify sidebar state)'};
+   }
    return result;
   }
   if(action==='history-list')return store.historySearch(arg?.query||'',arg?.limit||250);
