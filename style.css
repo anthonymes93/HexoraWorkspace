@@ -699,3 +699,8 @@ body.sidebar-trim-workspace-details:not(.sidebar-icons-only) .workspace{gap:6px}
 
 /* Keyboard selection for Google search (same active state as site results) */
 #new-tab-overlay .new-tab-google-search.is-active{background:linear-gradient(110deg,#45335f,#36294e);border-color:#ac86f4;box-shadow:inset 0 0 0 1px rgba(172,134,244,.22);color:#fff}
+
+/* The sole Google result must visibly read as the Enter action. */
+#new-tab-overlay .new-tab-google-search.is-active,
+#new-tab-overlay .new-tab-google-search[aria-selected="true"]{background:linear-gradient(110deg,#51396e,#3e3059);border:1px solid #bd98ff;box-shadow:inset 0 0 0 1px rgba(189,152,255,.35),0 0 0 1px rgba(189,152,255,.12);color:#fff;font-weight:650}
+#new-tab-overlay .new-tab-google-search.is-active span:first-child{color:#e6d4ff}
