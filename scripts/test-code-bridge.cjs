@@ -37,7 +37,7 @@ test('companion persists active file/caret and restores them on next activation'
     onDidChangeTextEditorSelection:cb=>{events.selection=cb;return{dispose(){}};},
     showTextDocument:async(_document,_opts)=>{openCount++;return editor;}
    },
-   commands:{registerCommand:(_name,cb)=>{events.chooseProject=cb;return{dispose(){}};}},
+   commands:{executeCommand:async()=>{},registerCommand:(_name,cb)=>{events.chooseProject=cb;return{dispose(){}};}},
    StatusBarAlignment:{Left:1},
    Uri:{file:p=>({scheme:'file',fsPath:p})},
    Selection:class{constructor(line,character){this.active={line,character};this.anchor={line,character};}},
