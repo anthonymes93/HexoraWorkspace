@@ -4,7 +4,7 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const os=require('node:os');
 const path=require('node:path');
-const {workspaceForTab,sessionFile,projectUpdateFile,ownerFile,clearSession}=require('../code-session-workspace');
+const {workspaceForTab,managedWorkspaceOrBlank,sessionFile,projectUpdateFile,ownerFile,clearSession}=require('../code-session-workspace');
 const {buildCompanionVsix,BRIDGE_VERSION}=require('../code-session-vsix');
 
 test('editor workspace identities remain independent across VS Code tabs',()=>{
@@ -12,8 +12,14 @@ test('editor workspace identities remain independent across VS Code tabs',()=>{
  try {
   const project=path.join(data,'Test Project');
   fs.mkdirSync(project);
+  // New tabs must use plain `code --new-window` for native folder-opening
+  // compatibility; they must not generate an empty managed workspace.
+  assert.equal(managedWorkspaceOrBlank(data,9,null),null);
+  assert.equal(fs.existsSync(path.join(data,'hexora-native-code','tab-9.code-workspace')),false);
   const blank=workspaceForTab(data,9,null);
   assert.deepEqual(JSON.parse(fs.readFileSync(blank,'utf8')).folders,[]);
+  const managed=managedWorkspaceOrBlank(data,10,project);
+  assert.equal(path.basename(managed),'tab-10.code-workspace');
   const first=workspaceForTab(data,10,project);
   const second=workspaceForTab(data,11,project);
   assert.notEqual(first,second);

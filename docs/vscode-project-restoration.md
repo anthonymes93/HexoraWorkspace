@@ -4,32 +4,40 @@ On the `experiment/vscode-no-flash` implementation, Hexora already saves native
 VS Code tab IDs and workspaces in SQLite. This change adds a **separate, durable
 project folder per tab**, saved in the same database.
 
-## Use it — no Hexora context menu needed
+## Fast native opening without tab context menus
 
-1. Create a VS Code tab with **⌘** in Hexora. New tabs now launch an **empty,
-   uniquely identified VS Code workspace** so the companion is active before a
-   project is selected.
-2. In VS Code, click **Open Project** in the bottom status bar, or press
-   **Ctrl+K, Ctrl+O** while that Hexora-managed Code window is active.
-3. Choose any local folder. The companion writes the project association
-   automatically, and Hexora syncs it into SQLite without requiring a
-   right-click in Hexora.
-4. Open a file and position the cursor. On restart, Hexora launches the
-   same folder and restores that file and cursor, independently for every tab.
-   Only the active Code tab launches; other Code sessions remain dormant.
+1. Click **⌘ VS Code** in Hexora. A native Windows folder picker appears
+   **before** launching VS Code. Pick the project folder to associate it with
+   the new Hexora tab, without using any tab context menu.
+2. VS Code opens the selected project in its own managed Hexora session.
+   The folder, last active file, and cursor restore when you restart Hexora.
+   Background tabs do not create additional VS Code processes until selected.
+3. **Cancel** the picker to open an ordinary blank VS Code window instead,
+   or **Ctrl-click ⌘** to skip the picker entirely and immediately open a
+   blank window via VS Code's original fast `code.cmd --new-window` launch.
+4. For a running managed VS Code session, the companion's **Open Project**
+   status-bar action (or **Ctrl+K, Ctrl+O**) changes its folder without
+   losing the Hexora association. The original right-click picker remains a
+   fallback.
 
-The companion also detects workspace-folder changes within the *same
-Hexora-managed .code-workspace* (e.g., VS Code's **Add Folder to Workspace**).
-It supports one local folder per Code tab. The existing Hexora right-click
-**Choose VS Code project folder…** remains as a fallback. Changing a project
-with that fallback while an editor is running takes effect on its next launch.
+**Reason:** the previous implementation opened every blank tab as a synthetic
+`.code-workspace` file. That adds startup work and VS Code's built-in
+**File → Open Folder** may replace the native child window Hexora is hosting.
+Blank tabs no longer use that synthetic workspace. VS Code's ordinary File
+menu is still controlled by VS Code, not Hexora; until native window replacement
+is handled by the host, use the pre-launch picker or the in-editor
+**Open Project** action for reliable project switching.
 
-The project association is saved in the existing SQLite `native_code_projects`
-table and is included in encrypted recovery backups. The active editor, caret,
-and companion project-update event are stored locally under
-`<Hexora userData>/hexora-native-code`, not in the project folder.
-Hexora checks a per-window owner token so a stale detached VS Code window
-cannot overwrite a newly activated tab's project association.
+## Startup behavior
+
+- New blank tabs skip workspace creation and skip companion installation.
+- Managed tabs retain isolated `.code-workspace` descriptors in
+  `<Hexora userData>/hexora-native-code` for project/file/caret restoration.
+- A companion update is installed **asynchronously**, never before the Code
+  host starts. After a new companion installation, a VS Code reload or next
+  session may be needed for the new extension code to activate.
+- If the installer fails, native Code still starts; Hexora logs the error and
+  retries on a later Hexora run rather than delaying every new tab.
 
 ## Scope and limitations
 
@@ -71,10 +79,12 @@ npm run test:code-projects
 
 On Windows, also test manually:
 
-1. Create a fresh Code tab with no project. Use its **Open Project** status bar
-   button, choose folder A, and verify Hexora now remembers the folder without
-   opening the Hexora right-click menu. Repeat with folder B in a second tab.
-   Also test the Ctrl+K, Ctrl+O shortcut in a managed tab.
+1. Click the VS Code rail icon and choose project A in the Windows folder
+   dialog. Verify the editor launches with folder A without using the tab
+   right-click menu. Click again and choose project B.
+   Ctrl-click the icon: a blank native Code tab should start without showing
+   the picker, without a synthetic empty .code-workspace descriptor, and
+   without a blocking companion install.
 2. Switch to a normal web tab, restart Hexora, then activate each Code tab.
    Verify each opens its **own** folder, and the inactive tab stays unlaunched.
 3. Rename and move tab 1 to a different Hexora workspace, restart, and verify
@@ -104,3 +114,8 @@ Additional automated checks:
 npm run test:code-auto-project
 npm run test:code-project-sync
 ```
+
+Manual native hosting validation remains required: in a blank Code tab, open
+**File → Open Folder** and confirm whether VS Code retains its hosted native
+window. Hexora cannot guarantee this menu behavior when VS Code replaces its
+window; use the pre-launch picker for a reliable project opening path.
