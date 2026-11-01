@@ -2,6 +2,7 @@ const $=id=>document.getElementById(id);
 const workspaces=[{id:'web',name:'Web Development',emoji:'◈'},{id:'business',name:'Business',emoji:'▤'},{id:'personal',name:'Personal',emoji:'☼'},{id:'ideas',name:'Ideas Lab',emoji:'✦'}];
 let activeWorkspace='web',sidebarOpen=true,offset=0,currentPage=null,refreshing=false,refreshPending=false;
 let contextTab=null,websiteTarget=null,workspaceEditing=null;
+let selectedStackId=null;
 const quickJumpsKey='hexora-quick-jumps';
 let quickJumps=[];
 try{const items=JSON.parse(localStorage.getItem(quickJumpsKey)||'[]');if(Array.isArray(items))quickJumps=items.filter(x=>Number.isSafeInteger(x.id)&&x.id>0).slice(0,20);}catch{}
@@ -111,6 +112,7 @@ function render(p){
  let shortcuts=$('quick-jumps');if(!shortcuts){shortcuts=document.createElement('div');shortcuts.id='quick-jumps';shortcuts.className='quick-jumps';conversations.append(shortcuts);}
  renderQuickJumps();
  const tabs=$('tabs');tabs.replaceChildren();
+ renderSecondTabRow(p);
  // Tab strip is deliberately bounded: the current page plus the active tab.
  const shown=[...p.tabs.slice(0,16)];
  if(p.active&&!shown.some(x=>x.id===p.active.id))shown.unshift({...p.active,active:true,suspended:false});
@@ -163,6 +165,28 @@ async function recoveryAction(name){
 }
 for(const name of ['backup','configure','unlock','restore'])$('recovery-'+name).onclick=()=>recoveryAction(name);
 
+// A real second horizontal row for the currently selected tab stack.
+function renderSecondTabRow(p){
+ const row=$('stack-tabs-row'),host=$('stack-tabs'),label=$('stack-tabs-label');
+ const stackData=p.stackData||{stacks:[],members:[]};
+ const membership=new Map(stackData.members.map(x=>[x.tab_id,x.stack_id]));
+ const activeStack=membership.get(p.activeId);
+ if(activeStack&&stackData.stacks.some(x=>x.id===activeStack))selectedStackId=activeStack;
+ const stack=stackData.stacks.find(x=>x.id===selectedStackId);
+ if(!stack){row.classList.add('hidden');host.replaceChildren();return;}
+ row.classList.remove('hidden');label.textContent='▤ '+stack.name;
+ host.replaceChildren();
+ const ids=stackData.members.filter(x=>x.stack_id===stack.id).map(x=>x.tab_id);
+ for(const id of ids){
+  const tab=p.tabs.find(x=>x.id===id);
+  const el=document.createElement('button');el.className='tab'+(id===p.activeId?' active':'');
+  el.textContent=tab?.title||'Tab #'+id;
+  el.title='Open stacked tab';
+  el.onclick=()=>action('activate',id);
+  host.append(el);
+ }
+}
+$('stack-row-close').onclick=()=>{selectedStackId=null;$('stack-tabs-row').classList.add('hidden');};
 // Unlimited-depth tab stacks; only expanded branches are rendered.
 function renderStackTree(host,page){
  const data=page.stackData;if(!data?.stacks?.length)return;
@@ -249,6 +273,14 @@ window.addEventListener('pointermove',e=>{
  const slotLeft=d.tab.getBoundingClientRect().left-parseFloat(d.tab.style.getPropertyValue('--drag-x')||'0');
  d.tab.style.setProperty('--drag-x',(desiredLeft-slotLeft)+'px');
  d.visualLeft=desiredLeft;
+ const under=document.elementFromPoint(e.clientX,e.clientY)?.closest('.tab[data-tab-id]');
+ const target=under&&under!==d.tab?Number(under.dataset.tabId):null;
+ if(target&&target!==d.id){
+  if(d.hoverId!==target){d.hoverId=target;d.hoverSince=performance.now();}
+ }else{d.hoverId=null;d.hoverSince=0;}
+ for(const element of tabStrip.querySelectorAll('.stack-drop-target'))element.classList.remove('stack-drop-target');
+ if(d.hoverId&&performance.now()-d.hoverSince>320)under?.classList.add('stack-drop-target');
+
  // Exchange places after just 10% overlap with the adjacent tab.
  // Direction gating prevents oscillation after an insertion shifts the layout.
  const direction=Math.sign(e.clientX-d.lastX);
@@ -280,7 +312,19 @@ window.addEventListener('pointerup',async()=>{
  const d=tabPointer;if(!d)return;
  if(d.moving)suppressTabClickUntil=Date.now()+300;
  const moving=d.moving;
+ const targetId=d.hoverId&&performance.now()-d.hoverSince>=320?d.hoverId:null;
+ for(const element of tabStrip.querySelectorAll('.stack-drop-target'))element.classList.remove('stack-drop-target');
  cancelTabPointer();
+ if(moving&&targetId&&targetId!==d.id){
+  try{
+   const stacks=currentPage?.stackData||{stacks:[],members:[]};
+   const membership=stacks.members.find(x=>x.tab_id===targetId);
+   const stackId=membership?.stack_id||await action('stack-create',{workspace:d.workspace,name:'New Stack',tabId:targetId});
+   await action('stack-assign',{tabId:d.id,stackId});
+   selectedStackId=stackId;refresh();
+  }catch(error){console.error('Could not create tab stack',error);refresh();}
+  return;
+ }
  if(!moving||dropSaving)return;
  dropSaving=true;
  const ids=[...tabStrip.querySelectorAll('.tab')].map(el=>Number(el.dataset.tabId)).filter(Number.isSafeInteger);
