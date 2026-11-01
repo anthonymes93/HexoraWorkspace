@@ -151,3 +151,6 @@
 .tabs .tab{cursor:grab;touch-action:pan-x}.tabs .tab:active{cursor:grabbing}.tabs .tab.dragging{opacity:.48;background:#383344;border-color:#a897ef;box-shadow:0 5px 18px #0008}.tabs .tab:not(.dragging){transition:background-color .12s,color .12s}
 
 body.reordering-tabs,body.reordering-tabs *{cursor:grabbing!important;user-select:none!important}.tabs .tab.dragging{opacity:1!important;position:relative;z-index:2;background:#302b3c;border-color:#8d7ae0;box-shadow:inset 0 2px #b3a1ff;cursor:grabbing!important}
+
+/* Continuous cursor tracking, without a detached drag preview. */
+.tabs .tab.dragging{transform:translate3d(var(--drag-x,0px),0,0);will-change:transform;transition:none!important;pointer-events:none}
