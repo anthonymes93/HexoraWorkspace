@@ -886,7 +886,7 @@ document.addEventListener('contextmenu',e=>{if(!e.target.closest('.tab, .chat-ro
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){hideTabRowMenu();hideTabMenu();if(websiteTarget)hideWebsiteModal();}});
 
 // The main process owns one animation timeline for both the native browser view and the toolbar layout.
-window.hexora.onSidebarFrame(width=>{const value=Math.max(64,Math.min(330,width));document.documentElement.style.setProperty('--hexora-panel-width',(value-64)+'px');document.documentElement.style.setProperty('--hexora-content-left',value+'px');document.body.classList.toggle('panel-collapsed',value<=65);});
+window.hexora.onSidebarFrame(width=>{const value=Math.max(64,Math.min(560,width));document.documentElement.style.setProperty('--hexora-panel-width',(value-64)+'px');document.documentElement.style.setProperty('--hexora-content-left',value+'px');document.body.classList.toggle('panel-collapsed',value<=65);});
 
 function openWorkspaceEditor(id){
  const workspace=id?workspaces.find(w=>w.id===id):null;workspaceEditing=id||null;
