@@ -398,3 +398,7 @@ body.reordering-tabs,body.reordering-tabs *{cursor:grabbing!important;user-selec
 /* Short titles reveal without resizing the tab strip or causing layout shift. */
 .hexora-tab-title-reveal{position:fixed;z-index:85;pointer-events:none;box-sizing:border-box;overflow:hidden;white-space:nowrap;padding:0 4px 0 0;background:#202126;border-radius:2px;box-shadow:5px 0 9px #11111655;animation:hexora-title-reveal .13s ease-out both}
 @keyframes hexora-title-reveal{from{opacity:0;clip-path:inset(0 100% 0 0)}to{opacity:1;clip-path:inset(0 0 0 0)}}
+
+/* Keep first-row tab widths stable: flex shrink was clipping even short names like ClickUp™. */
+#tabs>.tab{flex:0 0 auto;box-sizing:border-box;min-width:125px;max-width:220px}
+#tabs>.tab .tab-title-lines{min-width:0}
