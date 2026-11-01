@@ -284,10 +284,10 @@ const notionSidebarDemo=$('notion-sidebar-demo');
 notionSidebarDemo.onclick=async()=>{
  notionSidebarDemo.disabled=true;
  try{
-  const result=await action('notion-sidebar-demo');
-  notionSidebarDemo.title=result?.ok?'Notion sidebar '+result.action+' (demo)':result?.reason||'Notion sidebar toggle unavailable';
+  const result=await action('universal-sidebar-toggle');
+  notionSidebarDemo.title=result?.ok?'Website sidebar '+result.action+' (demo)':result?.reason||'Sidebar toggle unavailable';
   if(!result?.ok)window.alert(notionSidebarDemo.title);
- }catch(error){window.alert('Notion sidebar demo: '+error.message);}
+ }catch(error){window.alert('Universal sidebar demo: '+error.message);}
  finally{notionSidebarDemo.disabled=false;}
 };
 for(const id of ['back','forward','reload'])$(id).onclick=()=>action(id);
