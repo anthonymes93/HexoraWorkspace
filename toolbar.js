@@ -345,15 +345,28 @@ const tabStrip=$('tabs');
 // Frame-driven horizontal wheel scrolling with accumulated momentum.
 // New wheel input updates the destination rather than restarting an animation.
 const tabScrollAnimations=new WeakMap();
+function stopTabGlide(row){
+ const state=tabScrollAnimations.get(row);
+ if(!state)return;
+ if(state.frame)cancelAnimationFrame(state.frame);
+ state.frame=0;
+ state.target=row.scrollLeft;
+}
+// Native scrollbar interaction always takes precedence over wheel momentum.
+for(const strip of [tabStrip,$('stack-rows')]){
+ strip.addEventListener('pointerdown',e=>{
+  const row=e.target.closest('.tabs,.stack-tabs');
+  if(row&&strip.contains(row))stopTabGlide(row);
+ },true);
+}
 function glideTabRow(row,amount){
  const maximum=Math.max(0,row.scrollWidth-row.clientWidth);
  if(!maximum)return;
  let state=tabScrollAnimations.get(row);
- if(!state){state={target:row.scrollLeft,frame:0,last:0};tabScrollAnimations.set(row,state);}
+ if(!state){state={target:row.scrollLeft,frame:0};tabScrollAnimations.set(row,state);}
  state.target=Math.max(0,Math.min(maximum,state.target+amount));
  if(state.frame)return;
- const tick=now=>{
-  state.last=now;
+ const tick=()=>{
   if(!row.isConnected){state.frame=0;return;}
   const remaining=state.target-row.scrollLeft;
   if(Math.abs(remaining)<.45){row.scrollLeft=state.target;state.frame=0;return;}
