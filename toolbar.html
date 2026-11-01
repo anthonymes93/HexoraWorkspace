@@ -145,5 +145,43 @@
  <div class="accent-section"><div class="accent-section-header"><strong>Accent color</strong><span>Personalize highlights &amp; controls</span></div><div id="accent-options" class="accent-options" role="group" aria-label="Accent color choices"></div></div>
  <p id="appearance-status" class="hint" role="status"></p>
  </section></div>
+<link rel="stylesheet" href="project-picker.css"/>
+
+<div id="hexora-project-overlay" class="hpp-overlay hidden">
+ <section class="hpp-modal" role="dialog" aria-modal="true" aria-labelledby="hpp-title" aria-describedby="hpp-subtitle">
+  <header class="hpp-header">
+   <div class="hpp-logo" aria-hidden="true">✦</div>
+   <div><h2 id="hpp-title">Open project</h2><p id="hpp-subtitle">Choose a folder for this VS Code tab</p></div>
+   <button id="hpp-close" class="hpp-icon hpp-close" type="button" aria-label="Close project picker">×</button>
+  </header>
+  <section class="hpp-recents-section" aria-label="Recent projects">
+   <div class="hpp-section-label"><span>◷ &nbsp;Recent projects</span><button id="hpp-all-recents" type="button">View all ↗</button></div>
+   <div id="hpp-recents" class="hpp-recent-cards"></div>
+  </section>
+  <div class="hpp-browser">
+   <nav class="hpp-sidebar" aria-label="Folder shortcuts" id="hpp-sidebar"></nav>
+   <section class="hpp-files">
+    <div class="hpp-navline">
+     <button type="button" id="hpp-back" class="hpp-icon" aria-label="Back" title="Back">←</button>
+     <button type="button" id="hpp-forward" class="hpp-icon" aria-label="Forward" title="Forward">→</button>
+     <button type="button" id="hpp-up" class="hpp-icon" aria-label="Up one folder" title="Up one folder">↑</button>
+     <div id="hpp-breadcrumbs" class="hpp-crumbs" aria-label="Current location"></div>
+     <button id="hpp-edit-path" type="button" class="hpp-icon hpp-address" title="Type folder path" aria-label="Type folder path">✎</button>
+    </div>
+    <form id="hpp-path-form" class="hpp-path-form hidden"><label class="hpp-sr" for="hpp-path">Folder location</label><input id="hpp-path" type="text" autocomplete="off" spellcheck="false" placeholder="Enter a folder path"/><button type="submit">Go</button></form>
+    <div class="hpp-searchline"><div class="hpp-search"><span aria-hidden="true">⌕</span><label class="hpp-sr" for="hpp-search-input">Search folders here</label><input id="hpp-search-input" type="search" placeholder="Search folders and projects…" autocomplete="off"/></div><span id="hpp-count" aria-live="polite"></span></div>
+    <div class="hpp-folder-head"><span>Name</span><span>Modified</span><span>Favorite</span></div>
+    <div id="hpp-folders" class="hpp-folder-list" role="listbox" aria-label="Folders"></div>
+   </section>
+  </div>
+  <footer class="hpp-footer">
+   <div class="hpp-footnote"><span>ⓘ</span><span id="hpp-hint">Ctrl-click VS Code to open a blank tab</span></div>
+   <div class="hpp-actions"><button id="hpp-cancel" type="button" class="hpp-cancel">Cancel</button><button id="hpp-open" type="button" class="hpp-open">Open Project <span>↗</span></button></div>
+  </footer>
+  <div id="hpp-error" class="hpp-error hidden" role="alert"></div>
+ </section>
+</div>
+
+<script src="project-picker.js"></script>
 <script src="theme.js"></script>
 <script src="toolbar.js"></script></body></html>
