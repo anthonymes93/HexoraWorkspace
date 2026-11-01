@@ -346,7 +346,7 @@ function beginTabPointerDrag(e){
 function cancelTabPointer(){
  const d=tabPointer;if(!d)return;
  d.el.classList.remove('dragging');d.el.style.removeProperty('--drag-x');
- for(const el of document.querySelectorAll('.stack-drop-target'))el.classList.remove('stack-drop-target');
+ for(const el of document.querySelectorAll('.stack-drop-target,.tab-insert-before,.tab-insert-after'))el.classList.remove('stack-drop-target','tab-insert-before','tab-insert-after');
  document.body.classList.remove('reordering-tabs');
  try{if(d.el.hasPointerCapture(d.pointerId))d.el.releasePointerCapture(d.pointerId);}catch{}
  tabPointer=null;
@@ -358,6 +358,19 @@ function findTabDrop(e,d){
  const parent=row.dataset.stackId?Number(row.dataset.stackId):null;
  const targets=[...row.querySelectorAll('.tab')].filter(el=>el!==d.el);
  const pointerX=e.clientX;
+ // Insertion boundaries use the dragged tab's visual centre, not a narrow
+ // cursor-only hit area. Halfway between neighboring tabs means insert there.
+ const draggedRect=d.el.getBoundingClientRect();
+ const draggedCenter=e.clientX-d.offsetX+draggedRect.width/2;
+ const slots=targets.map(el=>({el,r:el.getBoundingClientRect()})).sort((a,b)=>a.r.left-b.r.left);
+ for(let i=0;i<slots.length-1;i++){
+  const left=slots[i],right=slots[i+1];
+  const boundary=(left.r.right+right.r.left)/2;
+  if(Math.abs(draggedCenter-boundary)<=Math.min(22,draggedRect.width*.22)){
+   d.candidateId=null;d.candidateSince=0;
+   return {parent,target:right.el,kind:'between',after:false,boundaryX:boundary};
+  }
+ }
  // Snapshot untransformed coordinates: the dragged tab's transform must not
  // change the destination or cause the tab bar to reorder under the cursor.
  let target=null,rect=null;
@@ -393,8 +406,9 @@ window.addEventListener('pointermove',e=>{
  // Only the dragged element moves during preview. No database or DOM reordering.
  d.el.style.setProperty('--drag-x',(e.clientX-d.startX)+'px');
  d.drop=findTabDrop(e,d);
- for(const el of document.querySelectorAll('.stack-drop-target'))el.classList.remove('stack-drop-target');
+ for(const el of document.querySelectorAll('.stack-drop-target,.tab-insert-before,.tab-insert-after'))el.classList.remove('stack-drop-target','tab-insert-before','tab-insert-after');
  if(d.drop?.kind==='on'&&d.drop.target)d.drop.target.classList.add('stack-drop-target');
+ if(d.drop?.kind==='between'&&d.drop.target)d.drop.target.classList.add(d.drop.after?'tab-insert-after':'tab-insert-before');
 });
 window.addEventListener('pointerup',async e=>{
  const d=tabPointer;if(!d||e.pointerId!==d.pointerId)return;
