@@ -141,6 +141,9 @@ async function activate(context){
  ownerFile=snapshotPath.replace(/\.editor\.json$/,'.owner');
  ownerToken=randomUUID();
  fs.writeFileSync(ownerFile,ownerToken,'utf8');
+ // Scope the native folder-open shortcut to Hexora sessions only.
+ try{await vscode.commands.executeCommand('setContext','hexoraSession.active',true);}
+ catch(error){console.warn('[Hexora Session Bridge] Context unavailable:',error.message);}
  // Expose a one-click project opener *inside VS Code*. This keeps the stable
  // Hexora .code-workspace identity instead of opening an unrelated Code window.
  const openCommand=vscode.commands.registerCommand('hexoraSession.openProject',chooseProject);
