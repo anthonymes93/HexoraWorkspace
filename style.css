@@ -580,3 +580,7 @@ body.sidebar-trim-workspace-details:not(.sidebar-icons-only) .workspace{gap:6px}
 
 /* VS Code is a native desktop-app tab, not a webpage favicon. */
 .native-code-tab-icon{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;width:18px;height:18px;margin-right:5px;border-radius:5px;color:var(--accent,#a7a9ff);background:rgba(120,130,170,.15);font-size:13px;line-height:1;pointer-events:none}
+
+/* Notion action-center launcher, following the VS Code button on the app rail. */
+#notion-rail{display:grid;place-items:center}
+.notion-mark{display:grid;place-items:center;width:24px;height:24px;border:2px solid currentColor;border-radius:4px;font:900 18px/1 Georgia,serif;letter-spacing:-2px;padding-right:2px;transform:rotate(-5deg)}
