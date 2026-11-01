@@ -418,3 +418,6 @@ body.reordering-tabs,body.reordering-tabs *{cursor:grabbing!important;user-selec
 #sidebar-resize-handle:hover::before,#sidebar-resize-handle:focus-visible::before,body.resizing-sidebar #sidebar-resize-handle::before{background:var(--hx-accent,#ad95ff);box-shadow:0 0 13px var(--hx-accent-soft,#ad95ff55)}
 body.resizing-sidebar,body.resizing-sidebar *{cursor:col-resize!important;user-select:none!important}
 body.panel-collapsed #sidebar-resize-handle{display:none}
+
+/* No sidebar easing while the native web view and renderer resize together. */
+body.resizing-sidebar .sidebar,body.resizing-sidebar .sidebar.hidden{transition:none!important}
