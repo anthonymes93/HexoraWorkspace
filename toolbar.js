@@ -286,7 +286,8 @@ let tabPointer=null,dropSaving=false,suppressTabClickUntil=0;
 function beginTabPointerDrag(e){
  if(e.button!==0||!e.isPrimary||e.target.closest('.close'))return;
  const tab=e.currentTarget;
- tabPointer={tab,id:Number(tab.dataset.tabId),workspace:activeWorkspace,startX:e.clientX,startY:e.clientY,moving:false,originLeft:tab.getBoundingClientRect().left,visualLeft:tab.getBoundingClientRect().left,grabOffset:e.clientX-tab.getBoundingClientRect().left,lastX:e.clientX,sourceStack:tab.dataset.stackId?Number(tab.dataset.stackId):null,targets:[...tab.parentElement.querySelectorAll('.tab[data-tab-id]')].filter(el=>el!==tab).map(el=>({id:Number(el.dataset.tabId),rect:el.getBoundingClientRect()}))};
+ try{tab.setPointerCapture(e.pointerId);}catch(error){console.warn('Tab pointer capture unavailable',error);}
+ tabPointer={tab,id:Number(tab.dataset.tabId),workspace:activeWorkspace,pointerId:e.pointerId,startX:e.clientX,startY:e.clientY,moving:false,originLeft:tab.getBoundingClientRect().left,visualLeft:tab.getBoundingClientRect().left,grabOffset:e.clientX-tab.getBoundingClientRect().left,lastX:e.clientX,sourceStack:tab.dataset.stackId?Number(tab.dataset.stackId):null,targets:[...tab.parentElement.querySelectorAll('.tab[data-tab-id]')].filter(el=>el!==tab).map(el=>({id:Number(el.dataset.tabId),rect:el.getBoundingClientRect()}))};
  // Do not capture until the movement threshold is met; a normal click still activates.
 }
 function animateReflow(before,dragged){
@@ -297,7 +298,7 @@ function animateReflow(before,dragged){
  }
 }
 window.addEventListener('pointermove',e=>{
- const d=tabPointer;if(!d||!e.isPrimary)return;
+ const d=tabPointer;if(!d||!e.isPrimary||e.pointerId!==d.pointerId)return;
  if(!d.tab.isConnected||activeWorkspace!==d.workspace){cancelTabPointer();return;}
  if(!d.moving){
   if(Math.hypot(e.clientX-d.startX,e.clientY-d.startY)<5)return;
@@ -346,16 +347,18 @@ window.addEventListener('pointermove',e=>{
 });
 function cancelTabPointer(){
  if(!tabPointer)return;
+ try{if(tabPointer.tab.hasPointerCapture(tabPointer.pointerId))tabPointer.tab.releasePointerCapture(tabPointer.pointerId);}catch{}
  tabPointer.tab.classList.remove('dragging');
  tabPointer.tab.style.removeProperty('--drag-x');
  document.body.classList.remove('reordering-tabs');
  tabPointer=null;
 }
-window.addEventListener('pointerup',async()=>{
- const d=tabPointer;if(!d)return;
+window.addEventListener('pointerup',async e=>{
+ const d=tabPointer;if(!d||e.pointerId!==d.pointerId)return;
  if(d.moving)suppressTabClickUntil=Date.now()+300;
  const moving=d.moving;
- const targetId=d.hoverId||null;
+ const endTarget=d.targets.find(item=>e.clientX>=item.rect.left+item.rect.width*.12&&e.clientX<=item.rect.right-item.rect.width*.12&&e.clientY>=item.rect.top&&e.clientY<=item.rect.bottom);
+ const targetId=d.hoverId||endTarget?.id||null;
  const destination=d.targetRow;
  const source=d.sourceStack;
  for(const node of document.querySelectorAll('.stack-drop-target'))node.classList.remove('stack-drop-target');
