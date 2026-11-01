@@ -9,6 +9,7 @@ const os=require('node:os');
 const {spawn}=require('node:child_process');
 const {managedWorkspaceOrBlank,clearSession,codeSessionDirectory}=require('./code-session-workspace');
 const {syncCodeProjects}=require('./code-project-sync');
+const projectPicker=require('./code-project-picker');
 const {buildCompanionVsix,BRIDGE_VERSION}=require('./code-session-vsix');
 // Each native VS Code tab owns its own PowerShell host and reparented window.
 const nativeCodeHosts=new Map();
@@ -353,13 +354,13 @@ function activate(id){
  evict();emit();return true;
 }
 
-async function openCodeTab(workspace='web',chooseProject=true){
+async function openCodeTab(workspace='web',chooseProject=true,pickedProject=null){
  if(process.platform!=='win32')throw Error('Native VS Code requires Windows.');
  // The folder picker runs *before* opening the native window. Switching
  // projects via VS Code's File menu can replace a reparented HWND, so provide
  // a safe first-class path that doesn't detach or strand a Code window.
- let selectedPath=null;
- if(chooseProject){
+ let selectedPath=pickedProject?projectPicker.validateFolder(pickedProject):null;
+ if(chooseProject&&!selectedPath){
   const selection=await dialog.showOpenDialog(win,{
    title:'Open project in a new VS Code tab (Cancel opens a blank tab)',
    properties:['openDirectory'],defaultPath:app.getPath('home')
@@ -374,7 +375,7 @@ async function openCodeTab(workspace='web',chooseProject=true){
  const count=store.search(VSCODE_URL,100).filter(isCodeTab).length+1;
  const row={id,url:codeTabUrl(id),title:selectedPath?('VS Code · '+path.basename(selectedPath)).slice(0,100):count===1?'Visual Studio Code':'Visual Studio Code '+count,workspace:typeof workspace==='string'&&workspace.length<=80?workspace:'web',pinned:false,muted:false,lastActive:Date.now(),ordinal:id};
  store.save(row);
- if(selectedPath)store.setCodeProject(id,selectedPath);
+ if(selectedPath){store.setCodeProject(id,selectedPath);projectPicker.rememberProject(store,selectedPath);}
  activate(id);
  return {id,workspace:row.workspace,active:true};
 }
@@ -883,6 +884,20 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
   menu.popup({window:win,x:Math.round(Math.max(0,Number(data?.x)||0)),y:Math.round(Math.max(0,Number(data?.y)||0))});
   return true;
  });
+ // Read-only, non-recursive folder browser for the branded VS Code project modal.
+ // All filesystem access stays in the main process. No arbitrary file reads.
+ ipcMain.handle('code-picker:locations',event=>{
+  if(event.sender!==win.webContents)throw Error('Invalid caller');
+  return projectPicker.locations(store);
+ });
+ ipcMain.handle('code-picker:list',(event,folder)=>{
+  if(event.sender!==win.webContents)throw Error('Invalid caller');
+  return projectPicker.listFolders(folder,projectPicker.readPaths(store,projectPicker.FAVORITES_KEY,100));
+ });
+ ipcMain.handle('code-picker:favorite',(event,folder)=>{
+  if(event.sender!==win.webContents)throw Error('Invalid caller');
+  return projectPicker.toggleFavorite(store,folder);
+ });
  ipcMain.handle('native-code:choose-project',async(event,id)=>{
   if(event.sender!==win.webContents)throw new Error('Invalid caller');
   const tabId=Number(id),row=store.get(tabId);
@@ -949,7 +964,7 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
   }
   if(action==='open-native-code'){
    const workspace=typeof arg==='string'?arg:typeof arg?.workspace==='string'?arg.workspace:'web';
-   return openCodeTab(workspace,arg?.skipPicker!==true);
+   return openCodeTab(workspace,arg?.skipPicker!==true,arg?.projectPath||null);
   }
   if(action==='new'){const workspace=typeof arg==='string'?arg:'web';const anchor=store.get(activeId);newTab(workspace,HOME,anchor?.workspace===workspace?activeId:null);}
   else if(action==='activate')activate(Number(arg));
