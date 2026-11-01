@@ -190,3 +190,7 @@ body.reordering-tabs,body.reordering-tabs *{cursor:grabbing!important;user-selec
 
 /* Normal arrow on tab hover; retain drag-and-drop interactions. */
 .tabs .tab,.tabs .tab *, .stack-tabs .tab,.stack-tabs .tab *{cursor:default!important}
+
+/* Real per-site favicon in main and nested tab rows. */
+.tabs .tab .tab-favicon,.stack-tabs .tab .tab-favicon{width:16px;height:16px;min-width:16px;flex:0 0 16px;object-fit:contain;display:block;pointer-events:none}
+.stack-tabs .tab .tab-favicon{width:14px;height:14px;min-width:14px;flex-basis:14px}
