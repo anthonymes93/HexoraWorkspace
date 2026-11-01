@@ -738,3 +738,9 @@ body.sidebar-trim-workspace-details:not(.sidebar-icons-only) .workspace{gap:6px}
 .top-main:has(.header-favorites-popover:not([hidden])) .top{position:relative;z-index:31}
 .top-main:has(.header-favorites-popover:not([hidden])) .tabsbar{position:relative;z-index:1}
 .header-favorites-popover:not([hidden]){z-index:40}
+
+/* Theme-aware micro-favicons: preserve colorful logos, correct low-contrast monochrome ones. */
+.header-favorite-icon{background:rgba(175,150,225,.11);border-color:rgba(175,150,225,.18)}
+.header-favorite-icon img.header-favicon-invert{filter:invert(1)}
+.header-favorite-icon img.header-favicon-contrast-tile{border-radius:3px}
+.header-favorite-icon:focus-visible{outline:2px solid #ad95ff;outline-offset:2px}
