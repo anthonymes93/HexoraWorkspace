@@ -472,8 +472,8 @@ body.sidebar-icons-only .quick-jump{width:34px;height:34px;min-height:34px;flex:
    Use a single geometric scale instead of leaving fixed 34px items clipped. */
 body.sidebar-icons-only .sidebar{
  --hx-icon-space:max(1px,calc(var(--hexora-panel-width) - 8px));
- --hx-icon-button:clamp(4px,calc(var(--hexora-panel-width) - 10px),52px);
- --hx-icon-glyph:clamp(3px,calc(var(--hexora-panel-width) * .34),23px);
+ --hx-icon-button:clamp(28px,calc(var(--hexora-panel-width) - 10px),52px);
+ --hx-icon-glyph:clamp(15px,calc(var(--hexora-panel-width) * .34),23px);
  padding:10px 3px 8px!important;
  gap:clamp(2px,calc(var(--hexora-panel-width) * .06),9px);
  overflow:hidden;
@@ -540,3 +540,7 @@ body.sidebar-icons-grid .quick-jump{
 }
 body.sidebar-icons-grid .workspace .emoji{font-size:20px!important}
 body.sidebar-icons-grid .quick-jumps{padding-top:11px!important}
+
+/* At micro widths preserve readable icons and crop the shelf rather than scaling to dust. */
+body.sidebar-icons-only:not(.sidebar-icons-grid) .workspaces,body.sidebar-icons-only:not(.sidebar-icons-grid) .quick-jumps{align-items:flex-start!important}
+body.sidebar-icons-only:not(.sidebar-icons-grid) .workspace,body.sidebar-icons-only:not(.sidebar-icons-grid) .quick-jump{margin-left:0!important}
