@@ -168,9 +168,9 @@
      <div id="hpp-breadcrumbs" class="hpp-crumbs" aria-label="Current location"></div>
      <button id="hpp-edit-path" type="button" class="hpp-icon hpp-address" title="Type folder path" aria-label="Type folder path">✎</button>
     </div>
-    <form id="hpp-path-form" class="hpp-path-form hidden"><label class="hpp-sr" for="hpp-path">Folder location</label><input id="hpp-path" type="text" autocomplete="off" spellcheck="false" placeholder="Enter a folder path"/><button type="submit">Go</button></form>
-    <div class="hpp-searchline"><div class="hpp-search"><span aria-hidden="true">⌕</span><label class="hpp-sr" for="hpp-search-input">Search folders here</label><input id="hpp-search-input" type="search" placeholder="Search folders and projects…" autocomplete="off"/></div><span id="hpp-count" aria-live="polite"></span></div>
-    <div class="hpp-folder-head"><span>Name</span><span>Modified</span><span>Favorite</span></div>
+    <form id="hpp-path-form" class="hpp-path-form"><label for="hpp-path" class="hpp-path-label">PATH</label><input id="hpp-path" type="text" autocomplete="off" spellcheck="false" placeholder="Paste a Windows folder path, e.g. C:\Projects" aria-label="Folder path — type or paste an absolute path"/><button type="submit">Go ↵</button></form>
+    <div class="hpp-searchline"><div class="hpp-search"><span aria-hidden="true">⌕</span><label class="hpp-sr" for="hpp-search-input">Search files and folders in this location</label><input id="hpp-search-input" type="search" placeholder="Search files and folders in this location…" autocomplete="off"/></div><span id="hpp-count" aria-live="polite"></span></div>
+    <div class="hpp-folder-head"><span>Name</span><span>Modified</span><span>Favorite / Type</span></div>
     <div id="hpp-folders" class="hpp-folder-list" role="listbox" aria-label="Folders"></div>
    </section>
   </div>
