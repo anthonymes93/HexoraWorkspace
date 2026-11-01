@@ -7,6 +7,8 @@ const {PasswordVault}=require('./password-vault');
 const fs=require('node:fs');
 const os=require('node:os');
 const {spawn}=require('node:child_process');
+const {workspaceForTab,clearSession,codeSessionDirectory}=require('./code-session-workspace');
+const {buildCompanionVsix,BRIDGE_VERSION}=require('./code-session-vsix');
 // Each native VS Code tab owns its own PowerShell host and reparented window.
 const nativeCodeHosts=new Map();
 const nativeCodeLaunchQueue=[];
@@ -398,11 +400,19 @@ function startNativeCodeHost(tabId,entry){
  const configured=store.getCodeProject(tabId)?.project_path;
  let projectPath=null;
  if(configured){
-  try{if(fs.statSync(configured).isDirectory())projectPath=configured;}
-  catch(error){console.warn('[Native VS Code tab '+tabId+'] Saved project unavailable; opening Code without a folder:',configured,error.message);}
+  try{
+   // A unique .code-workspace per Hexora tab gives the companion extension a
+   // stable identity even when two native tabs open the very same folder.
+   projectPath=workspaceForTab(app.getPath('userData'),tabId,configured);
+  }catch(error){console.warn('[Native VS Code tab '+tabId+'] Saved project unavailable; opening Code without a folder:',configured,error.message);}
+ }
+ let companionVsix=null;
+ if(projectPath&&store.getMeta('nativeCodeBridgeInstalledVersion')!==BRIDGE_VERSION){
+  try{companionVsix=buildCompanionVsix(codeSessionDirectory(app.getPath('userData')));}
+  catch(error){console.warn('[Native VS Code] Session companion packaging failed:',error.message);}
  }
  let proc;
- try{proc=spawn('powershell.exe',['-NoProfile','-STA','-ExecutionPolicy','Bypass','-File',script,'-ParentHwnd',hwnd,...(projectPath?['-ProjectPath',projectPath]:[])],{stdio:['pipe','pipe','pipe'],windowsHide:true});}
+ try{proc=spawn('powershell.exe',['-NoProfile','-STA','-ExecutionPolicy','Bypass','-File',script,'-ParentHwnd',hwnd,...(projectPath?['-ProjectPath',projectPath]:[]),...(companionVsix?['-CompanionVsix',companionVsix]:[])],{stdio:['pipe','pipe','pipe'],windowsHide:true});}
  catch(error){console.error('[Native VS Code tab '+tabId+'] spawn:',error.message);nativeCodeHosts.delete(tabId);nativeCodeLaunchingId=null;setImmediate(pumpNativeCodeLaunchQueue);return;}
  entry.proc=proc;
  let stdoutBuffer='',finished=false;
@@ -421,6 +431,7 @@ function startNativeCodeHost(tabId,entry){
    const line=stdoutBuffer.slice(0,idx).trim();stdoutBuffer=stdoutBuffer.slice(idx+1);
    if(!line)continue;
    console.log('[Native VS Code tab '+tabId+']',line);
+   if(line==='COMPANION_INSTALLED'&&!tabStoreClosing)store.setMeta('nativeCodeBridgeInstalledVersion',BRIDGE_VERSION);
    if(line==='READY'&&!entry.ready&&nativeCodeHosts.get(tabId)===entry){
     entry.ready=true;release();
     if(activeId===tabId&&!modalVisible&&!entry.detached)showNativeCode(tabId);
@@ -442,7 +453,10 @@ function evict(){if(live.size<=MAX_LIVE)return;const candidates=Array.from(live.
  while(live.size>MAX_LIVE&&candidates.length)discard(candidates.shift());}
 function newTab(workspace='web',url=HOME,afterId=null){const id=store.nextId(),t={id,title:'New tab',url:safeUrl(url),workspace:typeof workspace==='string'?workspace:'web',pinned:false,muted:false,lastActive:Date.now(),ordinal:id};if(afterId&&store.get(afterId)?.workspace===t.workspace)store.insertAfter(t,afterId);else store.save(t);activate(id);return id;}
 function closeTab(id){id=Number(id);favicons.delete(id);const closing=store.get(id);if(!closing)return;
- if(isCodeTab(closing))stopNativeCode(id);
+ if(isCodeTab(closing)){
+  stopNativeCode(id);
+  try{clearSession(app.getPath('userData'),id);}catch(error){console.warn('Could not clear VS Code session',id,error.message);}
+ }
  if(detached.has(id)){const popup=detached.get(id);setDetachedSaved(id,false);detached.delete(id);if(!popup.isDestroyed())popup.close();}
  discard(id);store.delete(id);if(activeId===id){activeId=null;const sameWorkspace=store.page(closing.workspace,0,50).find(t=>!detached.has(t.id));const target=sameWorkspace?.id||store.lastActiveId();if(target)activate(target);else newTab(closing.workspace);}emit();}
 function sweep(){const now=Date.now();for(const id of Array.from(live.keys())){if(id===activeId)continue;const t=store.get(id),v=live.get(id);if(!t){discard(id);continue;}if(detached.has(id)||t.pinned||now-t.last_active<IDLE_MS||v.webContents.isLoading()||v.webContents.isCurrentlyAudible?.())continue;discard(id);}emit();}
@@ -818,6 +832,9 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
   if(!fs.statSync(selectedPath).isDirectory())throw new Error('Selected project is not a folder.');
   // The tab may have been closed while the native directory picker was open.
   if(!isCodeTab(store.get(tabId)))throw new Error('VS Code tab was closed.');
+  if(previous&&path.normalize(previous).toLowerCase()!==path.normalize(selectedPath).toLowerCase()){
+   try{clearSession(app.getPath('userData'),tabId);}catch(error){console.warn('Could not clear previous VS Code editor state:',error.message);}
+  }
   store.setCodeProject(tabId,selectedPath);
   if(!store.getMeta('tabCustomTitle:'+tabId)){
    const updated=toModel(store.get(tabId));
@@ -832,6 +849,7 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
   const tabId=Number(id),row=store.get(tabId);
   if(!Number.isSafeInteger(tabId)||!isCodeTab(row))throw new Error('VS Code tab no longer exists.');
   store.clearCodeProject(tabId);
+  try{clearSession(app.getPath('userData'),tabId);}catch(error){console.warn('Could not clear VS Code editor state:',error.message);}
   if(!store.getMeta('tabCustomTitle:'+tabId)){const updated=toModel(row);updated.title='Visual Studio Code';store.save(updated);}
   emit();return {cleared:true,appliesOnNextLaunch:nativeCodeHosts.has(tabId)};
  });
@@ -900,7 +918,10 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
    const title=typeof arg?.title==='string'&&arg.title.trim()?arg.title.trim().slice(0,100):new URL(url).hostname;
    const id=arg?.newTab?newTab(typeof arg.workspace==='string'?arg.workspace:'web',url):Number(arg?.id);
    const row=store.get(id);if(!row)throw new Error('Tab no longer exists.');
-   if(isCodeTab(row)){stopNativeCode(id);store.clearCodeProject(id);}
+   if(isCodeTab(row)){
+    stopNativeCode(id);store.clearCodeProject(id);
+    try{clearSession(app.getPath('userData'),id);}catch(error){console.warn('Could not clear old VS Code session:',error.message);}
+   }
    const t=toModel(row);t.url=url;t.title=title;store.save(t);
    const view=live.get(id);
    if(view){view.webContents.loadURL(url).catch(err=>console.error('Could not open website',err));}
