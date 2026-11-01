@@ -113,7 +113,7 @@ function render(p){
  const shown=[...p.tabs.slice(0,16)];
  if(p.active&&!shown.some(x=>x.id===p.active.id))shown.unshift({...p.active,active:true,suspended:false});
  for(const item of shown){
-  const el=document.createElement('button');el.draggable=true;el.addEventListener('dragstart',e=>{e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain','hexora-tab:'+item.id);});el.className='tab'+(item.id===p.activeId?' active':'');
+  const el=document.createElement('button');el.dataset.tabId=String(item.id);el.draggable=p.tabs.slice(0,16).some(t=>t.id===item.id);el.addEventListener('dragstart',e=>{if(!el.draggable){e.preventDefault();return;}draggedTab=el;dragWorkspace=activeWorkspace;e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain','hexora-tab:'+item.id);el.classList.add('dragging');});el.addEventListener('dragend',()=>{el.classList.remove('dragging');draggedTab=null;dragWorkspace=null;});el.className='tab'+(item.id===p.activeId?' active':'');
   const name=document.createElement('span');name.className='name';name.textContent=(item.pinned?'◆ ':'')+(item.title||'ChatGPT');
   const close=document.createElement('span');close.className='close';close.textContent='×';close.onclick=e=>{e.stopPropagation();action('close',item.id);};
   el.title=item.url;el.onclick=()=>action('activate',item.id);
@@ -160,10 +160,39 @@ async function recoveryAction(name){
 }
 for(const name of ['backup','configure','unlock','restore'])$('recovery-'+name).onclick=()=>recoveryAction(name);
 
-// Drop a detached conversation back onto the main tab strip.
+// Smooth in-place tab reordering; detached tabs still dock on drop.
 const tabStrip=$('tabs');
-tabStrip.addEventListener('dragover',e=>{e.preventDefault();e.dataTransfer.dropEffect='move';});
-tabStrip.addEventListener('drop',e=>{e.preventDefault();const match=/^hexora-tab:(\d+)$/.exec(e.dataTransfer.getData('text/plain')||'');if(match)action('dock',Number(match[1]));});
+let draggedTab=null,dragWorkspace=null,dropSaving=false;
+tabStrip.addEventListener('dragover',e=>{
+ e.preventDefault();e.dataTransfer.dropEffect='move';
+ if(!draggedTab||dragWorkspace!==activeWorkspace)return;
+ const over=e.target.closest('.tab');
+ if(!over||over===draggedTab||!over.draggable)return;
+ const old=new Map([...tabStrip.children].map(el=>[el,el.getBoundingClientRect().left]));
+ const bounds=over.getBoundingClientRect();
+ const after=e.clientX>bounds.left+bounds.width/2;
+ tabStrip.insertBefore(draggedTab,after?over.nextSibling:over);
+ for(const el of tabStrip.children){
+  const dx=old.get(el)-el.getBoundingClientRect().left;
+  if(Math.abs(dx)>1)el.animate([{transform:'translateX('+dx+'px)'},{transform:'translateX(0)'}],{duration:150,easing:'ease-out'});
+ }
+});
+tabStrip.addEventListener('drop',async e=>{
+ e.preventDefault();
+ const match=/^hexora-tab:(\d+)$/.exec(e.dataTransfer.getData('text/plain')||'');
+ if(!match)return;
+ const id=Number(match[1]);
+ if(!draggedTab||Number(draggedTab.dataset.tabId)!==id||dragWorkspace!==activeWorkspace){
+  await action('dock',id);return;
+ }
+ if(dropSaving)return;
+ dropSaving=true;
+ const ids=[...tabStrip.querySelectorAll('.tab')].filter(el=>el.draggable).map(el=>Number(el.dataset.tabId));
+ draggedTab.classList.remove('dragging');draggedTab=null;dragWorkspace=null;
+ try{await action('reorder-tabs',{workspace:activeWorkspace,ids});}
+ catch(error){console.error('Could not reorder tabs',error);refresh();}
+ finally{dropSaving=false;}
+});
 
 // Right-click any tab to turn it into a website, or open a website in a separate tab.
 function hideTabMenu(restore=true){ const wasOpen=!$('tab-context-menu').classList.contains('hidden');$('tab-context-menu').classList.add('hidden');contextTab=null;if(wasOpen&&restore&&!websiteTarget)action('modal',false); }
