@@ -6,6 +6,12 @@ const {TabStore}=require('./tab-store');
 const {PasswordVault}=require('./password-vault');
 const fs=require('node:fs');
 const os=require('node:os');
+const {spawn}=require('node:child_process');
+let nativeCodeHost=null,nativeCodeActive=false;
+function nativeCodeCommand(message){if(nativeCodeHost?.stdin?.writable)nativeCodeHost.stdin.write(message+'\n');}
+function nativeCodeBounds(){if(!win||win.isDestroyed()||!nativeCodeHost)return;const [w,h]=win.getContentSize();nativeCodeCommand('RECT '+sidebarWidth+' '+TOP_HEIGHT+' '+Math.max(0,w-sidebarWidth)+' '+Math.max(0,h-TOP_HEIGHT));}
+function stopNativeCode(){nativeCodeActive=false;nativeCodeCommand('QUIT');if(nativeCodeHost){const proc=nativeCodeHost;nativeCodeHost=null;setTimeout(()=>{if(proc.exitCode===null)proc.kill();},2500).unref();}}
+
 const {snapshot,stageRestore,applyPending,verifyBackup}=require('./recovery');
 // Prevent two Hexora instances from accessing the same Chromium profile.
 const hasSingleInstanceLock=app.requestSingleInstanceLock();
@@ -255,6 +261,7 @@ function bounds(){
   // or late correction when the workspace panel finishes moving.
   view.setBounds({x:0,y:0,width:visibleWidth,height:visibleHeight});
  }
+ nativeCodeBounds();
  win.webContents.send('sidebar:frame',sidebarWidth,sidebarTransitioning,sidebarTransitionTarget);
 }
 let sidebarAnimation=null,sidebarTransitioning=false,sidebarTransitionTarget=null;
@@ -650,6 +657,20 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
   menu.popup({window:win,x:Math.round(Math.max(0,Number(data?.x)||0)),y:Math.round(Math.max(0,Number(data?.y)||0))});
   return true;
  });
+ ipcMain.handle('native-code:toggle',async event=>{
+  if(event.sender!==win.webContents)throw Error('Invalid caller');
+  if(process.platform!=='win32')throw Error('Native VS Code hosting requires Windows.');
+  if(nativeCodeHost){nativeCodeActive=!nativeCodeActive;nativeCodeCommand(nativeCodeActive?'SHOW':'HIDE');if(nativeCodeActive)nativeCodeBounds();return {active:nativeCodeActive};}
+  const script=path.join(__dirname,'experiments','vscode-hexora-host.ps1');
+  const hwnd=win.getNativeWindowHandle().readBigUInt64LE(0).toString();
+  const proc=spawn('powershell.exe',['-NoProfile','-STA','-ExecutionPolicy','Bypass','-File',script,'-ParentHwnd',hwnd],{stdio:['pipe','pipe','pipe'],windowsHide:true});
+  nativeCodeHost=proc;nativeCodeActive=true;
+  proc.stdout.on('data',data=>console.log('[Native VS Code]',String(data).trim()));
+  proc.stderr.on('data',data=>console.error('[Native VS Code]',String(data).trim()));
+  proc.on('error',error=>{console.error('Native VS Code host failed',error);if(nativeCodeHost===proc){nativeCodeHost=null;nativeCodeActive=false;}win?.webContents?.send('native-code:stopped');});
+  proc.on('exit',()=>{if(nativeCodeHost===proc){nativeCodeHost=null;nativeCodeActive=false;}if(win&&!win.isDestroyed())win.webContents.send('native-code:stopped');});
+  nativeCodeBounds();return {active:true};
+ });
  ipcMain.handle('tabs:page',(_e,arg)=>sendPage(arg));
  ipcMain.handle('tabs:search',(_e,term)=>store.search(term,50).map(pageRow));
  ipcMain.handle('tabs:lookup',(_e,id)=>{const row=store.get(Number(id));return row?pageRow(row):null;});
@@ -778,6 +799,6 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
   emit();return true;
  });
  setInterval(sweep,60*1000).unref();
- win.on('closed',()=>{quitting=true;for(const folder of [...extensionPopups.keys()])closeExtensionPopup(folder);if(sidebarAnimation)clearInterval(sidebarAnimation);for(const popup of detached.values())if(!popup.isDestroyed())popup.close();detached.clear();clearInterval(recoveryTimer);recoveryPassword=null;clearTimeout(stateTimer);win=null;for(const id of Array.from(live.keys()))discard(id);vault?.lock();store.close();});
+ win.on('closed',()=>{stopNativeCode();quitting=true;for(const folder of [...extensionPopups.keys()])closeExtensionPopup(folder);if(sidebarAnimation)clearInterval(sidebarAnimation);for(const popup of detached.values())if(!popup.isDestroyed())popup.close();detached.clear();clearInterval(recoveryTimer);recoveryPassword=null;clearTimeout(stateTimer);win=null;for(const id of Array.from(live.keys()))discard(id);vault?.lock();store.close();});
 });
 app.on('window-all-closed',()=>{if(process.platform!=='darwin')app.quit();});

@@ -1346,3 +1346,7 @@ v('vault-entry-form').onsubmit=async e=>{
 };
 v('vault-delete').onclick=async()=>{if(!vaultSelected||!confirm('Delete this saved login permanently?'))return;await window.hexora.vault.delete(vaultSelected);vaultClearEditor();v('vault-entry-form').classList.add('hidden');await vaultLoad();};
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&vaultOpen)vaultClose();});
+
+// Experimental native Windows application overlay (not yet a persistent tab).
+$('native-code-rail').addEventListener('click',async()=>{try{const state=await window.hexora.nativeCode.toggle();$('native-code-rail').classList.toggle('selected',state.active);}catch(error){alert('Native VS Code: '+error.message);}});
+window.hexora.nativeCode.onStopped(()=>$('native-code-rail').classList.remove('selected'));
