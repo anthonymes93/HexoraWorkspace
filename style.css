@@ -544,3 +544,18 @@ body.sidebar-icons-grid .quick-jumps{padding-top:11px!important}
 /* At micro widths preserve readable icons and crop the shelf rather than scaling to dust. */
 body.sidebar-icons-only:not(.sidebar-icons-grid) .workspaces,body.sidebar-icons-only:not(.sidebar-icons-grid) .quick-jumps{align-items:flex-start!important}
 body.sidebar-icons-only:not(.sidebar-icons-grid) .workspace,body.sidebar-icons-only:not(.sidebar-icons-grid) .quick-jump{margin-left:0!important}
+
+/* Narrow text-mode workspace rows: names first, details in the context menu. */
+body.sidebar-trim-workspace-details:not(.sidebar-icons-only) .workspace .count,
+body.sidebar-trim-workspace-details:not(.sidebar-icons-only) .workspace .workspace-edit{display:none!important}
+body.sidebar-trim-workspace-details:not(.sidebar-icons-only) .workspace .name{flex:1;min-width:0}
+body.sidebar-trim-workspace-details:not(.sidebar-icons-only) .workspace{gap:6px}
+/* Workspace menu lives above the panel, without affecting its width. */
+.workspace-context-menu{position:fixed;z-index:85;width:242px;padding:8px;background:linear-gradient(145deg,#292633,#1b1b23);border:1px solid #50475e;border-radius:13px;box-shadow:0 20px 70px #000b;color:#e9e4f0}
+.workspace-context-top{display:flex;align-items:center;gap:10px;padding:10px 9px 13px;margin-bottom:5px;border-bottom:1px solid #ffffff16}
+.workspace-context-icon{flex:0 0 36px;width:36px;height:36px;border-radius:10px;background:var(--hx-accent-soft,#ad95ff24);display:grid;place-items:center;font-size:20px;color:var(--hx-accent,#ad95ff)}
+.workspace-context-info{min-width:0;display:flex;flex-direction:column;gap:5px}
+.workspace-context-info strong{font-size:12px;white-space:normal;overflow-wrap:anywhere}
+.workspace-context-info small{font-size:10px;color:#a09aaa}
+.workspace-context-menu>button{display:block;width:100%;text-align:left;border:0;background:transparent;padding:11px 10px;border-radius:8px;font-size:12px;color:#dcd8e6;cursor:pointer}
+.workspace-context-menu>button:hover{background:#393345;color:#fff}
