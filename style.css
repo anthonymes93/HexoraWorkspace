@@ -223,6 +223,9 @@ body.reordering-tabs,body.reordering-tabs *{cursor:grabbing!important;user-selec
 .tabs::-webkit-scrollbar-track,.stack-tabs::-webkit-scrollbar-track,.conversation-list::-webkit-scrollbar-track,.tab-context-menu::-webkit-scrollbar-track,.tab-workspace-submenu::-webkit-scrollbar-track,.dialog #search-results::-webkit-scrollbar-track,.stats-dialog::-webkit-scrollbar-track,.stats-scroll::-webkit-scrollbar-track{background:transparent}
 .tabs::-webkit-scrollbar-thumb,.stack-tabs::-webkit-scrollbar-thumb,.conversation-list::-webkit-scrollbar-thumb,.tab-context-menu::-webkit-scrollbar-thumb,.tab-workspace-submenu::-webkit-scrollbar-thumb,.dialog #search-results::-webkit-scrollbar-thumb,.stats-dialog::-webkit-scrollbar-thumb,.stats-scroll::-webkit-scrollbar-thumb{background:#51495f;border-radius:20px}
 .tabs::-webkit-scrollbar-thumb:hover,.stack-tabs::-webkit-scrollbar-thumb:hover,.conversation-list::-webkit-scrollbar-thumb:hover,.tab-context-menu::-webkit-scrollbar-thumb:hover,.tab-workspace-submenu::-webkit-scrollbar-thumb:hover{background:#786a8e}
-/* Keep the primary tab strip clean while remaining scrollable via wheel/touchpad. */
-.tabs{scrollbar-width:none}
-.tabs::-webkit-scrollbar{display:none}
+/* Keep the top tab scrollbar visible, but refined and unobtrusive. */
+.tabs{scrollbar-width:thin;scrollbar-color:#51495f transparent}
+.tabs::-webkit-scrollbar{display:block;height:5px}
+.tabs::-webkit-scrollbar-track{background:transparent}
+.tabs::-webkit-scrollbar-thumb{background:#51495f;border-radius:20px}
+.tabs::-webkit-scrollbar-thumb:hover{background:#786a8e}
