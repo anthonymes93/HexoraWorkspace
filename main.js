@@ -10,6 +10,7 @@ const {spawn}=require('node:child_process');
 let nativeCodeHost=null,nativeCodeActive=false,nativeCodeDetached=false;
 function nativeCodeCommand(message){if(nativeCodeHost?.stdin?.writable)nativeCodeHost.stdin.write(message+'\n');}
 function nativeCodeBounds(){if(!win||win.isDestroyed()||!nativeCodeHost)return;const [w,h]=win.getContentSize();nativeCodeCommand('RECT '+sidebarWidth+' '+TOP_HEIGHT+' '+Math.max(0,w-sidebarWidth)+' '+Math.max(0,h-TOP_HEIGHT));}
+setInterval(()=>{if(nativeCodeHost&&nativeCodeActive&&!nativeCodeDetached)nativeCodeCommand('CHECK');},750).unref();
 function restoreNativeWebView(){if(win&&!win.isDestroyed()&&mainViewport){const view=live.get(activeId);if(view&&!modalVisible){mainViewport.addChildView(view);bounds();}}}
 function stopNativeCode(){nativeCodeActive=false;nativeCodeCommand('QUIT');if(nativeCodeHost){const proc=nativeCodeHost;nativeCodeHost=null;setTimeout(()=>{if(proc.exitCode===null)proc.kill();},2500).unref();}}
 
