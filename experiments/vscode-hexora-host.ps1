@@ -20,9 +20,13 @@ public static class HexoraNative {
  [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr h,int cmd);
  [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);
  [DllImport("user32.dll")] public static extern IntPtr SetFocus(IntPtr h);
+ [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
+ [DllImport("user32.dll")] public static extern IntPtr GetFocus();
+ [DllImport("user32.dll")] public static extern IntPtr GetParent(IntPtr h);
  [DllImport("kernel32.dll")] public static extern uint GetCurrentThreadId();
  [DllImport("user32.dll")] public static extern bool AttachThreadInput(uint a,uint b,bool attach);
  public static void Focus(IntPtr h) { uint pid;uint thread=GetWindowThreadProcessId(h,out pid);uint own=GetCurrentThreadId();bool linked=thread!=own&&AttachThreadInput(own,thread,true);try{SetForegroundWindow(h);SetFocus(h);}finally{if(linked)AttachThreadInput(own,thread,false);} }
+ public static string Diagnostic(IntPtr h) {var foreground=GetForegroundWindow();uint pid;uint thread=GetWindowThreadProcessId(h,out pid);uint own=GetCurrentThreadId();bool linked=thread!=own&&AttachThreadInput(own,thread,true);try{return "child="+h.ToInt64()+" foreground="+foreground.ToInt64()+" focus="+GetFocus().ToInt64()+" parent="+GetParent(h).ToInt64()+" childThread="+thread+" hostThread="+own;}finally{if(linked)AttachThreadInput(own,thread,false);}}
  public static long[] Windows() {var found=new List<long>();EnumWindows((h,lp)=>{if(!IsWindowVisible(h))return true;var title=new StringBuilder(512);GetWindowText(h,title,512);uint pid;GetWindowThreadProcessId(h,out pid);try{if(title.Length>0&&System.Diagnostics.Process.GetProcessById((int)pid).ProcessName.Equals("Code",StringComparison.OrdinalIgnoreCase))found.Add(h.ToInt64());}catch{}return true;},IntPtr.Zero);return found.ToArray();}
 }
 '@
@@ -48,16 +52,18 @@ try {
  [void][HexoraNative]::SetParent($child,$parent)
  $attached=$true
  [HexoraNative]::Focus($child)
+ Write-Output ('DIAG READY '+[HexoraNative]::Diagnostic($child))
  Write-Output 'READY'
  while($null -ne ($line=[Console]::ReadLine())){
   $parts=$line.Trim().Split(' ')
   switch($parts[0]){
    'RECT' {if($parts.Length -eq 5){$lastRect=@([int]$parts[1],[int]$parts[2],[Math]::Max(1,[int]$parts[3]),[Math]::Max(1,[int]$parts[4]));if(-not $detached){[void][HexoraNative]::SetWindowPos($child,[IntPtr]::Zero,$lastRect[0],$lastRect[1],$lastRect[2],$lastRect[3],0x0024)}}}
    'SHOW' {[void][HexoraNative]::ShowWindow($child,5);[HexoraNative]::Focus($child)}
-   'FOCUS' {[HexoraNative]::Focus($child)}
+   'FOCUS' {[HexoraNative]::Focus($child);Write-Output ('DIAG FOCUS '+[HexoraNative]::Diagnostic($child))}
+   'DIAG' {Write-Output ('DIAG MANUAL '+[HexoraNative]::Diagnostic($child))}
    'HIDE' {[void][HexoraNative]::ShowWindow($child,0)}
-   'DETACH' {if(-not $detached){[void][HexoraNative]::SetParent($child,[IntPtr]::Zero);[void][HexoraNative]::SetWindowLong($child,-16,$oldStyle);[void][HexoraNative]::SetWindowPos($child,[IntPtr]::Zero,120,120,1000,700,0x0024 -bor 0x0020);[void][HexoraNative]::ShowWindow($child,5);[HexoraNative]::Focus($child);$detached=$true;Write-Output 'DETACHED'}}
-   'ATTACH' {if($detached){[void][HexoraNative]::SetWindowLong($child,-16,$newStyle);[void][HexoraNative]::SetParent($child,$parent);[void][HexoraNative]::SetWindowPos($child,[IntPtr]::Zero,$lastRect[0],$lastRect[1],$lastRect[2],$lastRect[3],0x0024 -bor 0x0020);[void][HexoraNative]::ShowWindow($child,5);[HexoraNative]::Focus($child);$detached=$false;Write-Output 'ATTACHED'}}
+   'DETACH' {if(-not $detached){[void][HexoraNative]::SetParent($child,[IntPtr]::Zero);[void][HexoraNative]::SetWindowLong($child,-16,$oldStyle);[void][HexoraNative]::SetWindowPos($child,[IntPtr]::Zero,120,120,1000,700,0x0024 -bor 0x0020);[void][HexoraNative]::ShowWindow($child,5);[HexoraNative]::Focus($child);$detached=$true;Write-Output ('DIAG DETACHED '+[HexoraNative]::Diagnostic($child));Write-Output 'DETACHED'}}
+   'ATTACH' {if($detached){[void][HexoraNative]::SetWindowLong($child,-16,$newStyle);[void][HexoraNative]::SetParent($child,$parent);[void][HexoraNative]::SetWindowPos($child,[IntPtr]::Zero,$lastRect[0],$lastRect[1],$lastRect[2],$lastRect[3],0x0024 -bor 0x0020);[void][HexoraNative]::ShowWindow($child,5);[HexoraNative]::Focus($child);$detached=$false;Write-Output ('DIAG ATTACHED '+[HexoraNative]::Diagnostic($child));Write-Output 'ATTACHED'}}
    'QUIT' {break}
   }
   if($parts[0] -eq 'QUIT'){break}
