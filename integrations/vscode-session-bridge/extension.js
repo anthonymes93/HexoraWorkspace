@@ -4,9 +4,12 @@
 const vscode=require('vscode');
 const fs=require('node:fs');
 const path=require('node:path');
+const {randomUUID}=require('node:crypto');
 
 let timer=null;
 let snapshotPath=null;
+let ownerFile=null;
+let ownerToken=null;
 let restoring=false;
 let userChangedDuringRestore=false;
 let savedEditor=null;
@@ -35,9 +38,13 @@ function getEditorState(editor){
  const position=editor.selection.active;
  return {version:1,path:editor.document.uri.fsPath,workspaceRoot:vscode.workspace.workspaceFolders?.[0]?.uri.fsPath||'',line:position.line,character:position.character,updatedAt:Date.now()};
 }
+function ownsSession(){
+ if(!ownerFile||!ownerToken)return false;
+ try{return fs.readFileSync(ownerFile,'utf8')===ownerToken;}catch{return false;}
+}
 function commitSnapshot(){
  timer=null;
- if(!snapshotPath||restoring)return;
+ if(!snapshotPath||restoring||!ownsSession())return;
  const state=getEditorState(vscode.window.activeTextEditor);
  if(!state)return; // Keep last real editor when terminal, Settings, or Welcome is active.
  const tmp=snapshotPath+'.tmp-'+process.pid;
@@ -80,6 +87,11 @@ async function activate(context){
  snapshotPath=getSessionFile();
  if(!snapshotPath)return;
  savedEditor=readSaved(snapshotPath);
+ // A previously detached VS Code process can still be alive after Hexora
+ // restarts. Only the most recently activated native session may write state.
+ ownerFile=snapshotPath.replace(/\.editor\.json$/,'.owner');
+ ownerToken=randomUUID();
+ fs.writeFileSync(ownerFile,ownerToken,'utf8');
  restoring=true;
  // Save any manual interactions before an automatic restore: don't steal focus
  // from someone who already selected a different file during startup.
