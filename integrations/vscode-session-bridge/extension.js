@@ -10,6 +10,9 @@ let timer=null;
 let snapshotPath=null;
 let ownerFile=null;
 let ownerToken=null;
+let projectUpdatePath=null;
+let lastPublishedProject=null;
+let projectStatusItem=null;
 let restoring=false;
 let userChangedDuringRestore=false;
 let savedEditor=null;
@@ -32,6 +35,52 @@ function readSaved(file){
   if(!Number.isSafeInteger(item.line)||!Number.isSafeInteger(item.character)||item.line<0||item.character<0)return null;
   return item;
  }catch{return null;}
+}
+function currentProject(){
+ const folders=vscode.workspace.workspaceFolders;
+ // A tab currently stores one folder. Never silently select the first folder
+ // of a multi-root workspace or interpret a random open file as a project.
+ if(!Array.isArray(folders)||folders.length!==1||folders[0].uri.scheme!=='file')return null;
+ const project=folders[0].uri.fsPath;
+ return typeof project==='string'&&path.isAbsolute(project)?project:null;
+}
+function saveProject(){
+ if(!projectUpdatePath||!ownsSession())return;
+ const project=currentProject();
+ if(!project||project===lastPublishedProject)return;
+ const data={version:1,projectPath:project,ownerToken,updatedAt:Date.now()};
+ const tmp=projectUpdatePath+'.tmp-'+process.pid;
+ try{
+  fs.writeFileSync(tmp,JSON.stringify(data),'utf8');
+  fs.renameSync(tmp,projectUpdatePath);
+  lastPublishedProject=project;
+ }catch(error){
+  try{fs.rmSync(tmp,{force:true});}catch{}
+  console.warn('[Hexora Session Bridge] Could not save project:',error.message);
+ }
+}
+function refreshProjectButton(){
+ if(!projectStatusItem)return;
+ const project=currentProject();
+ projectStatusItem.text=project?'$(folder-opened) '+path.basename(project):'$(folder-opened) Open Project';
+ projectStatusItem.tooltip=project?'Hexora project: '+project+' · Click to switch folder':'Open a project folder in this Hexora tab';
+}
+async function chooseProject(){
+ const choices=await vscode.window.showOpenDialog({
+  canSelectFolders:true,canSelectFiles:false,canSelectMany:false,
+  openLabel:'Open in Hexora'
+ });
+ const uri=choices?.[0];
+ if(!uri||uri.scheme!=='file')return;
+ const count=vscode.workspace.workspaceFolders?.length||0;
+ const changed=vscode.workspace.updateWorkspaceFolders(0,count,{uri});
+ if(changed===false){
+  vscode.window.showErrorMessage('Hexora could not open that folder in this tab.');
+  return;
+ }
+ // Workspace folder changes normally generate an event; also sync once more
+ // after the update to handle host versions that delay the notification.
+ setTimeout(()=>{refreshProjectButton();saveProject();},300);
 }
 function getEditorState(editor){
  if(!editor||editor.document.uri.scheme!=='file')return null;
@@ -86,12 +135,27 @@ async function restoreEditor(){
 async function activate(context){
  snapshotPath=getSessionFile();
  if(!snapshotPath)return;
+ projectUpdatePath=snapshotPath.replace(/\.editor\.json$/,'.project.json');
  savedEditor=readSaved(snapshotPath);
  // A previously detached VS Code process can still be alive after Hexora
  // restarts. Only the most recently activated native session may write state.
  ownerFile=snapshotPath.replace(/\.editor\.json$/,'.owner');
  ownerToken=randomUUID();
  fs.writeFileSync(ownerFile,ownerToken,'utf8');
+ // Expose a one-click project opener *inside VS Code*. This keeps the stable
+ // Hexora .code-workspace identity instead of opening an unrelated Code window.
+ const openCommand=vscode.commands.registerCommand('hexoraSession.openProject',chooseProject);
+ projectStatusItem=vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left,25);
+ projectStatusItem.command='hexoraSession.openProject';
+ projectStatusItem.show();
+ refreshProjectButton();
+ // Automatically capture a folder that VS Code itself adds/replaces.
+ const onFolders=vscode.workspace.onDidChangeWorkspaceFolders(()=>{
+  refreshProjectButton();
+  saveProject();
+ });
+ context.subscriptions.push(openCommand,projectStatusItem,onFolders);
+ saveProject();
  restoring=true;
  // Save any manual interactions before an automatic restore: don't steal focus
  // from someone who already selected a different file during startup.
@@ -110,10 +174,14 @@ async function activate(context){
  }finally{
   restoring=false;
   queueSnapshot();
+  // A document switching after a workspace change is another chance to notice
+  // the new root without any Hexora menu interaction.
+  saveProject();
  }
 }
 function deactivate(){
  clearTimeout(timer);
+ saveProject();
  // Persist synchronously if VS Code unloads while the debounce is pending.
  commitSnapshot();
 }
