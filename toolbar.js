@@ -236,7 +236,7 @@ function updateTabFavicon(el,tab){
  if(!img){
   img=document.createElement('img');img.className='tab-favicon';
   img.alt='';img.draggable=false;
-  el.insertBefore(img,el.querySelector('.name')||el.firstChild);
+  el.insertBefore(img,el.querySelector('.tab-title-lines')||el.querySelector('.name')||el.firstChild);
  }
  // Use the favicon advertised by the page when available; fall back to the
  // site's /favicon.ico when Electron has not fired page-favicon-updated.
@@ -251,6 +251,23 @@ function updateTabFavicon(el,tab){
   img.style.visibility='visible';img.src=preferred;
  }
 }
+function syncFirstRowMicroTitles(){
+ const host=$('tabs');
+ for(const tab of host.querySelectorAll(':scope > .tab[data-tab-id]')){
+  const label=tab.querySelector('.name'),micro=tab.querySelector('.tab-micro-title');
+  if(!label||!micro)continue;
+  const clipped=label.scrollWidth>label.clientWidth+1;
+  micro.textContent=clipped?label.textContent:'';
+  micro.hidden=!clipped;
+  tab.classList.toggle('has-micro-title',clipped);
+ }
+}
+let microTitleFrame=0;
+function scheduleMicroTitles(){
+ if(microTitleFrame)cancelAnimationFrame(microTitleFrame);
+ microTitleFrame=requestAnimationFrame(()=>{microTitleFrame=0;syncFirstRowMicroTitles();});
+}
+new ResizeObserver(scheduleMicroTitles).observe($('tabs'));
 function renderTabRow(host,page,parentId){
  const data=page.stackData||{stacks:[],members:[]};
  const memberOf=new Map(data.members.map(m=>[m.tab_id,m.stack_id]));
@@ -283,6 +300,7 @@ function renderTabRow(host,page,parentId){
    }
    if(stack){const title='▤ '+stack.name;if(el.textContent!==title)el.textContent=title;}
   }
+  if(parentId===null)scheduleMicroTitles();
   return;
  }
  host.dataset.rowSignature=signature;
@@ -301,7 +319,11 @@ function renderTabRow(host,page,parentId){
    const name=document.createElement('span');name.className='name';name.textContent=(item.tab.pinned?'◆ ':'')+(item.tab.title||'New Tab');
    const close=document.createElement('span');close.className='close';close.textContent='×';
    close.onclick=e=>{e.stopPropagation();action('close',item.id);};
-   el.append(name,close);
+   if(parentId===null){
+    const lines=document.createElement('span');lines.className='tab-title-lines';
+    const micro=document.createElement('span');micro.className='tab-micro-title';micro.hidden=true;
+    lines.append(micro,name);el.append(lines,close);
+   }else el.append(name,close);
    updateTabFavicon(el,item.tab);
    el.title=item.tab.url||'Open tab';
    el.onclick=()=>{selectedRootTabId=null;selectedStackId=parentId;stackRowsDismissed=parentId===null;action('activate',item.id);};
@@ -310,6 +332,7 @@ function renderTabRow(host,page,parentId){
   el.addEventListener('pointerdown',beginTabPointerDrag);
   host.append(el);
  }
+ if(parentId===null)scheduleMicroTitles();
 }
 function renderSecondTabRow(page){
  const host=$('stack-rows');
