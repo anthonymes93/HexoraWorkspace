@@ -1,0 +1,61 @@
+name: Build Hexora Windows test packages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - package.json
+      - main.js
+      - .github/workflows/windows-test-build.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows-installer:
+    name: Test installer (unsigned EXE)
+    runs-on: windows-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Verify source syntax
+        run: |
+          node --check main.js
+          node --check preload.js
+          node --check toolbar.js
+      - name: Package Hexora for Windows
+        run: npm run build:win
+      - name: Upload installable test build
+        uses: actions/upload-artifact@v4
+        with:
+          name: Hexora-Windows-Installer
+          path: dist/*.exe
+          if-no-files-found: error
+          retention-days: 14
+
+  microsoft-store-preview:
+    name: Microsoft Store preview (unsigned AppX)
+    runs-on: windows-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Package Hexora for Store preview
+        run: npm run build:store
+      - name: Upload Store preview package
+        uses: actions/upload-artifact@v4
+        with:
+          name: Hexora-Microsoft-Store-Preview
+          path: dist/*.appx
+          if-no-files-found: error
+          retention-days: 14

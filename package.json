@@ -2,11 +2,51 @@
   "name": "hexora-workspace",
   "version": "0.4.0",
   "private": true,
-  "description": "Hexora Workspace with SQLite-backed on-demand browser tabs",
+  "description": "Hexora Workspace desktop browser and integrated workspaces",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "benchmark:tabs": "node --experimental-sqlite scripts/benchmark-tabs.cjs"
+    "benchmark:tabs": "node --experimental-sqlite scripts/benchmark-tabs.cjs",
+    "build:win": "npx --yes electron-builder@26.18.0 --win nsis --x64 --publish never",
+    "build:store": "npx --yes electron-builder@26.18.0 --win appx --x64 --publish never"
+  },
+  "build": {
+    "appId": "app.hexora.workspace",
+    "productName": "Hexora Workspace",
+    "asar": true,
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "**/*",
+      "!README.md",
+      "!scripts/**",
+      "!dist/**",
+      "!build/**",
+      "!release/**",
+      "!releases/**",
+      "!test-results/**"
+    ],
+    "win": {
+      "target": "nsis",
+      "artifactName": "Hexora-Setup-${version}-${arch}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "perMachine": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Hexora Workspace"
+    },
+    "appx": {
+      "applicationId": "HexoraWorkspace",
+      "identityName": "HexoraWorkspace.Preview",
+      "publisher": "CN=Hexora Development",
+      "publisherDisplayName": "Hexora Development",
+      "displayName": "Hexora Workspace",
+      "artifactName": "Hexora-Store-Preview-${version}-${arch}.${ext}"
+    }
   },
   "devDependencies": {
     "electron": "^38.0.0"

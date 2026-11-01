@@ -7,6 +7,10 @@ const {PasswordVault}=require('./password-vault');
 const fs=require('node:fs');
 const os=require('node:os');
 const {snapshot,stageRestore,applyPending,verifyBackup}=require('./recovery');
+// Stable profile path for development, NSIS and packaged builds.
+// Keep this unchanged so installing an update never silently switches profiles.
+app.setPath('userData', path.join(app.getPath('appData'), 'hexora-workspace'));
+
 // Prevent two Hexora instances from accessing the same Chromium profile.
 const hasSingleInstanceLock=app.requestSingleInstanceLock();
 if(!hasSingleInstanceLock){
