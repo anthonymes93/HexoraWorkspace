@@ -193,6 +193,12 @@ function render(p){
 const sidebarGrip=$('sidebar-resize-handle');
 let sidebarDrag=null,sidebarDesired=null,sidebarWorker=null;
 const clampSidebarWidth=x=>Math.round(Math.max(64,Math.min(560,Math.max(64,window.innerWidth-420),x)));
+function snapSidebarWidth(width,drag){
+ // Hysteresis avoids a sliver of tiny, clipped icons and prevents edge flicker.
+ if(drag.snapClosed){if(width<123)return 64;drag.snapClosed=false;}
+ else if(width<=106){drag.snapClosed=true;return 64;}
+ return width;
+}
 function queueSidebarResize(width){
  sidebarDesired=clampSidebarWidth(width);
  if(!sidebarWorker)sidebarWorker=(async()=>{
@@ -209,7 +215,7 @@ function queueSidebarResize(width){
 sidebarGrip.addEventListener('pointerdown',event=>{
  if(event.button!==0)return;
  event.preventDefault();
- sidebarDrag={pointerId:event.pointerId,last:clampSidebarWidth(event.clientX),previousX:event.clientX,previousTime:performance.now(),smoothedSpeed:0};
+ sidebarDrag={pointerId:event.pointerId,last:clampSidebarWidth(event.clientX),previousX:event.clientX,previousTime:performance.now(),smoothedSpeed:0,snapClosed:false};
  sidebarGrip.setPointerCapture(event.pointerId);
  document.body.classList.add('resizing-sidebar');
 });
@@ -218,14 +224,14 @@ sidebarGrip.addEventListener('pointermove',event=>{
  const now=performance.now(),elapsed=Math.max(1,now-sidebarDrag.previousTime);
  const speed=Math.abs(event.clientX-sidebarDrag.previousX)/elapsed;
  sidebarDrag.previousX=event.clientX;sidebarDrag.previousTime=now;
- sidebarDrag.last=clampSidebarWidth(event.clientX);
+ sidebarDrag.last=snapSidebarWidth(clampSidebarWidth(event.clientX),sidebarDrag);
  // Only a genuinely rapid sweep freezes responsive previews.
  // A normal drag should show the layout at the width under the cursor.
  // Average out mouse-event spikes; use hysteresis to avoid rapidly switching modes.
  sidebarDrag.smoothedSpeed=sidebarDrag.smoothedSpeed*.68+Math.min(speed,8)*.32;
  if(sidebarDrag.smoothedSpeed>1.65)sidebarFastDrag=true;
  else if(sidebarDrag.smoothedSpeed<.9)sidebarFastDrag=false;
- if(!sidebarFastDrag)applySidebarBreakpoint(sidebarDrag.last);
+ if(!sidebarFastDrag||sidebarDrag.last===64)applySidebarBreakpoint(sidebarDrag.last);
  clearTimeout(sidebarSettleTimer);
  sidebarSettleTimer=setTimeout(()=>{
   if(!sidebarDrag)return;
