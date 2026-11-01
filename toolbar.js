@@ -275,36 +275,60 @@ const newTabCustomKey='hexora:new-tab-shortcuts:v1';
 // Address suggestions are derived from Hexora's history, never persisted separately.
 let newTabHistoryMatches=[],newTabHistorySelected=-1,newTabHistoryRequest=0;
 const newTabSuggestions=$('new-tab-suggestions');
+const smartKey='hexora:smartbar:learning:v1';
+function smartState(){try{const v=JSON.parse(localStorage.getItem(smartKey)||'{}');return {choices:v.choices&&typeof v.choices==='object'?v.choices:{},dismissed:v.dismissed&&typeof v.dismissed==='object'?v.dismissed:{}};}catch{return {choices:{},dismissed:{}};}}
+function saveSmartState(s){try{localStorage.setItem(smartKey,JSON.stringify(s));}catch{}}
+function smartIdentity(e){return e.kind+':'+e.url;}
+function learnSmartChoice(entry,query){
+ if(!entry||!query)return;
+ const state=smartState(),key=query.trim().toLowerCase().slice(0,100),id=smartIdentity(entry);
+ if(!key)return;
+ if(!state.choices[key])state.choices[key]={};
+ state.choices[key][id]=Math.min(1000,(state.choices[key][id]||0)+1);
+ delete state.dismissed[id];
+ saveSmartState(state);
+}
 function hideNewTabSuggestions(){newTabSuggestions.hidden=true;newTabSuggestions.replaceChildren();newTabHistorySelected=-1;}
 function paintNewTabSuggestions(){
  newTabSuggestions.replaceChildren();
  newTabSuggestions.hidden=!newTabHistoryMatches.length;
  newTabHistoryMatches.forEach((entry,index)=>{
+  const row=document.createElement('div');row.className='new-tab-suggestion-row';
   const item=document.createElement('button');item.type='button';item.className='new-tab-suggestion';
   item.setAttribute('role','option');item.setAttribute('aria-selected',String(index===newTabHistorySelected));
   if(index===newTabHistorySelected)item.classList.add('selected');
   const title=document.createElement('strong');title.textContent=entry.title||entry.domain||entry.url;
-  const url=document.createElement('span');url.textContent=entry.url;
+  const url=document.createElement('span');url.textContent=entry.kind==='history'?'Previously visited · '+entry.domain:entry.url;
   item.append(title,url);
   item.addEventListener('mousedown',e=>e.preventDefault());
-  item.onclick=()=>launchNewTab(entry.url,entry.title);
-  newTabSuggestions.append(item);
+  item.onclick=()=>openSmartSuggestion(entry);
+  const remove=document.createElement('button');remove.type='button';remove.className='new-tab-dismiss';remove.textContent='×';remove.title='Dismiss this suggestion';remove.setAttribute('aria-label','Dismiss '+entry.title);
+  remove.onclick=()=>confirmSmartDismiss(entry);
+  row.append(item,remove);newTabSuggestions.append(row);
  });
 }
-// Site destinations are inferred from visited history; no independent site list.
-// Known app landing paths are only applied if that origin exists in history.
+function openSmartSuggestion(entry){learnSmartChoice(entry,newTabAddress.value);return launchNewTab(entry.url,entry.title);}
+function confirmSmartDismiss(entry){
+ const dialog=$('new-tab-dismiss-confirm'),name=$('new-tab-dismiss-name');
+ name.textContent=entry.title;
+ dialog.hidden=false;
+ $('new-tab-dismiss-cancel').onclick=()=>{dialog.hidden=true;newTabAddress.focus();};
+ $('new-tab-dismiss-accept').onclick=()=>{
+  const state=smartState(),id=smartIdentity(entry);
+  state.dismissed[id]=true;
+  for(const choices of Object.values(state.choices))if(choices&&typeof choices==='object')delete choices[id];
+  saveSmartState(state);dialog.hidden=true;
+  newTabHistoryMatches=newTabHistoryMatches.filter(x=>smartIdentity(x)!==id);
+  newTabHistorySelected=newTabHistoryMatches.length?0:-1;paintNewTabSuggestions();newTabAddress.focus();
+ };
+}
 function historyDestination(entry){
  let parsed;try{parsed=new URL(entry.url);}catch{return null;}
  if(!['http:','https:'].includes(parsed.protocol))return null;
- const host=parsed.hostname.toLowerCase();
- const cleanHost=host.replace(/^www\./,'');
+ const host=parsed.hostname.toLowerCase(),domain=host.replace(/^www\./,'');
  const appLanding={'gemini.google.com':'/app','chatgpt.com':'/','chat.openai.com':'/','app.notion.com':'/'};
- const path=appLanding[cleanHost]||'/';
- const origin=parsed.origin;
- // Search pages are not the destination site (e.g. a Google search for Gemini).
- const title=entry.title||cleanHost;
- const label=cleanHost==='gemini.google.com'?'Google Gemini':cleanHost==='chatgpt.com'||cleanHost==='chat.openai.com'?'ChatGPT':title;
- return {url:origin+path,title:label,domain:cleanHost,sourceTitle:title,sourceUrl:entry.url};
+ const title=domain==='gemini.google.com'?'Google Gemini':domain==='chatgpt.com'||domain==='chat.openai.com'?'ChatGPT':domain==='app.notion.com'?'Notion':domain;
+ return {url:parsed.origin+(appLanding[domain]||'/'),title,domain,kind:'site'};
 }
 async function updateNewTabSuggestions(){
  const request=++newTabHistoryRequest,query=newTabAddress.value.trim().toLowerCase();
@@ -312,26 +336,25 @@ async function updateNewTabSuggestions(){
  try{
   const entries=await action('history-list',{limit:500});
   if(request!==newTabHistoryRequest||newTabOverlay.classList.contains('hidden'))return;
-  const groups=new Map();
+  const sites=new Map(),pages=new Map();
   for(const entry of (Array.isArray(entries)?entries:[])){
    if(!entry||typeof entry.url!=='string')continue;
    const dest=historyDestination(entry);if(!dest)continue;
-   // Match against the website identity, not a long tracking URL or an
-   // unrelated Google search query. This avoids spurious search results.
-   const identity=[dest.title,dest.domain,entry.domain].filter(Boolean).join(' ').toLowerCase();
-   if(!identity.includes(query))continue;
-   const key=dest.domain;
-   if(!groups.has(key))groups.set(key,{...dest,score:0});
-   const group=groups.get(key);
-   const hostMatch=dest.domain.startsWith(query)?5:dest.domain.includes(query)?3:0;
-   const titleMatch=dest.title.toLowerCase().startsWith(query)?4:0;
-   group.score=Math.max(group.score,hostMatch+titleMatch);
-   if(dest.title.length<group.title.length)group.title=dest.title;
+   if([dest.title,dest.domain].join(' ').toLowerCase().includes(query)&&!sites.has(dest.domain))sites.set(dest.domain,dest);
+   // Preserve exact history destination, including search query parameters.
+   // Display only a readable label; never replace a search with a homepage.
+   const pageTitle=String(entry.title||'').trim();
+   if(pageTitle.toLowerCase().includes(query)&&entry.url!==dest.url&&!pages.has(entry.url))
+    pages.set(entry.url,{url:entry.url,title:pageTitle,domain:dest.domain,kind:'history'});
   }
-  newTabHistoryMatches=[...groups.values()].sort((a,b)=>b.score-a.score||a.domain.localeCompare(b.domain)).slice(0,8);
-  // Default Enter opens the best matching site, without requiring arrow keys.
-  newTabHistorySelected=newTabHistoryMatches.length?0:-1;
-  paintNewTabSuggestions();
+  const state=smartState(),choices=state.choices[query]||{};
+  const ranked=[...sites.values(),...pages.values()].filter(x=>!state.dismissed[smartIdentity(x)]);
+  ranked.sort((a,b)=>{
+   const score=x=>(choices[smartIdentity(x)]||0)*12+(x.kind==='site'?15:0)+(x.domain.startsWith(query)?8:0)+(x.title.toLowerCase().startsWith(query)?5:0);
+   return score(b)-score(a)||a.title.localeCompare(b.title);
+  });
+  newTabHistoryMatches=ranked.slice(0,8);
+  newTabHistorySelected=newTabHistoryMatches.length?0:-1;paintNewTabSuggestions();
  }catch{if(request===newTabHistoryRequest){newTabHistoryMatches=[];hideNewTabSuggestions();}}
 }
 newTabAddress.addEventListener('input',updateNewTabSuggestions);
@@ -340,10 +363,11 @@ newTabAddress.addEventListener('keydown',e=>{
   if(!newTabHistoryMatches.length)return;
   e.preventDefault();newTabHistorySelected=(newTabHistorySelected+(e.key==='ArrowDown'?1:-1)+newTabHistoryMatches.length)%newTabHistoryMatches.length;paintNewTabSuggestions();
  }else if(e.key==='Enter'&&newTabHistorySelected>=0&&newTabHistoryMatches[newTabHistorySelected]){
-  e.preventDefault();const entry=newTabHistoryMatches[newTabHistorySelected];launchNewTab(entry.url,entry.title);
+  e.preventDefault();openSmartSuggestion(newTabHistoryMatches[newTabHistorySelected]);
+ }else if(e.key==='Escape'&&!$('new-tab-dismiss-confirm').hidden){
+  e.stopPropagation();e.preventDefault();$('new-tab-dismiss-confirm').hidden=true;
  }else if(e.key==='Escape'&&!newTabSuggestions.hidden){e.stopPropagation();e.preventDefault();hideNewTabSuggestions();}
 });
-
 function newTabSavedLinks(){try{const x=JSON.parse(localStorage.getItem(newTabCustomKey)||'[]');return Array.isArray(x)?x.filter(y=>typeof y.url==='string'&&typeof y.title==='string').slice(0,24):[];}catch{return [];}}
 function renderNewTabCustomLinks(){
  const host=$('new-tab-custom-links');host.replaceChildren();
@@ -376,7 +400,7 @@ async function renderNewTabRecent(){
   if(!seen.size)host.textContent='Recently visited websites will appear here.';
  }catch{host.textContent='Recent websites unavailable.';}
 }
-function closeNewTabLauncher(){++newTabHistoryRequest;newTabHistoryMatches=[];hideNewTabSuggestions();newTabOverlay.classList.add('hidden');action('modal',false);}
+function closeNewTabLauncher(){$('new-tab-dismiss-confirm').hidden=true;++newTabHistoryRequest;newTabHistoryMatches=[];hideNewTabSuggestions();newTabOverlay.classList.add('hidden');action('modal',false);}
 function openNewTabLauncher(){
  newTabError.textContent='';
  newTabAddress.value='';
@@ -412,7 +436,7 @@ $('new-tab-save-shortcut').onclick=()=>{
 for(const id of ['new','new-rail','new-sidebar','add-tab'])$(id).onclick=openNewTabLauncher;
 $('new-tab-close').onclick=closeNewTabLauncher;
 newTabOverlay.onclick=e=>{if(e.target===newTabOverlay)closeNewTabLauncher();};
-$('new-tab-form').onsubmit=e=>{e.preventDefault();const entry=newTabHistorySelected>=0?newTabHistoryMatches[newTabHistorySelected]:null;launchNewTab(entry?entry.url:newTabAddress.value,entry?.title);};
+$('new-tab-form').onsubmit=e=>{e.preventDefault();const entry=newTabHistorySelected>=0?newTabHistoryMatches[newTabHistorySelected]:null;entry?openSmartSuggestion(entry):launchNewTab(newTabAddress.value);};
 $('new-tab-chatgpt').onclick=()=>action('new',activeWorkspace).then(closeNewTabLauncher).catch(e=>newTabError.textContent=e.message);
 for(const el of document.querySelectorAll('[data-new-tab-url]'))el.addEventListener('click',()=>launchNewTab(el.dataset.newTabUrl,el.dataset.newTabTitle));
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!newTabOverlay.classList.contains('hidden'))closeNewTabLauncher();});
