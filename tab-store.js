@@ -39,6 +39,22 @@ class TabStore {
  get(id){return this.q.get.get(id)||null;}
  save(t){this.q.put.run({id:t.id,url:t.url,title:t.title,workspace:t.workspace,pinned:+!!t.pinned,muted:+!!t.muted,last_active:t.lastActive||Date.now(),ordinal:t.ordinal||t.id});}
  delete(id){this.q.del.run(id);}
+ reorderVisible(workspace,ids){
+  if(typeof workspace!=='string'||!Array.isArray(ids)||ids.length<2||ids.length>16||!ids.every(Number.isSafeInteger)||new Set(ids).size!==ids.length)throw new Error('Invalid tab order');
+  const rows=this.page(workspace,0,50);
+  const visible=rows.slice(0,16).map(t=>t.id);
+  if(ids.length!==visible.length||!ids.every(id=>visible.includes(id)))throw new Error('Tabs changed while dragging; try again');
+  const byId=new Map(rows.map(row=>[row.id,row]));
+  const ordered=[...ids.map(id=>byId.get(id)),...rows.slice(16)];
+  const max=this.db.prepare('SELECT COALESCE(MAX(ordinal),0) AS n FROM tabs WHERE workspace=?').get(workspace).n;
+  const update=this.db.prepare('UPDATE tabs SET ordinal=? WHERE id=? AND workspace=?');
+  this.db.exec('BEGIN');
+  try{
+   for(let i=0;i<ordered.length;i++)update.run(max+ordered.length-i,ordered[i].id,workspace);
+   this.db.exec('COMMIT');
+  }catch(error){this.db.exec('ROLLBACK');throw error;}
+ }
+
  page(workspace,offset=0,limit=50){return this.q.page.all(workspace,Math.min(100,Math.max(1,limit)),Math.max(0,offset));}
  counts(){return this.q.counts.all();}
  search(term,limit=40){const value='%'+String(term).replace(/[\\%_]/g,m=>'\\'+m)+'%';return this.q.search.all(value,value,Math.min(100,Math.max(1,limit)));}
