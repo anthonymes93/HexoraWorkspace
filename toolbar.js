@@ -313,26 +313,24 @@ window.addEventListener('pointermove',e=>{
  const allRows=[tabStrip,...document.querySelectorAll('.stack-tabs')];
  const hitRow=allRows.find(row=>{const r=row.getBoundingClientRect();return e.clientY>=r.top&&e.clientY<=r.bottom&&e.clientX>=r.left&&e.clientX<=r.right;});
  d.targetRow=hitRow?(hitRow===tabStrip?null:Number(hitRow.dataset.stackId)):undefined;
- const targetTab=hitRow?[...hitRow.querySelectorAll('.tab[data-tab-id]')].find(el=>{
-  if(el===d.tab)return false;
-  const r=el.getBoundingClientRect();
-  return e.clientX>=r.left&&e.clientX<=r.right;
- }):null;
+ // Target the closest neighbour by its untransformed layout slot.
+ // Use the tab's centre rather than a tiny precise cursor region.
+ const candidates=hitRow?[...hitRow.querySelectorAll('.tab[data-tab-id]')].filter(el=>el!==d.tab):[];
+ const targetTab=candidates.find(el=>{
+  const rect=el.getBoundingClientRect();
+  return e.clientX>=rect.left-8&&e.clientX<=rect.right+8;
+ })||null;
  const targetId=targetTab?Number(targetTab.dataset.tabId):null;
- // Deliberately entering the middle of another tab means STACK;
- // a quick sweep over its edge continues to mean REORDER.
- let inStackZone=false;
- if(targetTab){
-  const r=targetTab.getBoundingClientRect();
-  inStackZone=e.clientX>=r.left+r.width*.22&&e.clientX<=r.right-r.width*.22;
- }
- if(targetId&&inStackZone){
+ const center=targetTab?targetTab.getBoundingClientRect():null;
+ const eligible=!!center&&e.clientX>=center.left+center.width*.10&&e.clientX<=center.right-center.width*.10;
+ if(eligible&&targetId){
   if(d.hoverId!==targetId){d.hoverId=targetId;d.hoverSince=performance.now();}
- }else{d.hoverId=null;d.hoverSince=0;}
+ }else if(!d.hoverLocked){d.hoverId=null;d.hoverSince=0;}
+ if(d.hoverId&&performance.now()-d.hoverSince>=120)d.hoverLocked=true;
  for(const node of document.querySelectorAll('.stack-drop-target'))node.classList.remove('stack-drop-target');
- if(d.hoverId&&performance.now()-d.hoverSince>=250)targetTab.classList.add('stack-drop-target');
+ const highlight=hitRow?.querySelector('.tab[data-tab-id="'+d.hoverId+'"]');
+ if(d.hoverLocked&&highlight)highlight.classList.add('stack-drop-target');
  if(d.targetRow!==d.sourceStack)return;
- // Holding over the center of a tab should NEVER relocate the source.
  if(d.hoverId)return;
  const direction=Math.sign(e.clientX-d.lastX);d.lastX=e.clientX;
  const sibling=direction>0?d.tab.nextElementSibling:direction<0?d.tab.previousElementSibling:null;
@@ -359,7 +357,7 @@ window.addEventListener('pointerup',async()=>{
  const d=tabPointer;if(!d)return;
  if(d.moving)suppressTabClickUntil=Date.now()+300;
  const moving=d.moving;
- const targetId=d.hoverId&&performance.now()-d.hoverSince>=250?d.hoverId:null;
+ const targetId=d.hoverId&&(d.hoverLocked||performance.now()-d.hoverSince>=120)?d.hoverId:null;
  const destination=d.targetRow;
  const source=d.sourceStack;
  for(const node of document.querySelectorAll('.stack-drop-target'))node.classList.remove('stack-drop-target');
