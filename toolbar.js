@@ -341,6 +341,19 @@ async function chooseTabStack(){
 $('tab-menu-stack').onclick=chooseTabStack;
 // Pointer-based reorder: no native Chromium drag image or dotted cursor rectangle.
 const tabStrip=$('tabs');
+// Mouse-wheel movement over a horizontal tab row scrolls the row sideways.
+// Do not intercept wheel events when there is no horizontal overflow.
+for(const strip of [tabStrip,$('stack-rows')]){
+ strip.addEventListener('wheel',e=>{
+  const row=e.target.closest('.tabs,.stack-tabs');
+  if(!row||!strip.contains(row)||row.scrollWidth<=row.clientWidth+1)return;
+  if(e.ctrlKey||e.metaKey)return;
+  const movement=Math.abs(e.deltaY)>Math.abs(e.deltaX)?e.deltaY:e.deltaX;
+  if(!movement)return;
+  e.preventDefault();
+  row.scrollLeft+=movement;
+ },{passive:false});
+}
 let tabPointer=null,dropSaving=false,suppressTabClickUntil=0;
 
 function showCreateStackDialog(){
