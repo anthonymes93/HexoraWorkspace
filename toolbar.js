@@ -313,25 +313,25 @@ window.addEventListener('pointermove',e=>{
  const allRows=[tabStrip,...document.querySelectorAll('.stack-tabs')];
  const hitRow=allRows.find(row=>{const r=row.getBoundingClientRect();return e.clientY>=r.top&&e.clientY<=r.bottom&&e.clientX>=r.left&&e.clientX<=r.right;});
  d.targetRow=hitRow?(hitRow===tabStrip?null:Number(hitRow.dataset.stackId)):undefined;
- // Target the closest neighbour by its untransformed layout slot.
- // Use the tab's centre rather than a tiny precise cursor region.
+ // Stack by actual overlap: the dragged tab must cover at least 35% of
+ // another tab. No timer or precise mouse hover required.
  const candidates=hitRow?[...hitRow.querySelectorAll('.tab[data-tab-id]')].filter(el=>el!==d.tab):[];
- const targetTab=candidates.find(el=>{
-  const rect=el.getBoundingClientRect();
-  return e.clientX>=rect.left-8&&e.clientX<=rect.right+8;
- })||null;
- const targetId=targetTab?Number(targetTab.dataset.tabId):null;
- const center=targetTab?targetTab.getBoundingClientRect():null;
- const eligible=!!center&&e.clientX>=center.left+center.width*.10&&e.clientX<=center.right-center.width*.10;
- if(eligible&&targetId){
-  if(d.hoverId!==targetId){d.hoverId=targetId;d.hoverSince=performance.now();}
- }else if(!d.hoverLocked){d.hoverId=null;d.hoverSince=0;}
- if(d.hoverId&&performance.now()-d.hoverSince>=120)d.hoverLocked=true;
+ const draggedLeft=desiredLeft,draggedRight=desiredLeft+d.tab.offsetWidth;
+ let targetTab=null,bestOverlap=0;
+ for(const candidate of candidates){
+  const rect=candidate.getBoundingClientRect();
+  const overlap=Math.max(0,Math.min(draggedRight,rect.right)-Math.max(draggedLeft,rect.left));
+  const ratio=overlap/Math.min(d.tab.offsetWidth,rect.width);
+  if(ratio>bestOverlap){bestOverlap=ratio;targetTab=candidate;}
+ }
+ // The visual tab position, rather than the cursor, selects the destination.
+ const targetId=bestOverlap>=.35&&targetTab?Number(targetTab.dataset.tabId):null;
+ d.hoverId=targetId;
+ d.hoverLocked=!!targetId;
  for(const node of document.querySelectorAll('.stack-drop-target'))node.classList.remove('stack-drop-target');
- const highlight=hitRow?.querySelector('.tab[data-tab-id="'+d.hoverId+'"]');
- if(d.hoverLocked&&highlight)highlight.classList.add('stack-drop-target');
+ if(targetId)targetTab.classList.add('stack-drop-target');
  if(d.targetRow!==d.sourceStack)return;
- if(d.hoverId)return;
+ if(targetId)return;
  const direction=Math.sign(e.clientX-d.lastX);d.lastX=e.clientX;
  const sibling=direction>0?d.tab.nextElementSibling:direction<0?d.tab.previousElementSibling:null;
  if(sibling&&sibling.classList.contains('tab')){
@@ -357,7 +357,7 @@ window.addEventListener('pointerup',async()=>{
  const d=tabPointer;if(!d)return;
  if(d.moving)suppressTabClickUntil=Date.now()+300;
  const moving=d.moving;
- const targetId=d.hoverId&&(d.hoverLocked||performance.now()-d.hoverSince>=120)?d.hoverId:null;
+ const targetId=d.hoverId||null;
  const destination=d.targetRow;
  const source=d.sourceStack;
  for(const node of document.querySelectorAll('.stack-drop-target'))node.classList.remove('stack-drop-target');
