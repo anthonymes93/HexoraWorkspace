@@ -375,6 +375,48 @@ function awaitNotionSidebarDemo(wc){
   return {ok:true,action:close?'hidden':'shown'};
  })()`,true).catch(error=>({ok:false,reason:error.message}));
 }
+// Experimental, per-webContents sidebar toggle. No domain allowlist.
+// Prioritize the website's own accessible toggle; otherwise only hide a
+// geometrically plausible semantic sidebar. Restore exactly the inline style
+// values we changed. Never guess at generic divs or main content.
+function toggleUniversalSidebar(wc){
+ return wc.executeJavaScript(`(() => {
+  const key='__hexoraUniversalSidebarDemo';
+  const previous=window[key];
+  if(previous?.element?.isConnected && previous.mode==='style'){
+   previous.element.style.display=previous.display;
+   previous.element.style.visibility=previous.visibility;
+   delete window[key];
+   return {ok:true,action:'shown',method:'semantic'};
+  }
+  const visible=el=>{
+   const r=el.getBoundingClientRect(),s=getComputedStyle(el);
+   return r.width>0&&r.height>0&&s.display!=='none'&&s.visibility!=='hidden';
+  };
+  const label=el=>[el.getAttribute('aria-label'),el.getAttribute('title'),el.getAttribute('data-tooltip'),el.getAttribute('data-state'),el.textContent?.trim().slice(0,70)].filter(Boolean).join(' ').toLowerCase();
+  const buttons=[...document.querySelectorAll('button,[role="button"]')].filter(visible);
+  const sidebarWords=/(?:side\\s?bar|navigation panel|navigation menu|side panel)/i;
+  const toggles=buttons.filter(el=>sidebarWords.test(label(el)) && /(?:toggle|open|close|hide|show|expand|collapse)/i.test(label(el)));
+  if(toggles.length===1){
+   toggles[0].click();
+   return {ok:true,action:'toggled',method:'native'};
+  }
+  // Semantic landmarks only; reject top bars, overlays and main content.
+  const candidates=[...document.querySelectorAll('aside,nav,[role="navigation"],[role="complementary"]')].filter(el=>{
+   if(!visible(el))return false;
+   const r=el.getBoundingClientRect(),s=getComputedStyle(el);
+   if(r.width<120||r.width>Math.min(540,innerWidth*.42)||r.height<innerHeight*.42)return false;
+   if(r.left>innerWidth*.15||r.top>innerHeight*.4)return false;
+   if(s.position==='fixed'&&r.width>innerWidth*.4)return false;
+   return !el.closest('dialog,[role="dialog"],[aria-modal="true"]');
+  });
+  if(candidates.length!==1)return {ok:false,reason:'No unambiguous sidebar detected on this page.'};
+  const el=candidates[0];
+  window[key]={mode:'style',element:el,display:el.style.display,visibility:el.style.visibility};
+  el.style.display='none';
+  return {ok:true,action:'hidden',method:'semantic'};
+ })()`,true).catch(error=>({ok:false,reason:error.message}));
+}
 function pageRow(r){const codeProject=isCodeTab(r)?store.getCodeProject(r.id)?.project_path||null:null;
  return{id:r.id,url:r.url,nativeCode:isCodeTab(r),nativeCodeProject:codeProject,nativeCodeProjectMissing:!!codeProject&&!fs.existsSync(codeProject),title:store.getMeta('tabCustomTitle:'+r.id)||r.title,workspace:r.workspace,pinned:!!r.pinned,muted:!!r.muted,lastActive:r.last_active,ordinal:r.ordinal,favicon:(favicons.get(r.id)?.origin===originOf(r.url)?favicons.get(r.id)?.url:null)||store.getMeta('favicon:'+originOf(r.url))||null,faviconFallback:(()=>{try{const u=new URL(r.url);return ['http:','https:'].includes(u.protocol)?u.origin+'/favicon.ico':null;}catch{return null;}})(),active:r.id===activeId,detached:detached.has(r.id),loading:!!loading.get(r.id),suspended:isCodeTab(r)?false:!live.has(r.id),chromeMode:chromeMode(r.id),panelMode:panelMode(r.id),panelPreference:panelPreference(r.id)};}
 function state(workspace='web',offset=0){const active=activeId?store.get(activeId):null;return{activeId,total:store.total(),counts:store.counts(),tabs:store.page(workspace,offset,50).map(pageRow),active:active?.workspace===workspace?active:null,activePanelMode:activeId?panelMode(activeId):'wide',stackData:store.stacks(workspace),offset};}
@@ -1009,23 +1051,11 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
  ipcMain.handle('tabs:action',async(_e,action,arg)=>{
    if(action==='copy-tab-link'){const tab=store.get(Number(arg));if(!tab)throw Error('This tab no longer exists.');const link=tabLink(tab.workspace,tab.id);clipboard.writeText(link);win.webContents.send('deep-link:copied','Tab link copied');return link;}
   const current=store.get(activeId);const wc=live.get(activeId)?.webContents;
-  if(action==='notion-sidebar-demo'){
-   const notionUrl=wc&&!wc.isDestroyed()?wc.getURL():current?.url;
-   let notionHost='';try{const parsed=new URL(notionUrl);if(parsed.protocol==='https:')notionHost=parsed.hostname.toLowerCase();}catch{}
-   if(!current||!['notion.so','www.notion.so','notion.com','www.notion.com','app.notion.com'].includes(notionHost))return {ok:false,reason:'Select a Notion tab first.'};
-   if(!wc||wc.isDestroyed())return {ok:false,reason:'Notion tab is not loaded.'};
-   const result=await awaitNotionSidebarDemo(wc);
-   if(result?.ok)return result;
-   // Notion's collapsed sidebar can be an unlabeled icon. Use Notion's
-   // documented Ctrl+\\ sidebar shortcut in the active webContents only.
-   // Electron input events are trusted; synthetic DOM KeyboardEvents are not.
-   if(result?.reason==='Notion sidebar control not found. Notion may have changed its UI.'){
-    wc.focus();
-    wc.sendInputEvent({type:'keyDown',keyCode:'\\',modifiers:['control']});
-    wc.sendInputEvent({type:'keyUp',keyCode:'\\',modifiers:['control']});
-    return {ok:true,action:'toggled via shortcut (verify sidebar state)'};
-   }
-   return result;
+  if(action==='universal-sidebar-toggle'){
+   if(!current||!wc||wc.isDestroyed())return {ok:false,reason:'Select a loaded website tab first.'};
+   let url;try{url=new URL(wc.getURL());}catch{return {ok:false,reason:'No website is loaded.'};}
+   if(!['https:','http:'].includes(url.protocol))return {ok:false,reason:'This tab does not contain a website.'};
+   return toggleUniversalSidebar(wc);
   }
   if(action==='history-list')return store.historySearch(arg?.query||'',arg?.limit||250);
   if(action==='history-delete'){store.removeHistory(Number(arg));return true;}
