@@ -966,3 +966,84 @@ historyUI('history-clear').onclick=async()=>{
  historyUI('history-message').textContent='History cleared';
 };
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&historyOpened)closeHistory();});
+
+/* Password vault: all persistence and cryptography live in Electron's main process. */
+let vaultOpen=false,vaultSelected=null,vaultItems=[];
+const v=id=>document.getElementById(id);
+function vaultDisplay(locked){
+ v('vault-locked').classList.toggle('hidden',!locked);
+ v('vault-unlocked').classList.toggle('hidden',locked);
+ v('vault-lock-title').textContent=(window.__vaultExists?'Unlock your vault':'Create your private vault');
+}
+async function vaultLoad(){
+ vaultItems=await window.hexora.vault.list();vaultRenderList();
+}
+function vaultRenderList(){
+ const list=v('vault-list');list.replaceChildren();const q=v('vault-search').value.trim().toLowerCase();
+ const items=vaultItems.filter(x=>(x.name+' '+x.site+' '+x.username).toLowerCase().includes(q));
+ if(!items.length){const empty=document.createElement('div');empty.className='vault-empty';empty.textContent=q?'No matching logins.':'No logins saved yet. Add your first website.';list.append(empty);}
+ for(const entry of items){
+  const button=document.createElement('button');button.type='button';button.className='vault-item'+(vaultSelected===entry.id?' selected':'');
+  const icon=document.createElement('span');icon.className='vault-item-icon';icon.textContent=(entry.name||'W').charAt(0).toUpperCase();
+  const detail=document.createElement('span');detail.className='vault-item-detail';
+  const name=document.createElement('strong');name.textContent=entry.name;
+  const site=document.createElement('small');site.textContent=entry.username||entry.site;
+  detail.append(name,site);button.append(icon,detail);button.onclick=()=>vaultEdit(entry.id);list.append(button);
+ }
+}
+function vaultClearEditor(){
+ vaultSelected=null;v('vault-entry-form').reset();v('vault-editor-error').textContent='';v('vault-password').type='password';
+ v('vault-editor-title').textContent='Save a login';v('vault-delete').classList.add('hidden');
+}
+async function vaultEdit(id=null){
+ vaultClearEditor();
+ if(id){
+  try{
+   const entry=await window.hexora.vault.get(id);vaultSelected=id;
+   v('vault-name').value=entry.name;v('vault-site').value=entry.site;
+   v('vault-username').value=entry.username;v('vault-password').value=entry.password;
+   v('vault-editor-title').textContent='Edit login';v('vault-delete').classList.remove('hidden');
+  }catch(err){v('vault-lock-error').textContent=err.message;return;}
+ }else{
+  const url=currentPage?.tabs.find(t=>t.id===currentPage?.activeId)?.url||'';
+  if(url.startsWith('http')){try{const u=new URL(url);v('vault-site').value=u.origin;v('vault-name').value=u.hostname;}catch{}}
+ }
+ v('vault-entry-form').classList.remove('hidden');vaultRenderList();v('vault-name').focus();
+}
+function vaultClose(){
+ if(!vaultOpen)return;vaultOpen=false;v('vault-overlay').classList.add('hidden');
+ v('vault-entry-form').classList.add('hidden');v('vault-password').value='';
+ v('vault-master').value='';action('modal',false);
+}
+async function vaultShow(){
+ vaultOpen=true;v('vault-overlay').classList.remove('hidden');action('modal',true);
+ v('vault-lock-error').textContent='';
+ try{
+  const status=await window.hexora.vault.status();window.__vaultExists=status.exists;vaultDisplay(status.locked);
+  if(!status.locked)await vaultLoad();else v('vault-master').focus();
+ }catch(err){v('vault-lock-error').textContent=err.message;}
+}
+v('vault-rail').onclick=vaultShow;
+v('vault-close').onclick=vaultClose;
+v('vault-overlay').onclick=e=>{if(e.target===v('vault-overlay'))vaultClose();};
+v('vault-unlock-form').onsubmit=async e=>{
+ e.preventDefault();v('vault-lock-error').textContent='';
+ try{await window.hexora.vault.unlock(v('vault-master').value);v('vault-master').value='';window.__vaultExists=true;vaultDisplay(false);await vaultLoad();}
+ catch(err){v('vault-lock-error').textContent=err.message;}
+};
+v('vault-lock').onclick=async()=>{await window.hexora.vault.lock();vaultClearEditor();v('vault-entry-form').classList.add('hidden');vaultItems=[];vaultDisplay(true);v('vault-master').focus();};
+v('vault-add').onclick=()=>vaultEdit();
+v('vault-search').oninput=vaultRenderList;
+v('vault-editor-cancel').onclick=()=>{vaultClearEditor();v('vault-entry-form').classList.add('hidden');vaultRenderList();};
+v('vault-reveal').onclick=()=>{const field=v('vault-password');field.type=field.type==='password'?'text':'password';v('vault-reveal').textContent=field.type==='password'?'Show':'Hide';};
+v('vault-copy-user').onclick=()=>{const value=v('vault-username').value;if(value)navigator.clipboard.writeText(value).catch(()=>{});};
+v('vault-copy-password').onclick=()=>{const value=v('vault-password').value;if(value)navigator.clipboard.writeText(value).catch(()=>{});};
+v('vault-entry-form').onsubmit=async e=>{
+ e.preventDefault();v('vault-editor-error').textContent='';
+ try{
+  await window.hexora.vault.save({id:vaultSelected,name:v('vault-name').value,site:v('vault-site').value,username:v('vault-username').value,password:v('vault-password').value});
+  vaultClearEditor();v('vault-entry-form').classList.add('hidden');await vaultLoad();
+ }catch(err){v('vault-editor-error').textContent=err.message;}
+};
+v('vault-delete').onclick=async()=>{if(!vaultSelected||!confirm('Delete this saved login permanently?'))return;await window.hexora.vault.delete(vaultSelected);vaultClearEditor();v('vault-entry-form').classList.add('hidden');await vaultLoad();};
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&vaultOpen)vaultClose();});
