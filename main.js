@@ -7,7 +7,7 @@ const {PasswordVault}=require('./password-vault');
 const fs=require('node:fs');
 const os=require('node:os');
 const {spawn}=require('node:child_process');
-const {workspaceForTab,clearSession,codeSessionDirectory}=require('./code-session-workspace');
+const {workspaceForTab,projectUpdateFile,ownerFile,clearSession,codeSessionDirectory}=require('./code-session-workspace');
 const {buildCompanionVsix,BRIDGE_VERSION}=require('./code-session-vsix');
 // Each native VS Code tab owns its own PowerShell host and reparented window.
 const nativeCodeHosts=new Map();
@@ -392,6 +392,43 @@ function pumpNativeCodeLaunchQueue(){
   nativeCodeLaunchingId=tabId;startNativeCodeHost(tabId,entry);return;
  }
 }
+// Read project updates written by the VS Code companion. Syncing on an
+// interval (including at startup) also covers quick Hexora shutdowns: a
+// project captured just before exit must not be missed.
+function syncNativeCodeProjects(){
+ if(!store||tabStoreClosing||quitting)return;
+ let filenames;
+ const directory=codeSessionDirectory(app.getPath('userData'));
+ try{filenames=fs.readdirSync(directory).filter(name=>/^tab-[1-9]\\d*\\.project\\.json$/.test(name));}
+ catch(error){if(error.code!=='ENOENT')console.warn('[Native VS Code] Project scan:',error.message);return;}
+ for(const filename of filenames){
+  const tabId=Number(filename.match(/^tab-(\\d+)/)?.[1]);
+  if(!Number.isSafeInteger(tabId)||tabId<1||!isCodeTab(store.get(tabId)))continue;
+  const entry=nativeCodeHosts.get(tabId);
+  if(entry?.ignoreProjectSync)continue;
+  try{
+   const file=projectUpdateFile(app.getPath('userData'),tabId);
+   if(fs.statSync(file).size>8192)continue;
+   const data=JSON.parse(fs.readFileSync(file,'utf8'));
+   if(data?.version!==1||typeof data.ownerToken!=='string'||data.ownerToken.length<16||
+    data.ownerToken!==fs.readFileSync(ownerFile(app.getPath('userData'),tabId),'utf8'))continue;
+   const project=data.projectPath;
+   if(typeof project!=='string'||project.length>32767||!path.isAbsolute(project))continue;
+   if(!fs.statSync(project).isDirectory())continue;
+   if(store.getCodeProject(tabId)?.project_path===project)continue;
+   store.setCodeProject(tabId,project);
+   if(!store.getMeta('tabCustomTitle:'+tabId)){
+    const row=toModel(store.get(tabId));
+    row.title=('VS Code · '+path.basename(project)).slice(0,100);
+    store.save(row);
+   }
+   emit();
+   console.log('[Native VS Code tab '+tabId+'] Project automatically saved:',project);
+  }catch(error){
+   if(error.code!=='ENOENT')console.warn('[Native VS Code tab '+tabId+'] Ignoring invalid project update:',error.message);
+  }
+ }
+}
 function startNativeCodeHost(tabId,entry){
  const script=path.join(__dirname,'experiments','vscode-hexora-host.ps1');
  const hwnd=win.getNativeWindowHandle().readBigUInt64LE(0).toString();
@@ -399,13 +436,12 @@ function startNativeCodeHost(tabId,entry){
  // PowerShell (rather than interpolating into a command) avoids shell injection.
  const configured=store.getCodeProject(tabId)?.project_path;
  let projectPath=null;
- if(configured){
-  try{
-   // A unique .code-workspace per Hexora tab gives the companion extension a
-   // stable identity even when two native tabs open the very same folder.
-   projectPath=workspaceForTab(app.getPath('userData'),tabId,configured);
-  }catch(error){console.warn('[Native VS Code tab '+tabId+'] Saved project unavailable; opening Code without a folder:',configured,error.message);}
- }
+ try{
+  const projectFolder=configured&&fs.existsSync(configured)&&fs.statSync(configured).isDirectory()?configured:null;
+  // Always launch a stable .code-workspace, even when a user hasn't chosen
+  // any folder yet. The companion can then capture a later folder selection.
+  projectPath=workspaceForTab(app.getPath('userData'),tabId,projectFolder);
+ }catch(error){console.warn('[Native VS Code tab '+tabId+'] Could not prepare session workspace:',error.message);}
  let companionVsix=null;
  if(projectPath&&store.getMeta('nativeCodeBridgeInstalledVersion')!==BRIDGE_VERSION){
   try{companionVsix=buildCompanionVsix(codeSessionDirectory(app.getPath('userData')));}
@@ -835,6 +871,7 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
   if(previous&&path.normalize(previous).toLowerCase()!==path.normalize(selectedPath).toLowerCase()){
    try{clearSession(app.getPath('userData'),tabId);}catch(error){console.warn('Could not clear previous VS Code editor state:',error.message);}
   }
+  if(nativeCodeHosts.has(tabId))nativeCodeHosts.get(tabId).ignoreProjectSync=true;
   store.setCodeProject(tabId,selectedPath);
   if(!store.getMeta('tabCustomTitle:'+tabId)){
    const updated=toModel(store.get(tabId));
@@ -848,6 +885,7 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
   if(event.sender!==win.webContents)throw new Error('Invalid caller');
   const tabId=Number(id),row=store.get(tabId);
   if(!Number.isSafeInteger(tabId)||!isCodeTab(row))throw new Error('VS Code tab no longer exists.');
+  if(nativeCodeHosts.has(tabId))nativeCodeHosts.get(tabId).ignoreProjectSync=true;
   store.clearCodeProject(tabId);
   try{clearSession(app.getPath('userData'),tabId);}catch(error){console.warn('Could not clear VS Code editor state:',error.message);}
   if(!store.getMeta('tabCustomTitle:'+tabId)){const updated=toModel(row);updated.title='Visual Studio Code';store.save(updated);}
@@ -1000,6 +1038,8 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
   emit();return true;
  });
  setInterval(sweep,60*1000).unref();
+ syncNativeCodeProjects();
+ setInterval(syncNativeCodeProjects,1000).unref();
  win.on('closed',()=>{if(nativeCodeLifecycleTimer){clearTimeout(nativeCodeLifecycleTimer);nativeCodeLifecycleTimer=null;}quitting=true;stopAllNativeCode();for(const folder of [...extensionPopups.keys()])closeExtensionPopup(folder);if(sidebarAnimation)clearInterval(sidebarAnimation);for(const popup of detached.values())if(!popup.isDestroyed())popup.close();detached.clear();clearInterval(recoveryTimer);recoveryPassword=null;clearTimeout(stateTimer);win=null;for(const id of Array.from(live.keys()))discard(id);vault?.lock();tabStoreClosing=true;store.close();});
  // Register every IPC handler before the renderer can issue actions.
  win.loadFile('toolbar.html').catch(err=>console.error('[Hexora] Toolbar load failed:',err));
