@@ -26,6 +26,13 @@ public static class HexoraNative {
  [DllImport("user32.dll")] public static extern IntPtr GetParent(IntPtr h);
  [DllImport("user32.dll")] public static extern bool IsChild(IntPtr parent,IntPtr candidate);
  [DllImport("user32.dll")] public static extern bool IsWindow(IntPtr h);
+ [DllImport("user32.dll")] public static extern bool IsWindowEnabled(IntPtr h);
+ [DllImport("user32.dll")] public static extern bool GetCursorPos(out POINT point);
+ [DllImport("user32.dll")] public static extern IntPtr WindowFromPoint(POINT point);
+ [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr h,out RECT rect);
+ [DllImport("user32.dll")] public static extern short GetAsyncKeyState(int vKey);
+ [DllImport("user32.dll")] public static extern int GetClassName(IntPtr h,StringBuilder name,int max);
+
  [DllImport("user32.dll")] public static extern IntPtr GetActiveWindow();
  [DllImport("user32.dll")] public static extern IntPtr SetActiveWindow(IntPtr h);
  [DllImport("kernel32.dll")] public static extern uint GetCurrentThreadId();
@@ -36,10 +43,33 @@ public static class HexoraNative {
  public static void ActivateHosted(IntPtr parent,IntPtr child) {uint pid;uint childThread=GetWindowThreadProcessId(child,out pid);uint parentThread=GetWindowThreadProcessId(parent,out pid);uint own=GetCurrentThreadId();bool linkChild=childThread!=own&&AttachThreadInput(own,childThread,true);bool linkParent=parentThread!=own&&parentThread!=childThread&&AttachThreadInput(own,parentThread,true);try{SetForegroundWindow(parent);SetActiveWindow(parent);SetFocus(child);}finally{if(linkParent)AttachThreadInput(own,parentThread,false);if(linkChild)AttachThreadInput(own,childThread,false);} }
  public static string Diagnostic(IntPtr h) {var foreground=GetForegroundWindow();uint pid;uint thread=GetWindowThreadProcessId(h,out pid);uint own=GetCurrentThreadId();bool linked=thread!=own&&AttachThreadInput(own,thread,true);try{return "child="+h.ToInt64()+" foreground="+foreground.ToInt64()+" focus="+GetFocus().ToInt64()+" parent="+GetParent(h).ToInt64()+" valid="+IsWindow(h)+" visible="+IsWindowVisible(h)+" active="+GetActiveWindow().ToInt64()+" childThread="+thread+" hostThread="+own;}finally{if(linked)AttachThreadInput(own,thread,false);}}
  [StructLayout(LayoutKind.Sequential)] public struct RECT {public int left;public int top;public int right;public int bottom;}
+ [StructLayout(LayoutKind.Sequential)] public struct POINT {public int x;public int y;}
  [StructLayout(LayoutKind.Sequential)] public struct GUITHREADINFO {public uint cbSize;public uint flags;public IntPtr hwndActive;public IntPtr hwndFocus;public IntPtr hwndCapture;public IntPtr hwndMenuOwner;public IntPtr hwndMoveSize;public IntPtr hwndCaret;public RECT rcCaret;}
  [DllImport("user32.dll",SetLastError=true)] public static extern bool GetGUIThreadInfo(uint idThread,ref GUITHREADINFO info);
  public static string ThreadInfo(uint thread) {var i=new GUITHREADINFO();i.cbSize=(uint)Marshal.SizeOf(typeof(GUITHREADINFO));bool ok=GetGUIThreadInfo(thread,ref i);return "thread="+thread+" ok="+ok+" active="+i.hwndActive.ToInt64()+" focus="+i.hwndFocus.ToInt64()+" capture="+i.hwndCapture.ToInt64()+" flags="+i.flags;}
- public static string FocusTrace(IntPtr parent,IntPtr child) {uint pid;uint ct=GetWindowThreadProcessId(child,out pid);uint pt=GetWindowThreadProcessId(parent,out pid);uint fg=GetWindowThreadProcessId(GetForegroundWindow(),out pid);return "foreground="+GetForegroundWindow().ToInt64()+" foregroundThread="+fg+" child="+child.ToInt64()+" parent="+parent.ToInt64()+" childGUI=["+ThreadInfo(ct)+"] parentGUI=["+ThreadInfo(pt)+"] foregroundGUI=["+ThreadInfo(fg)+"]";}
+ public static string FocusTrace(IntPtr parent,IntPtr child) {uint pid;uint ct=GetWindowThreadProcessId(child,out pid);uint pt=GetWindowThreadProcessId(parent,out pid);uint fg=GetWindowThreadProcessId(GetForegroundWindow(),out pid);return "childEnabled="+IsWindowEnabled(child)+" parentEnabled="+IsWindowEnabled(parent)+" foreground="+GetForegroundWindow().ToInt64()+" foregroundThread="+fg+" child="+child.ToInt64()+" parent="+parent.ToInt64()+" childGUI=["+ThreadInfo(ct)+"] parentGUI=["+ThreadInfo(pt)+"] foregroundGUI=["+ThreadInfo(fg)+"]";}
+ public static int mouseProbeSequence=0;
+ public static void WatchMouse(IntPtr parent,IntPtr child) {
+  int sequence=System.Threading.Interlocked.Increment(ref mouseProbeSequence);
+  System.Threading.ThreadPool.QueueUserWorkItem(_=>{
+   try{
+    bool wasDown=false;int reported=0;
+    for(int i=0;i<400&&sequence==mouseProbeSequence;i++){
+     bool down=(GetAsyncKeyState(1)&0x8000)!=0;
+     if(down&&!wasDown&&reported<12){
+      POINT point;RECT rect;
+      if(GetCursorPos(out point)&&GetWindowRect(child,out rect)&&point.x>=rect.left&&point.x<rect.right&&point.y>=rect.top&&point.y<rect.bottom){
+       IntPtr hit=WindowFromPoint(point);StringBuilder name=new StringBuilder(128);GetClassName(hit,name,128);
+       uint pid;uint hitThread=GetWindowThreadProcessId(hit,out pid);
+       Console.WriteLine("MOUSE_PROBE x="+point.x+" y="+point.y+" hit="+hit.ToInt64()+" hitClass="+name+" hitPid="+pid+" hitThread="+hitThread+" hitIsCode="+(hit==child||IsChild(child,hit))+" childEnabled="+IsWindowEnabled(child)+" parentEnabled="+IsWindowEnabled(parent)+" foreground="+GetForegroundWindow().ToInt64()+" child="+child.ToInt64()+" parent="+parent.ToInt64());
+       reported++;
+      }
+     }
+     wasDown=down;System.Threading.Thread.Sleep(30);
+    }
+   }catch(Exception error){Console.WriteLine("MOUSE_PROBE_ERROR "+error.Message);}
+  });
+ }
  public static long[] Windows() {var found=new List<long>();EnumWindows((h,lp)=>{if(!IsWindowVisible(h))return true;var title=new StringBuilder(512);GetWindowText(h,title,512);uint pid;GetWindowThreadProcessId(h,out pid);try{if(title.Length>0&&System.Diagnostics.Process.GetProcessById((int)pid).ProcessName.Equals("Code",StringComparison.OrdinalIgnoreCase))found.Add(h.ToInt64());}catch{}return true;},IntPtr.Zero);return found.ToArray();}
 }
 '@
@@ -78,6 +108,7 @@ try {
    'ACTIVATE' {if(-not $detached -and [HexoraNative]::IsWindow($child) -and [HexoraNative]::GetParent($child) -eq $parent -and [HexoraNative]::GetForegroundWindow() -eq $parent){[HexoraNative]::ActivateHosted($parent,$child);Write-Output ('DIAG ACTIVATED '+[HexoraNative]::Diagnostic($child))}}
    'CHECK' {if(-not $detached -and [HexoraNative]::IsWindow($child) -and [HexoraNative]::GetParent($child) -eq $parent -and [HexoraNative]::GetForegroundWindow() -eq $parent){$state=[HexoraNative]::Diagnostic($child);if($state -match ('focus='+$parent.ToInt64()+'(\s|$)')){[HexoraNative]::FocusHosted($parent,$child);Write-Output ('DIAG REPAIRED '+[HexoraNative]::Diagnostic($child))}}}
    'TRACE' {Write-Output ('FOCUS_TRACE '+($parts[1..($parts.Length-1)] -join ' ')+' '+[HexoraNative]::FocusTrace($parent,$child))}
+   'WATCH_MOUSE' {if(-not $detached){[HexoraNative]::WatchMouse($parent,$child);Write-Output 'MOUSE_PROBE ARMED'}}
    'DIAG' {Write-Output ('DIAG '+($parts[1..($parts.Length-1)] -join ' ')+' '+[HexoraNative]::Diagnostic($child))}
    'HIDE' {[void][HexoraNative]::ShowWindow($child,0)}
    'DETACH' {if(-not $detached){[void][HexoraNative]::SetParent($child,[IntPtr]::Zero);[void][HexoraNative]::SetWindowLong($child,-16,$oldStyle);[void][HexoraNative]::SetWindowPos($child,[IntPtr]::Zero,120,120,1000,700,0x0024 -bor 0x0020);[void][HexoraNative]::ShowWindow($child,5);[HexoraNative]::Focus($child);$detached=$true;Write-Output ('DIAG DETACHED '+[HexoraNative]::Diagnostic($child));Write-Output 'DETACHED'}}
