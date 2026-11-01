@@ -312,9 +312,10 @@ function syncFirstRowMicroTitles(){
  for(const tab of host.querySelectorAll(':scope > .tab[data-tab-id]')){
   const label=tab.querySelector('.name'),micro=tab.querySelector('.tab-micro-title');
   if(!label||!micro)continue;
-  micro.textContent=label.textContent;
-  micro.hidden=false;
-  tab.classList.add('has-micro-title');
+  const clipped=label.scrollWidth>label.clientWidth+2;
+  micro.textContent=clipped?label.textContent:'';
+  micro.hidden=!clipped;
+  tab.classList.toggle('has-micro-title',clipped);
  }
 }
 let microTitleFrame=0;
