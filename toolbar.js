@@ -989,6 +989,16 @@ function vaultRenderList(){
   const name=document.createElement('strong');name.textContent=entry.name;
   const site=document.createElement('small');site.textContent=entry.username||entry.site;
   detail.append(name,site);button.append(icon,detail);button.onclick=()=>vaultEdit(entry.id);list.append(button);
+  const fill=document.createElement('button');fill.type='button';fill.className='vault-fill-button';fill.textContent='Autofill';fill.title='Fill this login in the active website';
+  fill.onclick=async event=>{
+   event.stopPropagation();
+   try{
+    const result=await window.hexora.vault.autofill(entry.id);
+    if(!result?.filled)throw Error(result?.reason||'No login fields found on this page.');
+    vaultClose();
+   }catch(err){v('vault-editor-error').textContent=err.message;v('vault-entry-form').classList.remove('hidden');}
+  };
+  button.append(fill);
  }
 }
 function vaultClearEditor(){
