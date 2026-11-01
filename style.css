@@ -334,3 +334,38 @@ body.reordering-tabs,body.reordering-tabs *{cursor:grabbing!important;user-selec
 .history-empty strong{font-size:17px;color:#e7e4ec}
 .history-empty span{font-size:12px;color:#93909e;max-width:270px;line-height:1.6}
 @media(max-width:650px){.history-dialog{width:calc(100vw - 24px);height:calc(100vh - 30px)}.history-header,.history-tools{padding-left:18px;padding-right:18px}.history-tools{flex-wrap:wrap}.history-search{flex-basis:100%}.history-summary{padding:5px 18px 15px}.history-tip{display:none}.history-content{padding:0 12px}.history-footer{padding:12px 18px}.history-entry{gap:9px}.history-entry time{display:none}}
+
+
+/* Password vault — private, polished security workspace. */
+.vault-dialog{width:min(1000px,calc(100vw - 48px));height:min(740px,calc(100vh - 48px));display:flex;flex-direction:column;overflow:hidden;color:#f0edf5;background:linear-gradient(145deg,#26222e,#17181f 60%,#131419);border:1px solid #494452;border-radius:20px;box-shadow:0 35px 110px #000d}
+.vault-header{display:flex;justify-content:space-between;padding:29px 32px 24px;border-bottom:1px solid #ffffff13}
+.vault-header h2{margin:8px 0;font-size:27px;letter-spacing:-.8px}.vault-header h2:first-letter{color:var(--hx-accent,#ad95ff)}
+.vault-header p{margin:0;color:#aaa5b5;font-size:12px}
+.vault-eyebrow{font-size:10px;letter-spacing:2px;color:var(--hx-accent,#ad95ff);font-weight:700}
+.vault-icon{width:36px;height:36px;font-size:24px;border-radius:9px;background:#2b2933;border:1px solid #484351;color:#bdb8c7;cursor:pointer}
+.vault-locked{margin:auto;display:flex;flex-direction:column;gap:12px;align-items:center;max-width:390px;padding:28px;text-align:center}
+.vault-lock-mark{display:grid;place-items:center;width:66px;height:66px;border-radius:19px;border:1px solid var(--hx-accent-border,#ad95ff75);background:var(--hx-accent-soft,#ad95ff24);color:var(--hx-accent,#ad95ff);font-size:40px}
+.vault-locked h3{margin:6px 0 0;font-size:23px}.vault-locked p{font-size:12px;color:#aaa5b5;line-height:1.55;margin:0}
+.vault-locked small{font-size:10px;color:#898697;line-height:1.6}
+#vault-unlock-form{width:100%;display:flex;flex-direction:column;gap:10px;text-align:left}
+#vault-unlock-form label,.vault-editor label{font-size:11px;color:#aaa6b6}
+#vault-unlock-form input,.vault-editor input,.vault-actions input{width:100%;height:42px;padding:0 12px;border:1px solid #47424f;background:#111319;color:#f2eff7;border-radius:9px;font-size:12px}
+#vault-unlock-form input:focus,.vault-editor input:focus,.vault-actions input:focus{border-color:var(--hx-accent,#ad95ff)}
+.vault-error{font-size:11px;color:#ffb1b8;min-height:0;margin:0}
+.vault-unlocked{flex:1;min-height:0;display:flex;flex-direction:column}
+.vault-actions{display:flex;align-items:center;gap:9px;padding:18px 30px;border-bottom:1px solid #ffffff12}
+.vault-actions>input{flex:1}
+.vault-body{flex:1;display:grid;grid-template-columns:minmax(240px,1fr) minmax(300px,1.2fr);min-height:0}
+.vault-list{padding:14px;overflow-y:auto;border-right:1px solid #ffffff13;scrollbar-color:#423d4e transparent;scrollbar-width:thin}
+.vault-item{display:flex;align-items:center;gap:12px;text-align:left;width:100%;padding:12px;border-radius:11px;background:none;border:1px solid transparent;color:#e6e1ec;cursor:pointer}
+.vault-item:hover{background:#2a2833}.vault-item.selected{background:var(--hx-accent-soft,#ad95ff24);border-color:var(--hx-accent-border,#ad95ff75)}
+.vault-item-icon{width:36px;height:36px;display:grid;place-items:center;border-radius:11px;color:var(--hx-accent,#ad95ff);background:#373141;font-weight:700}
+.vault-item-detail{display:flex;flex-direction:column;gap:5px;min-width:0}.vault-item-detail strong{font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.vault-item-detail small{font-size:10px;color:#a6a0b1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.vault-empty{padding:25px 15px;color:#9690a0;font-size:12px;line-height:1.6}
+.vault-editor{display:flex;flex-direction:column;gap:8px;padding:23px 26px;overflow-y:auto;scrollbar-width:thin}
+.vault-editor h3{margin:0 0 10px;font-size:17px}
+.vault-form-controls{display:flex;gap:7px;flex-wrap:wrap;margin-top:9px}
+.vault-editor .pill{padding:9px 11px}
+.vault-danger{color:#ffb9c1;border-color:#77434d}
+.vault-footer{margin:0;padding:12px 30px;color:#8b8797;font-size:10px;border-top:1px solid #ffffff11}
+@media(max-width:650px){.vault-dialog{width:calc(100vw - 20px);height:calc(100vh - 24px)}.vault-header{padding:20px}.vault-actions{padding:12px;flex-wrap:wrap}.vault-body{grid-template-columns:1fr;overflow-y:auto}.vault-list{max-height:180px;border-right:0;border-bottom:1px solid #ffffff12}.vault-editor{padding:18px}.vault-footer{padding:11px}}
