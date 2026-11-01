@@ -22,6 +22,7 @@ class TabStore {
    CREATE INDEX IF NOT EXISTS idx_stacks_parent ON tab_stacks(workspace,parent_id);
    CREATE TABLE IF NOT EXISTS tab_stack_members(tab_id INTEGER PRIMARY KEY,stack_id INTEGER NOT NULL REFERENCES tab_stacks(id) ON DELETE CASCADE);
    CREATE INDEX IF NOT EXISTS idx_stack_members ON tab_stack_members(stack_id);`);
+  if(!this.db.prepare('PRAGMA table_info(tab_stacks)').all().some(c=>c.name==='anchor_tab_id'))this.db.exec('ALTER TABLE tab_stacks ADD COLUMN anchor_tab_id INTEGER');
   this.db.exec('PRAGMA foreign_keys=ON');
   this.q={
    get:this.db.prepare('SELECT * FROM tabs WHERE id=?'),
@@ -115,7 +116,7 @@ class TabStore {
   try{
    const row=parentId===null?null:this.db.prepare('SELECT workspace FROM tab_stacks WHERE id=?').get(parentId);
    if(parentId!==null&&row?.workspace!==workspace)throw Error('Invalid parent stack');
-   const result=this.db.prepare('INSERT INTO tab_stacks(workspace,name,parent_id) VALUES(?,?,?)').run(workspace,name,parentId);
+   const result=this.db.prepare('INSERT INTO tab_stacks(workspace,name,parent_id,anchor_tab_id) VALUES(?,?,?,?)').run(workspace,name,parentId,targetId);
    const id=Number(result.lastInsertRowid);
    const move=this.db.prepare('INSERT INTO tab_stack_members(tab_id,stack_id) VALUES(?,?) ON CONFLICT(tab_id) DO UPDATE SET stack_id=excluded.stack_id');
    move.run(targetId,id);move.run(sourceId,id);
