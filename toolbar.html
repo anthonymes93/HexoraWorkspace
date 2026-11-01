@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' https: http: data:"><title>Hexora Workspace</title><link rel="stylesheet" href="style.css"></head>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' https: http: data:"><title>Hexora Workspace</title><link rel="stylesheet" href="style.css"><style>.hexora-apps{padding:3px 10px 13px}.hexora-apps button{display:flex;align-items:center;gap:11px;width:100%;border:1px solid #685b874d;background:#9e86dc16;color:inherit;border-radius:9px;padding:11px 12px;cursor:pointer;text-align:left;font-size:13px}.hexora-apps button:hover{background:#9e86dc32}.hexora-apps button span:nth-child(2){flex:1}</style></head>
 <body>
 <div class="rail">
   <div class="logo" title="Hexora">✦</div>
@@ -18,6 +18,7 @@
 </div>
 <aside class="sidebar" id="sidebar">
   <div class="sidebar-title"><strong>Hexora <em>Workspace</em></strong><div class="sidebar-title-actions"><button id="add-workspace" title="New workspace">＋</button><button id="collapse-sidebar" title="Collapse workspace panel" aria-label="Collapse workspace panel">‹</button></div></div>
+  <div class="eyebrow">Apps</div><div class="hexora-apps"><button id="open-email-app" type="button" title="Open Hexora Email in its own window">✉ <span>Email</span> <span aria-hidden="true">↗</span></button></div>
   <div class="eyebrow">Workspaces</div><div id="workspaces" class="workspaces"></div>
   <div class="conversation-head"><button id="toggle-conversations" class="conversation-collapse" type="button" aria-controls="conversations" aria-expanded="true" title="Collapse open conversations"><span class="eyebrow">Open conversations</span><span id="conversations-chevron" aria-hidden="true">⌄</span></button><button id="new-sidebar" title="New tab">＋</button></div>
   <div id="workspace-context-menu" class="workspace-context-menu hidden" role="menu" aria-label="Workspace details">
