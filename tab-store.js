@@ -26,6 +26,8 @@ class TabStore {
   if(!this.db.prepare('PRAGMA table_info(tab_stacks)').all().some(c=>c.name==='ordinal'))this.db.exec('ALTER TABLE tab_stacks ADD COLUMN ordinal INTEGER NOT NULL DEFAULT 0');
   this.db.exec('UPDATE tab_stacks SET ordinal=COALESCE((SELECT ordinal FROM tabs WHERE id=tab_stacks.anchor_tab_id),id) WHERE ordinal=0');
   this.db.exec('PRAGMA foreign_keys=ON');
+  this.db.exec(`CREATE TABLE IF NOT EXISTS browsing_history (id INTEGER PRIMARY KEY AUTOINCREMENT,url TEXT NOT NULL,title TEXT NOT NULL,domain TEXT NOT NULL,visited_at INTEGER NOT NULL,tab_id INTEGER);
+   CREATE INDEX IF NOT EXISTS idx_history_time ON browsing_history(visited_at DESC,id DESC);`);
   this.q={
    get:this.db.prepare('SELECT * FROM tabs WHERE id=?'),
    put:this.db.prepare(`INSERT INTO tabs(id,url,title,workspace,pinned,muted,last_active,ordinal)
@@ -218,6 +220,22 @@ class TabStore {
  }
  lastActiveId(){return this.q.latest.get()?.id||null;}
  moveWorkspace(source,destination){this.db.prepare('UPDATE tabs SET workspace=? WHERE workspace=?').run(destination,source);}
+ recordVisit(url,title,tabId){
+  if(typeof url!=='string'||!/^https?:\/\//i.test(url)||url.length>4096)return;
+  let domain;try{domain=new URL(url).hostname;}catch{return;}
+  const time=Date.now();
+  const previous=this.db.prepare('SELECT id,visited_at FROM browsing_history WHERE url=? AND tab_id=? ORDER BY id DESC LIMIT 1').get(url,tabId);
+  if(previous&&time-previous.visited_at<30000){
+   this.db.prepare('UPDATE browsing_history SET title=?,visited_at=? WHERE id=?').run(String(title||domain).slice(0,200),time,previous.id);
+  }else this.db.prepare('INSERT INTO browsing_history(url,title,domain,visited_at,tab_id) VALUES(?,?,?,?,?)').run(url,String(title||domain).slice(0,200),domain,time,tabId);
+ }
+ historySearch(query='',limit=250){
+  const term=String(query).trim().slice(0,200),take=Math.min(500,Math.max(1,Number(limit)||250));
+  if(!term)return this.db.prepare('SELECT * FROM browsing_history ORDER BY visited_at DESC,id DESC LIMIT ?').all(take);
+  return this.db.prepare('SELECT * FROM browsing_history WHERE title LIKE ? OR url LIKE ? OR domain LIKE ? ORDER BY visited_at DESC,id DESC LIMIT ?').all(...Array(3).fill('%'+term+'%'),take);
+ }
+ removeHistory(id){this.db.prepare('DELETE FROM browsing_history WHERE id=?').run(id);}
+ clearHistory(){this.db.prepare('DELETE FROM browsing_history').run();}
  getMeta(key){return this.q.metaGet.get(key)?.value||null;}
  setMeta(key,value){this.q.metaSet.run(key,String(value));}
  importLegacy(jsonFile) {
