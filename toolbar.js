@@ -219,12 +219,23 @@ sidebarGrip.addEventListener('pointermove',event=>{
  const speed=Math.abs(event.clientX-sidebarDrag.previousX)/elapsed;
  sidebarDrag.previousX=event.clientX;sidebarDrag.previousTime=now;
  sidebarDrag.last=clampSidebarWidth(event.clientX);
- if(speed>0.85)sidebarFastDrag=true;
+ // Only a genuinely rapid sweep freezes responsive previews.
+ // A normal drag should show the layout at the width under the cursor.
+ if(speed>2.4)sidebarFastDrag=true;
+ else if(speed<1.4)sidebarFastDrag=false;
+ if(!sidebarFastDrag)applySidebarBreakpoint(sidebarDrag.last);
+ clearTimeout(sidebarSettleTimer);
+ sidebarSettleTimer=setTimeout(()=>{
+  if(!sidebarDrag)return;
+  sidebarFastDrag=false;
+  applySidebarBreakpoint(sidebarDrag.last);
+ },110);
  queueSidebarResize(sidebarDrag.last);
 });
 async function endSidebarResize(event){
  if(!sidebarDrag||sidebarDrag.pointerId!==event.pointerId)return;
  const last=sidebarDrag.last;
+ clearTimeout(sidebarSettleTimer);sidebarSettleTimer=null;
  sidebarDrag=null;
  document.body.classList.remove('resizing-sidebar');
  if(sidebarGrip.hasPointerCapture(event.pointerId))sidebarGrip.releasePointerCapture(event.pointerId);
@@ -895,7 +906,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'){hideTabRowMenu();hi
 
 // The main process owns one animation timeline for both the native browser view and the toolbar layout.
 let sidebarWasAnimating=false;
-let sidebarFastDrag=false;
+let sidebarFastDrag=false,sidebarSettleTimer=null;
 function applySidebarBreakpoint(value){
  const body=document.body,root=document.documentElement;
  body.classList.toggle('panel-collapsed',value<=65);
