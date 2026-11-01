@@ -113,20 +113,8 @@ function render(p){
  let shortcuts=$('quick-jumps');if(!shortcuts){shortcuts=document.createElement('div');shortcuts.id='quick-jumps';shortcuts.className='quick-jumps';conversations.append(shortcuts);}
  renderQuickJumps();
  const tabs=$('tabs');tabs.replaceChildren();
+ renderTabRow(tabs,p,null);
  renderSecondTabRow(p);
- // Tab strip is deliberately bounded: the current page plus the active tab.
- const shown=[...p.tabs.slice(0,16)];
- if(p.active&&!shown.some(x=>x.id===p.active.id))shown.unshift({...p.active,active:true,suspended:false});
- for(const item of shown){
-  const el=document.createElement('button');el.dataset.tabId=String(item.id);el.draggable=false;el.className='tab'+(item.id===p.activeId?' active':'');
-  if(p.tabs.slice(0,16).some(t=>t.id===item.id))el.addEventListener('pointerdown',beginTabPointerDrag);
-  const name=document.createElement('span');name.className='name';name.textContent=(item.pinned?'◆ ':'')+(item.title||'ChatGPT');
-  const close=document.createElement('span');close.className='close';close.textContent='×';close.onclick=e=>{e.stopPropagation();action('close',item.id);};
-  el.title=item.url;el.onclick=()=>{stackRowsDismissed=false;selectedStackId=null;selectedRootTabId=item.id;action('activate',item.id);};
-  el.addEventListener('contextmenu',e=>{e.preventDefault();showTabMenu(e.clientX,e.clientY,item);});
-  const pop=document.createElement('span');pop.className='close';pop.title='Detach tab into new window';pop.textContent='↗';pop.onclick=e=>{e.stopPropagation();action('detach',item.id);};
-  el.append(name,pop,close);tabs.append(el);
- }
 }
 function updateSidebar(persist=true){action('sidebar',!sidebarOpen);if(persist&&currentPage?.activeId)action('panel-mode',{id:currentPage.activeId,mode:sidebarOpen?'wide':'thin'});save();}
 for(const id of ['new','new-rail','new-sidebar','add-tab'])$(id).onclick=()=>action('new',activeWorkspace);
@@ -171,6 +159,43 @@ let openStackPath=[];
 let stackRowsDismissed=true;
 const expandedStackNodes=new Set();
 let lastRowHeight=120;
+
+// Render each tab or container exactly once, in its actual parent row.
+function renderTabRow(host,page,parentId){
+ const data=page.stackData||{stacks:[],members:[]};
+ const memberOf=new Map(data.members.map(m=>[m.tab_id,m.stack_id]));
+ const children=data.stacks.filter(st=>st.parent_id===parentId);
+ const items=[];
+ for(const tab of page.tabs){
+  if((memberOf.get(tab.id)??null)===parentId)items.push({type:'tab',id:tab.id,tab,ordinal:tab.ordinal||0});
+ }
+ for(const stack of children){
+  const anchor=page.tabs.find(t=>t.id===stack.anchor_tab_id);
+  items.push({type:'stack',id:stack.id,stack,ordinal:anchor?.ordinal||0});
+ }
+ items.sort((a,b)=>b.ordinal-a.ordinal||a.id-b.id);
+ for(const item of items){
+  const el=document.createElement('button');el.className='tab'+(item.type==='tab'&&item.id===page.activeId?' active':'');
+  el.draggable=false;
+  if(item.type==='stack'){
+   el.dataset.stackContainerId=String(item.id);el.textContent='▤ '+item.stack.name;
+   el.title='Open stack: '+item.stack.name;
+   el.onclick=()=>{selectedStackId=item.id;selectedRootTabId=null;stackRowsDismissed=false;refresh();};
+  }else{
+   el.dataset.tabId=String(item.id);
+   if(parentId!==null)el.dataset.stackId=String(parentId);
+   const name=document.createElement('span');name.className='name';name.textContent=(item.tab.pinned?'◆ ':'')+(item.tab.title||'New Tab');
+   const close=document.createElement('span');close.className='close';close.textContent='×';
+   close.onclick=e=>{e.stopPropagation();action('close',item.id);};
+   el.append(name,close);
+   el.title=item.tab.url||'Open tab';
+   el.onclick=()=>{selectedRootTabId=null;selectedStackId=parentId;stackRowsDismissed=parentId===null;action('activate',item.id);};
+   el.addEventListener('contextmenu',e=>{e.preventDefault();showTabMenu(e.clientX,e.clientY,item.tab);});
+  }
+  el.addEventListener('pointerdown',beginTabPointerDrag);
+  host.append(el);
+ }
+}
 function renderSecondTabRow(page){
  const host=$('stack-rows');host.replaceChildren();
  const data=page.stackData||{stacks:[],members:[]};
@@ -197,17 +222,9 @@ function renderSecondTabRow(page){
   const stack=stacks.get(openStackPath[depth]);if(!stack)continue;
   const row=document.createElement('div');row.className='stack-tabs-row';row.dataset.stackId=String(stack.id);
   const label=document.createElement('button');label.className='stack-tabs-label';label.textContent='▤ '+stack.name;
-  label.title='Show this stack';label.onclick=()=>{selectedStackId=stack.id;openStackPath=openStackPath.slice(0,depth+1);refresh();};
+  label.title='Show this stack';label.onclick=()=>{selectedStackId=stack.id;stackRowsDismissed=false;refresh();};
   const tabs=document.createElement('div');tabs.className='stack-tabs';tabs.dataset.stackId=String(stack.id);
-  for(const membership of data.members.filter(m=>m.stack_id===stack.id)){
-   const id=membership.tab_id,tab=page.tabs.find(t=>t.id===id);
-   const el=document.createElement('button');el.className='tab'+(id===page.activeId?' active':'');
-   el.dataset.tabId=String(id);el.dataset.stackId=String(stack.id);el.draggable=false;
-   el.textContent=tab?.title||'Tab #'+id;el.title=tab?.url||'Open stacked tab';
-   el.addEventListener('pointerdown',beginTabPointerDrag);
-   el.onclick=()=>{stackRowsDismissed=false;selectedStackId=stack.id;action('activate',id);};
-   tabs.append(el);
-  }
+  renderTabRow(tabs,page,stack.id);
   const close=document.createElement('button');close.className='stack-row-close';close.textContent='×';close.title='Hide stack rows';
   close.onclick=()=>{selectedStackId=null;stackRowsDismissed=true;openStackPath=[];renderSecondTabRow({...page,activeId:null});};
   row.append(label,tabs,close);host.append(row);
