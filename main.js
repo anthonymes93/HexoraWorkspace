@@ -7,7 +7,8 @@ const {PasswordVault}=require('./password-vault');
 const fs=require('node:fs');
 const os=require('node:os');
 const {spawn}=require('node:child_process');
-const {workspaceForTab,projectUpdateFile,ownerFile,clearSession,codeSessionDirectory}=require('./code-session-workspace');
+const {workspaceForTab,clearSession,codeSessionDirectory}=require('./code-session-workspace');
+const {syncCodeProjects}=require('./code-project-sync');
 const {buildCompanionVsix,BRIDGE_VERSION}=require('./code-session-vsix');
 // Each native VS Code tab owns its own PowerShell host and reparented window.
 const nativeCodeHosts=new Map();
@@ -392,42 +393,23 @@ function pumpNativeCodeLaunchQueue(){
   nativeCodeLaunchingId=tabId;startNativeCodeHost(tabId,entry);return;
  }
 }
-// Read project updates written by the VS Code companion. Syncing on an
-// interval (including at startup) also covers quick Hexora shutdowns: a
-// project captured just before exit must not be missed.
+// Apply project records at startup and while editors are running. A record
+// belongs to one Hexora tab and is ignored if its native host was superseded.
 function syncNativeCodeProjects(){
  if(!store||tabStoreClosing||quitting)return;
- let filenames;
- const directory=codeSessionDirectory(app.getPath('userData'));
- try{filenames=fs.readdirSync(directory).filter(name=>/^tab-[1-9]\\d*\\.project\\.json$/.test(name));}
- catch(error){if(error.code!=='ENOENT')console.warn('[Native VS Code] Project scan:',error.message);return;}
- for(const filename of filenames){
-  const tabId=Number(filename.match(/^tab-(\\d+)/)?.[1]);
-  if(!Number.isSafeInteger(tabId)||tabId<1||!isCodeTab(store.get(tabId)))continue;
-  const entry=nativeCodeHosts.get(tabId);
-  if(entry?.ignoreProjectSync)continue;
-  try{
-   const file=projectUpdateFile(app.getPath('userData'),tabId);
-   if(fs.statSync(file).size>8192)continue;
-   const data=JSON.parse(fs.readFileSync(file,'utf8'));
-   if(data?.version!==1||typeof data.ownerToken!=='string'||data.ownerToken.length<16||
-    data.ownerToken!==fs.readFileSync(ownerFile(app.getPath('userData'),tabId),'utf8'))continue;
-   const project=data.projectPath;
-   if(typeof project!=='string'||project.length>32767||!path.isAbsolute(project))continue;
-   if(!fs.statSync(project).isDirectory())continue;
-   if(store.getCodeProject(tabId)?.project_path===project)continue;
-   store.setCodeProject(tabId,project);
-   if(!store.getMeta('tabCustomTitle:'+tabId)){
-    const row=toModel(store.get(tabId));
+ syncCodeProjects({
+  userData:app.getPath('userData'),store,
+  eligible:id=>isCodeTab(store.get(id))&&!nativeCodeHosts.get(id)?.ignoreProjectSync,
+  onProject:(id,project)=>{
+   if(!store.getMeta('tabCustomTitle:'+id)){
+    const row=toModel(store.get(id));
     row.title=('VS Code · '+path.basename(project)).slice(0,100);
     store.save(row);
    }
    emit();
-   console.log('[Native VS Code tab '+tabId+'] Project automatically saved:',project);
-  }catch(error){
-   if(error.code!=='ENOENT')console.warn('[Native VS Code tab '+tabId+'] Ignoring invalid project update:',error.message);
+   console.log('[Native VS Code tab '+id+'] Project automatically saved:',project);
   }
- }
+ });
 }
 function startNativeCodeHost(tabId,entry){
  const script=path.join(__dirname,'experiments','vscode-hexora-host.ps1');
