@@ -16,7 +16,6 @@ let projectStatusItem=null;
 let restoring=false;
 let userChangedDuringRestore=false;
 let savedEditor=null;
-const disposables=[];
 
 function getSessionFile(){
  const workspace=vscode.workspace.workspaceFile;
@@ -162,6 +161,7 @@ async function activate(context){
  const onEditor=vscode.window.onDidChangeActiveTextEditor(()=>{
   if(restoring){userChangedDuringRestore=true;return;}
   queueSnapshot();
+  saveProject();
  });
  const onSelection=vscode.window.onDidChangeTextEditorSelection(event=>{
   if(event.textEditor!==vscode.window.activeTextEditor)return;
