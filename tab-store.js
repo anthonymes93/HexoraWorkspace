@@ -120,6 +120,11 @@ class TabStore {
    const id=Number(result.lastInsertRowid);
    const move=this.db.prepare('INSERT INTO tab_stack_members(tab_id,stack_id) VALUES(?,?) ON CONFLICT(tab_id) DO UPDATE SET stack_id=excluded.stack_id');
    move.run(targetId,id);move.run(sourceId,id);
+   // Keep the drop target first and dragged tab last in the new child row.
+   const first=this.get(targetId),second=this.get(sourceId);
+   const base=Math.max(first.ordinal,second.ordinal);
+   this.db.prepare('UPDATE tabs SET ordinal=? WHERE id=?').run(base+2,targetId);
+   this.db.prepare('UPDATE tabs SET ordinal=? WHERE id=?').run(base+1,sourceId);
    this.db.exec('COMMIT');return id;
   }catch(error){this.db.exec('ROLLBACK');throw error;}
  }
@@ -128,7 +133,14 @@ class TabStore {
   if(stackId===null){this.db.prepare('DELETE FROM tab_stack_members WHERE tab_id=?').run(tabId);return;}
   const stack=this.db.prepare('SELECT workspace FROM tab_stacks WHERE id=?').get(stackId);
   if(!stack||stack.workspace!==tab.workspace)throw Error('Stack must be in the same workspace');
-  this.db.prepare('INSERT INTO tab_stack_members(tab_id,stack_id) VALUES(?,?) ON CONFLICT(tab_id) DO UPDATE SET stack_id=excluded.stack_id').run(tabId,stackId);
+  this.db.exec('BEGIN');
+  try{
+   const min=this.db.prepare('SELECT MIN(t.ordinal) n FROM tabs t JOIN tab_stack_members m ON m.tab_id=t.id WHERE m.stack_id=?').get(stackId).n;
+   this.db.prepare('INSERT INTO tab_stack_members(tab_id,stack_id) VALUES(?,?) ON CONFLICT(tab_id) DO UPDATE SET stack_id=excluded.stack_id').run(tabId,stackId);
+   // Appending is intentional: dropped tabs are regular tabs at the far right.
+   if(min!==null)this.db.prepare('UPDATE tabs SET ordinal=? WHERE id=?').run(min-1,tabId);
+   this.db.exec('COMMIT');
+  }catch(error){this.db.exec('ROLLBACK');throw error;}
  }
  moveStack(id,parentId){
   const stack=this.db.prepare('SELECT * FROM tab_stacks WHERE id=?').get(id);
