@@ -170,19 +170,26 @@ async function renameStack(stack){
  catch(error){alert('Unable to rename stack: '+error.message);}
 }
 function updateTabFavicon(el,tab){
+ const preferred=tab.favicon||tab.faviconFallback;
  let img=el.querySelector('.tab-favicon');
- if(!tab.favicon){
-  if(img)img.remove();
-  return;
- }
+ if(!preferred){img?.remove();return;}
  if(!img){
   img=document.createElement('img');img.className='tab-favicon';
-  img.alt='';img.draggable=false;img.referrerPolicy='no-referrer';
+  img.alt='';img.draggable=false;
   el.insertBefore(img,el.querySelector('.name')||el.firstChild);
  }
- if(img.getAttribute('src')!==tab.favicon)img.src=tab.favicon;
- img.onerror=()=>{img.style.visibility='hidden';};
- img.onload=()=>{img.style.visibility='visible';};
+ // Use the favicon advertised by the page when available; fall back to the
+ // site's /favicon.ico when Electron has not fired page-favicon-updated.
+ const fallback=tab.faviconFallback;
+ const src=img.getAttribute('src');
+ if(src!==preferred){
+  img.onerror=()=>{
+   if(fallback&&img.getAttribute('src')!==fallback){img.src=fallback;return;}
+   img.style.visibility='hidden';
+  };
+  img.onload=()=>{img.style.visibility='visible';};
+  img.style.visibility='visible';img.src=preferred;
+ }
 }
 function renderTabRow(host,page,parentId){
  const data=page.stackData||{stacks:[],members:[]};
