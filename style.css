@@ -559,3 +559,11 @@ body.sidebar-trim-workspace-details:not(.sidebar-icons-only) .workspace{gap:6px}
 .workspace-context-info small{font-size:10px;color:#a09aaa}
 .workspace-context-menu>button{display:block;width:100%;text-align:left;border:0;background:transparent;padding:11px 10px;border-radius:8px;font-size:12px;color:#dcd8e6;cursor:pointer}
 .workspace-context-menu>button:hover{background:#393345;color:#fff}
+
+/* Floating workspace tooltip, reserved for icon-only sidebar layouts. */
+.workspace-hover-tip{position:fixed;z-index:100;display:flex;align-items:center;gap:10px;width:max-content;max-width:250px;padding:10px 13px;color:#eeeaf5;background:linear-gradient(145deg,#302a3b,#1e1d27);border:1px solid #665777;border-radius:11px;box-shadow:0 13px 36px #000a;pointer-events:none;animation:workspace-tip-in .14s ease-out}
+.workspace-tip-icon{display:grid;place-items:center;width:34px;height:34px;flex:0 0 34px;border-radius:9px;background:var(--hx-accent-soft,#ad95ff24);color:var(--hx-accent,#ad95ff);font-size:19px}
+.workspace-tip-details{display:flex;flex-direction:column;gap:5px;min-width:0}
+.workspace-tip-details strong{font-size:12px;font-weight:650;line-height:1.2;overflow-wrap:anywhere}
+.workspace-tip-details small{font-size:10px;color:#ada6bb}
+@keyframes workspace-tip-in{from{opacity:0;transform:translateX(-5px)}to{opacity:1;transform:translateX(0)}}
