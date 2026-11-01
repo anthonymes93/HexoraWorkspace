@@ -3,11 +3,16 @@ on:
   push:
     branches:
       - 'feature/vscode-project-session-restore'
+      - 'feature/vscode-active-file-session'
       - 'experiment/vscode-no-flash'
   pull_request:
     paths:
       - 'tab-store.js'
       - 'main.js'
+      - 'code-session-vsix.js'
+      - 'code-session-workspace.js'
+      - 'integrations/vscode-session-bridge/**'
+      - 'scripts/test-code-session.cjs'
       - 'experiments/vscode-hexora-host.ps1'
       - 'scripts/test-code-projects.cjs'
       - 'package.json'
@@ -25,3 +30,5 @@ jobs:
           node-version: '22'
       - name: Verify persistent VS Code project associations
         run: npm run test:code-projects
+      - name: Verify VS Code active-file session bundle and isolation
+        run: npm run test:code-session
