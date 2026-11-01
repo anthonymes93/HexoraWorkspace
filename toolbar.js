@@ -846,6 +846,13 @@ function showTabMenu(x,y,item){
  menu.style.left=Math.max(8,Math.min(x,innerWidth-menu.offsetWidth-8))+'px';
  menu.style.top=Math.max(8,Math.min(y,innerHeight-menu.offsetHeight-8))+'px';
 }
+$('tab-menu-detach').onclick=async()=>{
+ if(!contextTab)return;
+ const id=contextTab.id;
+ hideTabMenu();
+ try{await action('detach',id);refresh();}
+ catch(error){alert('Could not open a new window: '+error.message);}
+};
 $('tab-menu-close-selected').onclick=async()=>{
  const ids=[...selectedTabIds];if(ids.length<2)return;
  hideTabMenu();
