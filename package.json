@@ -9,7 +9,8 @@
     "benchmark:tabs": "node --experimental-sqlite scripts/benchmark-tabs.cjs",
     "build:win": "npx --yes electron-builder@26.18.0 --win nsis --x64 --publish never",
     "build:store": "npx --yes electron-builder@26.18.0 --win appx --x64 --publish never",
-    "demo:taskbar": "electron demo/taskbar"
+    "demo:taskbar": "electron demo/taskbar",
+    "test:links": "node --test scripts/test-deep-links.cjs"
   },
   "build": {
     "appId": "app.hexora.workspace",
@@ -47,7 +48,15 @@
       "publisherDisplayName": "Hexora Development",
       "displayName": "Hexora Workspace",
       "artifactName": "Hexora-Store-Preview-${version}-${arch}.${ext}"
-    }
+    },
+    "protocols": [
+      {
+        "name": "Hexora Workspace",
+        "schemes": [
+          "hexora"
+        ]
+      }
+    ]
   },
   "devDependencies": {
     "electron": "^38.0.0"

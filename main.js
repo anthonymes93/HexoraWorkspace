@@ -3,6 +3,7 @@ const {app,BrowserWindow,WebContentsView,View,session,ipcMain,shell,dialog,clipb
 const path=require('node:path');
 const {screen}=require('electron');
 const {TabStore}=require('./tab-store');
+const {workspaceLink,tabLink,parseDeepLink}=require('./deep-links');
 const {PasswordVault}=require('./password-vault');
 const fs=require('node:fs');
 const os=require('node:os');
@@ -10,13 +11,19 @@ const {snapshot,stageRestore,applyPending,verifyBackup}=require('./recovery');
 // Stable profile path for development, NSIS and packaged builds.
 // Keep this unchanged so installing an update never silently switches profiles.
 app.setPath('userData', path.join(app.getPath('appData'), 'hexora-workspace'));
+// Register deep links for both packaged installs and Electron development on Windows.
+if(process.platform==='win32'){
+ if(process.defaultApp&&process.argv[1])app.setAsDefaultProtocolClient('hexora',process.execPath,[path.resolve(process.argv[1])]);
+ else app.setAsDefaultProtocolClient('hexora');
+}else if(app.isPackaged)app.setAsDefaultProtocolClient('hexora');
 
 // Prevent two Hexora instances from accessing the same Chromium profile.
 const hasSingleInstanceLock=app.requestSingleInstanceLock();
 if(!hasSingleInstanceLock){
  app.quit();
 }else{
- app.on('second-instance',()=>{
+ app.on('second-instance',(_event,argv)=>{
+   for(const arg of argv)receiveDeepLink(arg);
   const main=BrowserWindow.getAllWindows().find(w=>!w.isDestroyed()&&w.getTitle().includes('Hexora Workspace'));
   if(main){if(main.isMinimized())main.restore();main.show();main.focus();}
  });
@@ -32,6 +39,22 @@ function savedDetachedIds(){try{const values=JSON.parse(store.getMeta(LAYOUT_KEY
 function setDetachedSaved(id,present){const ids=new Set(savedDetachedIds());if(present)ids.add(id);else ids.delete(id);store.setMeta(LAYOUT_KEY,JSON.stringify([...ids]));}
 let mainViewport=null,win,store,activeId=null,sidebarWidth=330,live=new Map(),favicons=new Map(),loading=new Map(),stateTimer=null,modalVisible=false,recoveryPassword=null,recoveryDir=null,recoveryTimer=null,recoveryBusy=false,lastBackup=null;
 const extensionPartition='persist:hexora-chatgpt';
+let deepLinkReady=false;
+const pendingDeepLinks=[];
+function deliverDeepLinks(){
+ if(!deepLinkReady||!win||win.isDestroyed())return;
+ while(pendingDeepLinks.length)win.webContents.send('deep-link:navigate',pendingDeepLinks.shift());
+}
+function receiveDeepLink(value){
+ const target=parseDeepLink(value);
+ if(!target)return false;
+ pendingDeepLinks.push(target);
+ if(pendingDeepLinks.length>20)pendingDeepLinks.shift();
+ deliverDeepLinks();
+ return true;
+}
+for(const arg of process.argv)receiveDeepLink(arg);
+app.on('open-url',(event,url)=>{event.preventDefault();receiveDeepLink(url);});
 let extensionRecords=[],extensionLoaded=new Map(),extensionSession=null,extensionConfigFile=null;
 const extensionPopups=new Map();
 const extensionRegistrations=new Map();
@@ -445,6 +468,11 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
  win=new BrowserWindow({width:1360,height:900,minWidth:700,minHeight:400,title:'Hexora Workspace',autoHideMenuBar:true,backgroundColor:'#111215',webPreferences:{preload:path.join(__dirname,'preload.js'),contextIsolation:true,sandbox:true,nodeIntegration:false}});
  mainViewport=new View();win.contentView.addChildView(mainViewport);
  win.loadFile('toolbar.html');win.on('resize',bounds);win.webContents.on('did-finish-load',emit);
+  win.webContents.on('did-start-loading',()=>{deepLinkReady=false;});
+  ipcMain.handle('deep-link:ready',event=>{
+   if(event.sender!==win.webContents)throw Error('Invalid deep-link caller.');
+   deepLinkReady=true;deliverDeepLinks();return true;
+  });
  const last=Number(store.getMeta('activeId'));if(!last||!activate(last)){const backup=store.lastActiveId();if(!backup||!activate(backup))newTab();}
  // Reopen each detached tab at its saved screen position after the primary workspace starts.
  // Missing/deleted tab IDs are cleaned up, and one bad window cannot prevent startup.
@@ -649,6 +677,10 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
    {label:count+' saved '+(count===1?'tab':'tabs'),enabled:false},
    {type:'separator'},
    {label:'Open workspace',click:()=>win.webContents.send('workspace:menu-action',{id,action:'open'})},
+    {label:'Copy Link to Workspace',click:()=>{
+     try{clipboard.writeText(workspaceLink(id));win.webContents.send('deep-link:copied','Workspace link copied');}
+     catch(error){console.error('Could not copy workspace link',error);}
+    }},
    {label:'Rename / customize',click:()=>win.webContents.send('workspace:menu-action',{id,action:'rename'})}
   ]);
   menu.popup({window:win,x:Math.round(Math.max(0,Number(data?.x)||0)),y:Math.round(Math.max(0,Number(data?.y)||0))});
@@ -659,7 +691,14 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
  ipcMain.handle('tabs:lookup',(_e,id)=>{const row=store.get(Number(id));return row?pageRow(row):null;});
  ipcMain.handle('tabs:action',(_e,action,arg)=>{
   const current=store.get(activeId);const wc=live.get(activeId)?.webContents;
-  if(action==='history-list')return store.historySearch(arg?.query||'',arg?.limit||250);
+  if(action==='copy-tab-link'){
+    const tab=store.get(Number(arg));
+    if(!tab)throw Error('This tab no longer exists.');
+    const link=tabLink(tab.workspace,tab.id);
+    clipboard.writeText(link);win.webContents.send('deep-link:copied','Tab link copied');
+    return link;
+   }
+   if(action==='history-list')return store.historySearch(arg?.query||'',arg?.limit||250);
   if(action==='history-delete'){store.removeHistory(Number(arg));return true;}
   if(action==='history-clear'){store.clearHistory();return true;}
   if(action==='history-open'){
