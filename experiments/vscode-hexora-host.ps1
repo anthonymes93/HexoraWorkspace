@@ -124,7 +124,8 @@ do {
  if($candidate){$child=[IntPtr]([long]$candidate)}
 } until ($child -ne [IntPtr]::Zero -or [DateTime]::UtcNow -gt $deadline)
 if($child -eq [IntPtr]::Zero){throw 'No new VS Code window detected'}
-Write-Output ('WINDOW_CAPTURED hwnd='+$child.ToInt64()+' elapsedMs='+[int]([DateTime]::UtcNow-$launchBegan).TotalMilliseconds)
+$captureElapsedMs=[int](([DateTime]::UtcNow-$launchBegan).TotalMilliseconds)
+Write-Output ('WINDOW_CAPTURED hwnd='+$child.ToInt64()+' elapsedMs='+$captureElapsedMs)
 # Hide the newly created desktop window before changing styles / parenting.
 # It must not briefly cover Hexora or steal input from the tab host.
 [void][HexoraNative]::ShowWindow($child,0)
