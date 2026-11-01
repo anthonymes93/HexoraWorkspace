@@ -25,7 +25,7 @@ test('editor workspace identities remain independent across VS Code tabs',()=>{
   fs.writeFileSync(state,JSON.stringify({path:path.join(project,'index.js')}));
   clearSession(data,10);
   assert.equal(fs.existsSync(state),false);
-  assert.equal(fs.existsSync(first),false);
+  assert.equal(fs.existsSync(first),true,'keep workspace descriptor safe for detached VS Code window');
   assert.equal(fs.existsSync(second),true);
   assert.throws(()=>workspaceForTab(data,0,project),/Invalid/);
   assert.throws(()=>workspaceForTab(data,14,path.join(data,'missing')),/ENOENT/);
