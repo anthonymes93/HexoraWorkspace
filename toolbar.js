@@ -599,6 +599,8 @@ function hideTabMenu(restore=true){ $('tab-workspace-submenu').classList.add('hi
 function showTabMenu(x,y,item){
  contextTab=item;
  $('tab-menu-current-title').textContent=item.title||'Untitled tab';
+ $('tab-menu-url').value=item.url||'';
+ $('tab-menu-url-error').textContent='';
  action('modal',true);
  $('tab-menu-chrome').textContent=item.chromeMode?'✓ Disable Chrome compatibility':'◉ Enable Chrome compatibility';
  const pref=item.panelPreference||{mode:item.panelMode,source:'default'};
@@ -658,8 +660,21 @@ $('tab-menu-rename').onclick=()=>{
  };
  requestAnimationFrame(()=>{input.focus();input.select();});
 };
-$('tab-menu-replace').onclick=()=>showWebsiteModal(false);
-$('tab-menu-new').onclick=()=>showWebsiteModal(true);
+$('tab-menu-url-form').onsubmit=async e=>{
+ e.preventDefault();
+ const tab=contextTab;if(!tab)return;
+ const input=$('tab-menu-url'),error=$('tab-menu-url-error');
+ let url=input.value.trim();
+ if(!url){error.textContent='Enter a website address.';input.focus();return;}
+ if(!/^[a-zA-Z][\\w+.-]*:\/\//.test(url))url='https://'+url;
+ try{
+  const parsed=new URL(url);
+  if(!['http:','https:'].includes(parsed.protocol)||!parsed.hostname||parsed.username||parsed.password)throw new Error('Enter a valid HTTP or HTTPS address.');
+  await action('open-website',{id:tab.id,newTab:false,workspace:tab.workspace,url:parsed.href});
+  hideTabMenu();
+  await refresh();
+ }catch(err){error.textContent=err.message||'Could not open website.';input.focus();}
+};
 for(const mode of ['wide','thin']){
  $('tab-menu-panel-'+mode).onclick=async()=>{if(!contextTab)return;const id=contextTab.id;hideTabMenu();try{await action('panel-mode',{id,mode});refresh();}catch(err){alert(err.message);}};
  $('tab-menu-domain-'+mode).onclick=async()=>{if(!contextTab)return;const id=contextTab.id;hideTabMenu();try{await action('panel-domain-mode',{id,mode});refresh();}catch(err){alert(err.message);}};
