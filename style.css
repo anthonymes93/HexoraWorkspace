@@ -240,3 +240,34 @@ body.reordering-tabs,body.reordering-tabs *{cursor:grabbing!important;user-selec
 
 /* Compact titles automatically when first row has 11+ tabs. */
 .tabs.compact-titles > .tab .name{font-size:80%;line-height:1.25}
+
+
+/* Independent accent color system for both Classic and Obsidian. */
+:root{--hx-accent:#ad95ff;--hx-accent-soft:#ad95ff24;--hx-accent-border:#ad95ff75;--hx-accent-ink:#15121d}
+:root[data-hexora-accent="teal"]{--hx-accent:#34c7b1;--hx-accent-soft:#34c7b124;--hx-accent-border:#34c7b175;--hx-accent-ink:#081c19}
+:root[data-hexora-accent="dark-gray"]{--hx-accent:#a2a8b4;--hx-accent-soft:#9da2ad20;--hx-accent-border:#9da2ad65;--hx-accent-ink:#13151a}
+:root[data-hexora-accent="blue"]{--hx-accent:#64a9f7;--hx-accent-soft:#64a9f724;--hx-accent-border:#64a9f775;--hx-accent-ink:#0b1625}
+:root[data-hexora-accent="green"]{--hx-accent:#61c897;--hx-accent-soft:#61c89724;--hx-accent-border:#61c89775;--hx-accent-ink:#0b1e14}
+:root[data-hexora-accent="orange"]{--hx-accent:#ecab63;--hx-accent-soft:#ecab6324;--hx-accent-border:#ecab6375;--hx-accent-ink:#25180b}
+:root[data-hexora-accent="rose"]{--hx-accent:#ec8fb1;--hx-accent-soft:#ec8fb124;--hx-accent-border:#ec8fb175;--hx-accent-ink:#26111b}
+:root[data-hexora-accent="ice"]{--hx-accent:#8bcbdc;--hx-accent-soft:#8bcbdc24;--hx-accent-border:#8bcbdc75;--hx-accent-ink:#102126}
+.accent-section{margin-top:20px;padding-top:17px;border-top:1px solid #ffffff17}
+.accent-section-header{display:flex;justify-content:space-between;gap:10px;align-items:baseline;margin-bottom:11px}
+.accent-section-header strong{font-size:13px;color:#e7e5ed}
+.accent-section-header span{font-size:11px;color:#9694a3}
+.accent-options{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px}
+.accent-choice{display:flex;align-items:center;gap:8px;min-width:0;padding:10px 9px;background:#22232a;border:1px solid #383843;border-radius:10px;color:#cacbd2;font-size:11px;text-align:left}
+.accent-choice:hover{background:#30303a;border-color:#5a5a66}
+.accent-choice.selected{background:var(--hx-accent-soft);border-color:var(--hx-accent-border);color:#fff}
+.accent-swatch{flex:none;width:17px;height:17px;border-radius:50%;border:1px solid #ffffff30;box-shadow:inset 0 1px 2px #0003}
+@media(max-width:520px){.accent-options{grid-template-columns:repeat(2,minmax(0,1fr))}}
+:root .logo,:root[data-hexora-theme="obsidian"] .logo{background:var(--hx-accent);color:var(--hx-accent-ink)}
+:root .sidebar-title em,:root[data-hexora-theme="obsidian"] .sidebar-title em{color:var(--hx-accent)}
+:root .pill.primary,:root[data-hexora-theme="obsidian"] .pill.primary{background:var(--hx-accent);border-color:var(--hx-accent);color:var(--hx-accent-ink)}
+:root .railbtn.selected,:root[data-hexora-theme="obsidian"] .railbtn.selected{background:var(--hx-accent-soft);color:var(--hx-accent)}
+:root .workspace.selected,:root .chat-row.active,:root[data-hexora-theme="obsidian"] .workspace.selected,:root[data-hexora-theme="obsidian"] .chat-row.active{background:var(--hx-accent-soft);box-shadow:inset 2px 0 var(--hx-accent)}
+:root[data-hexora-theme="obsidian"] .tab.active{box-shadow:inset 0 2px var(--hx-accent)}
+:root .tab-menu-brand-icon{background:var(--hx-accent-soft);color:var(--hx-accent)}
+:root .tab-context-menu .tab-menu-featured{background:var(--hx-accent-soft);border-color:var(--hx-accent-border)}
+:root .tab-menu-featured .menu-glyph{color:var(--hx-accent)}
+:root button:focus-visible,:root input:focus-visible{outline-color:var(--hx-accent)}
