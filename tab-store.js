@@ -41,6 +41,16 @@ class TabStore {
    metaSet:this.db.prepare('INSERT INTO meta(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value'),
    search:this.db.prepare("SELECT * FROM tabs WHERE (title LIKE ? ESCAPE '\\' OR url LIKE ? ESCAPE '\\') ORDER BY last_active DESC LIMIT ?")
   };
+  // One-time migration away from experimental stacks. Preserve actual tabs,
+  // but remove the corrupt nested group graph from earlier iterations.
+  if(this.getMeta('tabEngineVersion')!=='2'){
+   this.db.exec('BEGIN');
+   try{
+    this.db.exec('DELETE FROM tab_stack_members; DELETE FROM tab_stacks;');
+    this.setMeta('tabEngineVersion','2');
+    this.db.exec('COMMIT');
+   }catch(error){this.db.exec('ROLLBACK');throw error;}
+  }
  }
  total(){return this.q.count.get().count;}
  nextId(){return this.q.max.get().max+1;}
