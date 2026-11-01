@@ -292,118 +292,99 @@ $('tab-menu-stack').onclick=chooseTabStack;
 // Pointer-based reorder: no native Chromium drag image or dotted cursor rectangle.
 const tabStrip=$('tabs');
 let tabPointer=null,dropSaving=false,suppressTabClickUntil=0;
+
+function showCreateStackDialog(){
+ return new Promise(resolve=>{
+  const veil=document.createElement('div');veil.className='overlay';veil.style.zIndex='99999';
+  veil.innerHTML='<div class="dialog" role="dialog" aria-modal="true" aria-label="Create tab stack"><div class="dialog-header"><b>Create Tab Stack</b></div><form id="hexora-create-stack-form"><label for="hexora-stack-name">Stack name</label><input id="hexora-stack-name" required maxlength="80" autocomplete="off" value="New Stack"><div class="website-actions"><button type="button" class="pill" id="hexora-stack-cancel">Cancel</button><button type="submit" class="pill primary">Create Stack</button></div></form></div>';
+  document.body.append(veil);action('modal',true);
+  const field=veil.querySelector('#hexora-stack-name');field.focus();field.select();
+  let settled=false;
+  const finish=value=>{if(settled)return;settled=true;document.removeEventListener('keydown',key);veil.remove();action('modal',false);resolve(value);};
+  const key=e=>{if(e.key==='Escape'){e.preventDefault();finish(null);}};
+  document.addEventListener('keydown',key);
+  veil.querySelector('#hexora-stack-cancel').onclick=()=>finish(null);
+  veil.onclick=e=>{if(e.target===veil)finish(null);};
+  veil.querySelector('form').onsubmit=e=>{e.preventDefault();finish(field.value.trim()||null);};
+ });
+}
 function beginTabPointerDrag(e){
  if(e.button!==0||!e.isPrimary||e.target.closest('.close'))return;
- const tab=e.currentTarget;
- try{tab.setPointerCapture(e.pointerId);}catch(error){console.warn('Tab pointer capture unavailable',error);}
- tabPointer={tab,id:Number(tab.dataset.tabId),workspace:activeWorkspace,pointerId:e.pointerId,startX:e.clientX,startY:e.clientY,moving:false,originLeft:tab.getBoundingClientRect().left,visualLeft:tab.getBoundingClientRect().left,grabOffset:e.clientX-tab.getBoundingClientRect().left,lastX:e.clientX,sourceStack:tab.dataset.stackId?Number(tab.dataset.stackId):null,targets:[...tab.parentElement.querySelectorAll('.tab[data-tab-id]')].filter(el=>el!==tab).map(el=>({id:Number(el.dataset.tabId),rect:el.getBoundingClientRect()}))};
- // Do not capture until the movement threshold is met; a normal click still activates.
+ const el=e.currentTarget,row=el.parentElement,rect=el.getBoundingClientRect();
+ const type=el.dataset.stackContainerId?'stack':'tab';
+ tabPointer={el,row,id:Number(type==='stack'?el.dataset.stackContainerId:el.dataset.tabId),type,
+  pointerId:e.pointerId,workspace:activeWorkspace,startX:e.clientX,startY:e.clientY,
+  offsetX:e.clientX-rect.left,offsetY:e.clientY-rect.top,moving:false,drop:null};
+ try{el.setPointerCapture(e.pointerId);}catch{}
 }
-function animateReflow(before,dragged){
- for(const el of tabStrip.children){
-  if(el===dragged)continue;
-  const dx=(before.get(el)||0)-el.getBoundingClientRect().left;
-  if(Math.abs(dx)>0.5)el.animate([{transform:'translate3d('+dx+'px,0,0)'},{transform:'translate3d(0,0,0)'}],{duration:190,easing:'cubic-bezier(.2,.8,.2,1)'});
- }
-}
-window.addEventListener('pointermove',e=>{
- const d=tabPointer;if(!d||!e.isPrimary||e.pointerId!==d.pointerId)return;
- if(!d.tab.isConnected||activeWorkspace!==d.workspace){cancelTabPointer();return;}
- if(!d.moving){
-  if(Math.hypot(e.clientX-d.startX,e.clientY-d.startY)<5)return;
-  d.moving=true;d.tab.classList.add('dragging');document.body.classList.add('reordering-tabs');
- }
- e.preventDefault();
- const source=d.tab.parentElement;
- const desiredLeft=e.clientX-d.grabOffset;
- const slotLeft=d.tab.getBoundingClientRect().left-parseFloat(d.tab.style.getPropertyValue('--drag-x')||'0');
- d.tab.style.setProperty('--drag-x',(desiredLeft-slotLeft)+'px');
- // Hit-test actual tab rectangles rather than relying on the browser's
- // elementFromPoint during translated, dynamically reordered tabs.
- const allRows=[tabStrip,...document.querySelectorAll('.stack-tabs')];
- const hitRow=allRows.find(row=>{const r=row.getBoundingClientRect();return e.clientY>=r.top&&e.clientY<=r.bottom&&e.clientX>=r.left&&e.clientX<=r.right;});
- d.targetRow=hitRow?(hitRow===tabStrip?null:Number(hitRow.dataset.stackId)):undefined;
- // Hit-test stable original tab slots, not moving DOM nodes. Fast reordering
- // changes element positions, so live overlap checks lose their target.
- const targets=d.targetRow===d.sourceStack?d.targets:
-  (hitRow?[...hitRow.querySelectorAll('.tab[data-tab-id]')].filter(el=>el!==d.tab).map(el=>({id:Number(el.dataset.tabId),rect:el.getBoundingClientRect()})):[]);
- const target=targets.find(item=>{
-  const r=item.rect;
-  return e.clientX>=r.left+r.width*.12&&e.clientX<=r.right-r.width*.12
-   &&e.clientY>=r.top&&e.clientY<=r.bottom;
- });
- d.hoverId=target?.id||null;
- for(const node of document.querySelectorAll('.stack-drop-target'))node.classList.remove('stack-drop-target');
- if(d.hoverId){
-  const highlight=[...document.querySelectorAll('.tab[data-tab-id]')].find(el=>Number(el.dataset.tabId)===d.hoverId);
-  highlight?.classList.add('stack-drop-target');
- }
- if(d.targetRow!==d.sourceStack)return;
- if(d.hoverId)return;
- const direction=Math.sign(e.clientX-d.lastX);d.lastX=e.clientX;
- const sibling=direction>0?d.tab.nextElementSibling:direction<0?d.tab.previousElementSibling:null;
- if(sibling&&sibling.classList.contains('tab')){
-  const edge=sibling.getBoundingClientRect();
-  const crosses=direction>0?desiredLeft+d.tab.offsetWidth>=edge.left+edge.width*.10:desiredLeft<=edge.right-edge.width*.10;
-  if(crosses){
-   const before=new Map([...source.children].map(el=>[el,el.getBoundingClientRect().left]));
-   source.insertBefore(d.tab,direction>0?sibling.nextSibling:sibling);
-   const slot=d.tab.getBoundingClientRect().left-parseFloat(d.tab.style.getPropertyValue('--drag-x')||'0');
-   d.tab.style.setProperty('--drag-x',(desiredLeft-slot)+'px');
-   for(const el of source.children){if(el===d.tab)continue;const dx=(before.get(el)||0)-el.getBoundingClientRect().left;if(Math.abs(dx)>1)el.animate([{transform:'translateX('+dx+'px)'},{transform:'translateX(0)'}],{duration:160,easing:'ease-out'});}
-  }
- }
-});
 function cancelTabPointer(){
- if(!tabPointer)return;
- try{if(tabPointer.tab.hasPointerCapture(tabPointer.pointerId))tabPointer.tab.releasePointerCapture(tabPointer.pointerId);}catch{}
- tabPointer.tab.classList.remove('dragging');
- tabPointer.tab.style.removeProperty('--drag-x');
+ const d=tabPointer;if(!d)return;
+ d.el.classList.remove('dragging');d.el.style.removeProperty('--drag-x');
+ for(const el of document.querySelectorAll('.stack-drop-target'))el.classList.remove('stack-drop-target');
  document.body.classList.remove('reordering-tabs');
+ try{if(d.el.hasPointerCapture(d.pointerId))d.el.releasePointerCapture(d.pointerId);}catch{}
  tabPointer=null;
 }
+function findTabDrop(e,d){
+ const rows=[$('tabs'),...document.querySelectorAll('.stack-tabs')];
+ const row=rows.find(node=>{const r=node.getBoundingClientRect();return e.clientY>=r.top&&e.clientY<=r.bottom;});
+ if(!row)return null;
+ const parent=row.dataset.stackId?Number(row.dataset.stackId):null;
+ const targets=[...row.querySelectorAll('.tab')].filter(el=>el!==d.el);
+ let target=targets.find(el=>{const r=el.getBoundingClientRect();return e.clientX>=r.left&&e.clientX<=r.right;});
+ if(target){
+  const r=target.getBoundingClientRect();
+  const within=(e.clientX-r.left)/r.width;
+  // Dropping on the central 70% creates/joins a stack; edges reorder.
+  const kind=within>=.15&&within<=.85?'on':'between';
+  return {parent,target,kind,id:Number(target.dataset.stackContainerId||target.dataset.tabId),
+   targetType:target.dataset.stackContainerId?'stack':'tab',after:within>.5};
+ }
+ return {parent,target:null,kind:'end'};
+}
+window.addEventListener('pointermove',e=>{
+ const d=tabPointer;if(!d||e.pointerId!==d.pointerId||!e.isPrimary)return;
+ if(!d.el.isConnected||activeWorkspace!==d.workspace){cancelTabPointer();return;}
+ if(!d.moving){
+  if(Math.hypot(e.clientX-d.startX,e.clientY-d.startY)<6)return;
+  d.moving=true;d.el.classList.add('dragging');document.body.classList.add('reordering-tabs');
+ }
+ e.preventDefault();
+ // Only the dragged element moves during preview. No database or DOM reordering.
+ d.el.style.setProperty('--drag-x',(e.clientX-d.startX)+'px');
+ d.drop=findTabDrop(e,d);
+ for(const el of document.querySelectorAll('.stack-drop-target'))el.classList.remove('stack-drop-target');
+ if(d.drop?.kind==='on'&&d.drop.target)d.drop.target.classList.add('stack-drop-target');
+});
 window.addEventListener('pointerup',async e=>{
  const d=tabPointer;if(!d||e.pointerId!==d.pointerId)return;
- if(d.moving)suppressTabClickUntil=Date.now()+300;
- const moving=d.moving;
- const endTarget=d.targets.find(item=>e.clientX>=item.rect.left+item.rect.width*.12&&e.clientX<=item.rect.right-item.rect.width*.12&&e.clientY>=item.rect.top&&e.clientY<=item.rect.bottom);
- const targetId=d.hoverId||endTarget?.id||null;
- const destination=d.targetRow;
- const source=d.sourceStack;
- for(const node of document.querySelectorAll('.stack-drop-target'))node.classList.remove('stack-drop-target');
+ const moving=d.moving,drop=findTabDrop(e,d);
+ if(moving)suppressTabClickUntil=Date.now()+400;
  cancelTabPointer();
- if(!moving||dropSaving)return;
+ if(!moving||!drop||dropSaving)return;
+ if(drop.kind==='on'&&drop.id===d.id&&drop.targetType===d.type)return;
  dropSaving=true;
  try{
-  const stacks=currentPage?.stackData||{stacks:[],members:[]};
-  const membership=new Map(stacks.members.map(x=>[x.tab_id,x.stack_id]));
-  if(targetId&&targetId!==d.id){
-   // Dropping onto a tab creates a child stack below its existing row.
-   const parent=membership.get(targetId)||null;
-   // A new group is a child of the destination row. Existing stacks are
-   // entered directly when dropping from a different row onto a member.
-   if(destination!==source&&parent!==null){
-    await action('stack-assign',{tabId:d.id,stackId:parent});
-    selectedStackId=parent;
-   }else{
-    const newStack=await action('stack-create-pair',{workspace:d.workspace,name:'New Stack',sourceId:d.id,targetId,parentId:parent});
-    selectedStackId=newStack;if(source===null)selectedRootTabId=targetId;
-   }
-   stackRowsDismissed=false;await refresh();
-  }else if(destination!==undefined&&destination!==source){
-   // Empty space in another row moves the tab into that row.
-   await action('stack-assign',{tabId:d.id,stackId:destination});
-   selectedStackId=destination;if(destination===null)selectedRootTabId=d.id;stackRowsDismissed=false;await refresh();
-  }else if(source===null){
-   const ids=[...tabStrip.querySelectorAll('.tab')].map(el=>Number(el.dataset.tabId)).filter(Number.isSafeInteger);
-   await action('reorder-tabs',{workspace:d.workspace,ids});
-  }else if(source!==null){
-   const row=document.querySelector('.stack-tabs[data-stack-id="'+source+'"]');
-   const ids=row?[...row.querySelectorAll('.tab[data-tab-id]')].map(el=>Number(el.dataset.tabId)):[];
-   if(ids.length)await action('reorder-stack',{stackId:source,ids});
-   else await refresh();
-  }else await refresh();
- }catch(error){console.error('Could not move stacked tab',error);refresh();}
+  if(drop.kind==='on'&&drop.targetType==='tab'&&d.type==='tab'){
+   // Do not change tabs until the user actually confirms the name.
+   const name=await showCreateStackDialog();
+   if(!name)return;
+   const id=await action('stack-create-pair',{workspace:d.workspace,name,
+    sourceId:d.id,targetId:drop.id,parentId:drop.parent});
+   selectedStackId=id;selectedRootTabId=null;stackRowsDismissed=false;
+  }else if(drop.kind==='on'&&drop.targetType==='stack'&&d.type==='tab'){
+   await action('stack-assign',{tabId:d.id,stackId:drop.id});
+   selectedStackId=drop.id;selectedRootTabId=null;stackRowsDismissed=false;
+  }else if(drop.kind==='on'&&drop.targetType==='stack'&&d.type==='stack'){
+   if(d.id!==drop.id)await action('stack-nest',{id:d.id,parentId:drop.id});
+   selectedStackId=drop.id;selectedRootTabId=null;stackRowsDismissed=false;
+  }else if(d.type==='tab'&&drop.parent!==((d.row.dataset.stackId&&Number(d.row.dataset.stackId))||null)){
+   await action('stack-assign',{tabId:d.id,stackId:drop.parent});
+   selectedStackId=drop.parent;stackRowsDismissed=drop.parent===null;
+  }
+  // Ordering will be separately persisted by the stable row-order action.
+  await refresh();
+ }catch(err){console.error('Tab drop failed',err);alert('Could not move tab: '+err.message);await refresh();}
  finally{dropSaving=false;}
 });
 window.addEventListener('pointercancel',()=>{cancelTabPointer();refresh();});
