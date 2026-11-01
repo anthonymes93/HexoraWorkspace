@@ -913,12 +913,12 @@ window.hexora.onSidebarFrame((width,transitioning=false,target=null)=>{
   body.classList.remove('sidebar-auto-transition','sidebar-transition-icons');
   body.classList.toggle('panel-collapsed',value<=65);
   body.classList.toggle('sidebar-icons-only',value>65&&value<=184);
-  body.classList.toggle('sidebar-icons-grid',value>=113&&value<=184);
+  body.classList.toggle('sidebar-icons-grid',value>=146&&value<=184);
   root.style.setProperty('--hexora-sidebar-fluid',String(Math.max(0,Math.min(1,(value-240)/95))));
  }else{
   body.classList.remove('panel-collapsed');
   body.classList.toggle('sidebar-icons-only',body.classList.contains('sidebar-transition-icons'));
-  body.classList.toggle('sidebar-icons-grid',body.classList.contains('sidebar-transition-icons')&&Number(target)>=113&&Number(target)<=184);
+  body.classList.toggle('sidebar-icons-grid',body.classList.contains('sidebar-transition-icons')&&Number(target)>=146&&Number(target)<=184);
  }
 });
 
