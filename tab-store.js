@@ -23,6 +23,8 @@ class TabStore {
    CREATE TABLE IF NOT EXISTS tab_stack_members(tab_id INTEGER PRIMARY KEY,stack_id INTEGER NOT NULL REFERENCES tab_stacks(id) ON DELETE CASCADE);
    CREATE INDEX IF NOT EXISTS idx_stack_members ON tab_stack_members(stack_id);`);
   if(!this.db.prepare('PRAGMA table_info(tab_stacks)').all().some(c=>c.name==='anchor_tab_id'))this.db.exec('ALTER TABLE tab_stacks ADD COLUMN anchor_tab_id INTEGER');
+  if(!this.db.prepare('PRAGMA table_info(tab_stacks)').all().some(c=>c.name==='ordinal'))this.db.exec('ALTER TABLE tab_stacks ADD COLUMN ordinal INTEGER NOT NULL DEFAULT 0');
+  this.db.exec('UPDATE tab_stacks SET ordinal=COALESCE((SELECT ordinal FROM tabs WHERE id=tab_stacks.anchor_tab_id),id) WHERE ordinal=0');
   this.db.exec('PRAGMA foreign_keys=ON');
   this.q={
    get:this.db.prepare('SELECT * FROM tabs WHERE id=?'),
@@ -116,7 +118,7 @@ class TabStore {
   try{
    const row=parentId===null?null:this.db.prepare('SELECT workspace FROM tab_stacks WHERE id=?').get(parentId);
    if(parentId!==null&&row?.workspace!==workspace)throw Error('Invalid parent stack');
-   const result=this.db.prepare('INSERT INTO tab_stacks(workspace,name,parent_id,anchor_tab_id) VALUES(?,?,?,?)').run(workspace,name,parentId,targetId);
+   const result=this.db.prepare('INSERT INTO tab_stacks(workspace,name,parent_id,anchor_tab_id,ordinal) VALUES(?,?,?,?,?)').run(workspace,name,parentId,targetId,this.get(targetId).ordinal);
    const id=Number(result.lastInsertRowid);
    const move=this.db.prepare('INSERT INTO tab_stack_members(tab_id,stack_id) VALUES(?,?) ON CONFLICT(tab_id) DO UPDATE SET stack_id=excluded.stack_id');
    move.run(targetId,id);move.run(sourceId,id);
@@ -127,6 +129,27 @@ class TabStore {
    this.db.prepare('UPDATE tabs SET ordinal=? WHERE id=?').run(base+1,sourceId);
    this.db.exec('COMMIT');return id;
   }catch(error){this.db.exec('ROLLBACK');throw error;}
+ }
+ reorderRow(workspace,parentId,items){
+  if(!Array.isArray(items)||!items.length||items.length>1000)throw Error('Invalid row order');
+  const tabs=parentId===null
+   ?this.db.prepare('SELECT t.id FROM tabs t LEFT JOIN tab_stack_members m ON m.tab_id=t.id WHERE t.workspace=? AND m.tab_id IS NULL').all(workspace).map(x=>'t:'+x.id)
+   :this.db.prepare('SELECT m.tab_id id FROM tab_stack_members m JOIN tabs t ON t.id=m.tab_id WHERE t.workspace=? AND m.stack_id=?').all(workspace,parentId).map(x=>'t:'+x.id);
+  const stacks=parentId===null
+   ?this.db.prepare('SELECT id FROM tab_stacks WHERE workspace=? AND parent_id IS NULL').all(workspace).map(x=>'s:'+x.id)
+   :this.db.prepare('SELECT id FROM tab_stacks WHERE workspace=? AND parent_id=?').all(workspace,parentId).map(x=>'s:'+x.id);
+  const valid=[...tabs,...stacks];
+  if(items.length!==valid.length||new Set(items).size!==valid.length||!items.every(x=>valid.includes(x)))throw Error('Row changed during drag');
+  const max=Math.max(this.db.prepare('SELECT COALESCE(MAX(ordinal),0) n FROM tabs').get().n,this.db.prepare('SELECT COALESCE(MAX(ordinal),0) n FROM tab_stacks').get().n);
+  this.db.exec('BEGIN');
+  try{
+   for(let i=0;i<items.length;i++){
+    const [kind,id]=items[i].split(':');
+    if(kind==='t')this.db.prepare('UPDATE tabs SET ordinal=? WHERE id=?').run(max+items.length-i,id);
+    else this.db.prepare('UPDATE tab_stacks SET ordinal=? WHERE id=?').run(max+items.length-i,id);
+   }
+   this.db.exec('COMMIT');
+  }catch(e){this.db.exec('ROLLBACK');throw e;}
  }
  putTabInStack(tabId,stackId){
   const tab=this.get(tabId);if(!tab)throw Error('Tab not found');
