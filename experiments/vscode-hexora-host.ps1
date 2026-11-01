@@ -111,6 +111,16 @@ $parent=[IntPtr]([long]::Parse($ParentHwnd))
 # the same CLI setup (notably on versioned Windows installs).
 # CreateNoWindow hides only the cmd.exe interpreter; the VS Code GUI remains normal.
 $cmd=Get-Command code.cmd -ErrorAction Stop
+# Keep Hexora-hosted VS Code's window/session history separate from the
+# standalone VS Code profile. Share installed extensions, but not workbench
+# state, cached webviews, recently opened workspaces, or session restoration.
+$hexoraCodeProfile=Join-Path $env:APPDATA 'Hexora\VSCodeProfile'
+$sharedExtensions=Join-Path $env:USERPROFILE '.vscode\extensions'
+[void][System.IO.Directory]::CreateDirectory($hexoraCodeProfile)
+# Use environment variables for paths so cmd.exe never interprets spaces,
+# ampersands, or other special characters in Windows user/profile paths.
+$codeProfileArgs=' --user-data-dir "%HEXORA_VSCODE_USER_DATA%" --extensions-dir "%HEXORA_VSCODE_EXTENSIONS%"'
+
 $existing=@([HexoraNative]::Windows())
 $launchBegan=[DateTime]::UtcNow
 $launch=New-Object System.Diagnostics.ProcessStartInfo
@@ -120,12 +130,14 @@ if($ProjectPath){
  # Pass the chosen directory through a child-only environment variable rather
  # than concatenating an arbitrary folder name into a cmd.exe command line.
  # /v:off prevents delayed ! expansion, including paths with ! characters.
- $launch.Arguments=('/d /v:off /s /c ""{0}" --new-window "%HEXORA_VSCODE_PROJECT%""' -f $cmd.Source)
+ $launch.Arguments=('/d /v:off /s /c ""{0}" --new-window{1} "%HEXORA_VSCODE_PROJECT%""' -f $cmd.Source,$codeProfileArgs)
  $launch.EnvironmentVariables['HEXORA_VSCODE_PROJECT']=$ProjectPath
  Write-Output 'LAUNCH_SAVED_PROJECT'
 }else{
- $launch.Arguments=('/d /s /c ""{0}" --new-window"' -f $cmd.Source)
+ $launch.Arguments=('/d /v:off /s /c ""{0}" --new-window{1}"' -f $cmd.Source,$codeProfileArgs)
 }
+$launch.EnvironmentVariables['HEXORA_VSCODE_USER_DATA']=$hexoraCodeProfile
+$launch.EnvironmentVariables['HEXORA_VSCODE_EXTENSIONS']=$sharedExtensions
 $launch.UseShellExecute=$false
 $launch.CreateNoWindow=$true
 $launch.WorkingDirectory=Split-Path -Path $cmd.Source -Parent
