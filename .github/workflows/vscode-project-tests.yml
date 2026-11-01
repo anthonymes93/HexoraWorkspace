@@ -67,6 +67,8 @@ jobs:
         run: npm run test:code-project-sync
       - name: Verify real project browsing and saved favorites
         run: npm run test:project-picker
+      - name: Verify integrated feature wiring
+        run: npm run test:integration
       - name: Verify workspace and tab deep links
         run: npm run test:links
       - name: Verify taskbar identity behavior
