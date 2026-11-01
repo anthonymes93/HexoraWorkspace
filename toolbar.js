@@ -956,41 +956,20 @@ window.hexora.onSidebarFrame((width,transitioning=false,target=null)=>{
  }
 });
 
-let workspaceMenuId=null;
-function hideWorkspaceMenu(){
- $('workspace-context-menu').classList.add('hidden');workspaceMenuId=null;
+function showWorkspaceMenu(event,workspace){
+ event.preventDefault();event.stopPropagation();
+ const count=currentPage?.counts.find(x=>x.workspace===workspace.id)?.count||0;
+ window.hexora.workspaceMenu({id:workspace.id,name:workspace.name,count,x:event.clientX,y:event.clientY})
+  .catch(error=>console.error('Workspace menu:',error));
 }
-function showWorkspaceMenu(e,w){
- e.preventDefault();e.stopPropagation();
- workspaceMenuId=w.id;
- const menu=$('workspace-context-menu');
- $('workspace-context-icon').textContent=w.emoji;
- $('workspace-context-name').textContent=w.name;
- const count=currentPage?.counts.find(x=>x.workspace===w.id)?.count||0;
- $('workspace-context-count').textContent=count+' saved '+(count===1?'tab':'tabs');
- // Position the menu in the toolbar header area so it is never clipped by the native website view.
- document.body.append(menu);
- menu.classList.remove('hidden');
- // WebContentsView renders above the toolbar outside the sidebar.
- // Keep this context menu inside the actual sidebar bounds so neither the
- // website nor the menu needs to disappear.
- const sidebar=$('sidebar').getBoundingClientRect();
- menu.style.width=Math.max(80,sidebar.width-12)+'px';
- menu.style.left=Math.round(sidebar.left+6)+'px';
- const rect=menu.getBoundingClientRect();
- menu.style.top=Math.max(24,Math.min(e.clientY,window.innerHeight-rect.height-12))+'px';
-}
-$('workspace-context-open').onclick=async()=>{
- const id=workspaceMenuId;if(!id)return;hideWorkspaceMenu();
- activeWorkspace=id;offset=0;save();await action('switch-workspace',id);refresh();
-};
-$('workspace-context-rename').onclick=()=>{
- const id=workspaceMenuId;if(!id)return;hideWorkspaceMenu();openWorkspaceEditor(id);
-};
-document.addEventListener('pointerdown',e=>{
- if(workspaceMenuId&&!$('workspace-context-menu').contains(e.target))hideWorkspaceMenu();
-},true);
-document.addEventListener('keydown',e=>{if(e.key==='Escape'&&workspaceMenuId)hideWorkspaceMenu();});
+window.hexora.onWorkspaceMenuAction(async({id,action:menuAction})=>{
+ if(!workspaces.some(workspace=>workspace.id===id))return;
+ if(menuAction==='rename')openWorkspaceEditor(id);
+ else if(menuAction==='open'){
+  activeWorkspace=id;offset=0;save();
+  await action('switch-workspace',id);refresh();
+ }
+});
 function openWorkspaceEditor(id){
  const workspace=id?workspaces.find(w=>w.id===id):null;workspaceEditing=id||null;
  $('workspace-editor-title').textContent=workspace?'Edit workspace':'New workspace';
