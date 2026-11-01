@@ -21,8 +21,15 @@ function saveSidebarReorder(key,from,to){
  ids.splice(target,0,ids.splice(source,1)[0]);
  // Keep the current page's order and retain entries on other pages.
  const existing=sidebarOrder(key).map(String).filter(id=>!ids.includes(id));
- localStorage.setItem(key,JSON.stringify([...ids,...existing]));
- refresh();
+ if(key===sidebarWorkspaceOrderKey){
+  localStorage.setItem(key,JSON.stringify([...ids,...existing]));
+  refresh();
+ }else{
+  // The SQLite tab ordinals are the source of truth for both sidebar and tab rows.
+  localStorage.removeItem(key);
+  action('reorder-sidebar-tabs',{workspace:activeWorkspace,ids:ids.map(Number)})
+   .then(()=>refresh()).catch(error=>alert('Could not reorder tabs: '+error.message));
+ }
 }
 function enableSidebarDrag(el,id,key){
  el.dataset.reorderId=String(id);
@@ -149,7 +156,7 @@ function render(p){
  }
  const conversations=$('conversations');conversations.replaceChildren();
  renderStackTree(conversations,p);
- for(const item of orderSidebarItems(p.tabs,sidebarConversationOrderPrefix+activeWorkspace,t=>t.id)){
+ for(const item of p.tabs){
   const el=document.createElement('button');el.className='chat-row'+(item.active?' active':'');
   const symbol=document.createElement('span');symbol.className='symbol';symbol.textContent=item.suspended?'☾':'▤';
   const name=document.createElement('span');name.className='label';name.textContent=item.title||'New tab';
