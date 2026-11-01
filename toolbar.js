@@ -1633,3 +1633,6 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&vaultOpen)vaultClos
  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!panel.hidden){e.stopPropagation();close();}});
  render();
 })();
+
+// Hexora Apps: native multi-account email companion window.
+$('open-email-app')?.addEventListener('click',()=>window.hexora.email.open().catch(err=>alert('Email: '+err.message)));
