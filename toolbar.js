@@ -3,6 +3,7 @@ const workspaces=[{id:'web',name:'Web Development',emoji:'◈'},{id:'business',n
 let activeWorkspace='web',sidebarOpen=true,offset=0,currentPage=null,refreshing=false,refreshPending=false;
 let contextTab=null,websiteTarget=null,workspaceEditing=null;
 let selectedStackId=null;
+let selectedRootTabId=null;
 const quickJumpsKey='hexora-quick-jumps';
 let quickJumps=[];
 try{const items=JSON.parse(localStorage.getItem(quickJumpsKey)||'[]');if(Array.isArray(items))quickJumps=items.filter(x=>Number.isSafeInteger(x.id)&&x.id>0).slice(0,20);}catch{}
@@ -121,7 +122,7 @@ function render(p){
   if(p.tabs.slice(0,16).some(t=>t.id===item.id))el.addEventListener('pointerdown',beginTabPointerDrag);
   const name=document.createElement('span');name.className='name';name.textContent=(item.pinned?'◆ ':'')+(item.title||'ChatGPT');
   const close=document.createElement('span');close.className='close';close.textContent='×';close.onclick=e=>{e.stopPropagation();action('close',item.id);};
-  el.title=item.url;el.onclick=()=>{stackRowsDismissed=false;selectedStackId=null;action('activate',item.id);};
+  el.title=item.url;el.onclick=()=>{stackRowsDismissed=false;selectedStackId=null;selectedRootTabId=item.id;action('activate',item.id);};
   el.addEventListener('contextmenu',e=>{e.preventDefault();showTabMenu(e.clientX,e.clientY,item);});
   const pop=document.createElement('span');pop.className='close';pop.title='Detach tab into new window';pop.textContent='↗';pop.onclick=e=>{e.stopPropagation();action('detach',item.id);};
   el.append(name,pop,close);tabs.append(el);
@@ -175,13 +176,32 @@ function renderSecondTabRow(page){
  const stacks=new Map(data.stacks.map(s=>[s.id,s]));
  const members=new Map(data.members.map(m=>[m.tab_id,m.stack_id]));
  const activeStack=members.get(page.activeId);
- if(!stackRowsDismissed&&selectedStackId&&stacks.has(selectedStackId)){
-  openStackPath=[];let node=stacks.get(selectedStackId),seen=new Set();
+ // A top-row click selects only stacks anchored to that specific tab.
+ // Do not infer the same second row for every member of a group.
+ let focusStack=null;
+ if(selectedRootTabId!==null){
+  const root=page.tabs.find(t=>t.id===selectedRootTabId);
+  if(root){
+   focusStack=data.stacks.find(st=>st.anchor_tab_id===selectedRootTabId&&st.parent_id===null)||null;
+   if(!focusStack){
+    // Legacy stacks created before anchors existed: choose one representative.
+    focusStack=data.stacks.find(st=>st.parent_id===null&&!st.anchor_tab_id&&
+     data.members.filter(m=>m.stack_id===st.id)[0]?.tab_id===selectedRootTabId)||null;
+   }
+  }
+ }else if(selectedStackId&&stacks.has(selectedStackId))focusStack=stacks.get(selectedStackId);
+ else if(activeStack&&stacks.has(activeStack))focusStack=stacks.get(activeStack);
+ openStackPath=[];
+ if(!stackRowsDismissed&&focusStack){
+  let node=focusStack,seen=new Set();
   while(node&&!seen.has(node.id)){seen.add(node.id);openStackPath.unshift(node.id);node=stacks.get(node.parent_id);}
- }else if(!stackRowsDismissed&&activeStack&&stacks.has(activeStack)){
-  openStackPath=[];let node=stacks.get(activeStack),seen=new Set();
-  while(node&&!seen.has(node.id)){seen.add(node.id);openStackPath.unshift(node.id);node=stacks.get(node.parent_id);}
- }else openStackPath=[];
+  // Extend through the explicitly selected nested stack, if one was chosen.
+  if(selectedStackId&&stacks.has(selectedStackId)){
+   const path=[],visited=new Set();let child=stacks.get(selectedStackId);
+   while(child&&!visited.has(child.id)){visited.add(child.id);path.unshift(child.id);child=stacks.get(child.parent_id);}
+   if(path[0]===openStackPath[0])openStackPath=path;
+  }
+ }
  for(let depth=0;depth<openStackPath.length;depth++){
   const stack=stacks.get(openStackPath[depth]);if(!stack)continue;
   const row=document.createElement('div');row.className='stack-tabs-row';row.dataset.stackId=String(stack.id);
@@ -347,13 +367,13 @@ window.addEventListener('pointerup',async()=>{
     selectedStackId=parent;
    }else{
     const newStack=await action('stack-create-pair',{workspace:d.workspace,name:'New Stack',sourceId:d.id,targetId,parentId:parent});
-    selectedStackId=newStack;
+    selectedStackId=newStack;if(source===null)selectedRootTabId=targetId;
    }
    stackRowsDismissed=false;await refresh();
   }else if(destination!==undefined&&destination!==source){
    // Empty space in another row moves the tab into that row.
    await action('stack-assign',{tabId:d.id,stackId:destination});
-   selectedStackId=destination;stackRowsDismissed=false;await refresh();
+   selectedStackId=destination;if(destination===null)selectedRootTabId=d.id;stackRowsDismissed=false;await refresh();
   }else if(source===null){
    const ids=[...tabStrip.querySelectorAll('.tab')].map(el=>Number(el.dataset.tabId)).filter(Number.isSafeInteger);
    await action('reorder-tabs',{workspace:d.workspace,ids});
