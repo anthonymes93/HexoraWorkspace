@@ -8,6 +8,7 @@ on:
       - 'experiment/vscode-no-flash'
       - 'feature/hexora-project-picker'
       - 'integration/hexora-feature-reconciliation'
+      - 'fix/vscode-standalone-profile-isolation'
   pull_request:
     paths:
       - 'tab-store.js'
@@ -31,6 +32,7 @@ on:
       - 'toolbar.js'
       - 'preload.js'
       - 'scripts/test-project-picker.cjs'
+      - 'scripts/test-vscode-profile-isolation.cjs'
       - '.github/workflows/vscode-project-tests.yml'
 jobs:
   project-persistence:
@@ -65,6 +67,8 @@ jobs:
         run: npm run test:code-auto-project
       - name: Verify fenced auto-detected project records
         run: npm run test:code-project-sync
+      - name: Verify VS Code profile separation
+        run: node --test scripts/test-vscode-profile-isolation.cjs
       - name: Verify real project browsing and saved favorites
         run: npm run test:project-picker
       - name: Verify integrated feature wiring
