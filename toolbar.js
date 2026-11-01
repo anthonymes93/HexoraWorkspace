@@ -173,8 +173,8 @@ function renderSecondTabRow(p){
  const activeStack=membership.get(p.activeId);
  if(activeStack&&stackData.stacks.some(x=>x.id===activeStack))selectedStackId=activeStack;
  const stack=stackData.stacks.find(x=>x.id===selectedStackId);
- if(!stack){row.classList.add('hidden');host.replaceChildren();return;}
- row.classList.remove('hidden');label.textContent='▤ '+stack.name;
+ if(!stack){row.classList.add('hidden');document.body.classList.remove('stack-row-open');action('stack-row-height',120);host.replaceChildren();return;}
+ row.classList.remove('hidden');document.body.classList.add('stack-row-open');action('stack-row-height',164);label.textContent='▤ '+stack.name;
  host.replaceChildren();
  const ids=stackData.members.filter(x=>x.stack_id===stack.id).map(x=>x.tab_id);
  for(const id of ids){
@@ -186,7 +186,7 @@ function renderSecondTabRow(p){
   host.append(el);
  }
 }
-$('stack-row-close').onclick=()=>{selectedStackId=null;$('stack-tabs-row').classList.add('hidden');};
+$('stack-row-close').onclick=()=>{selectedStackId=null;$('stack-tabs-row').classList.add('hidden');document.body.classList.remove('stack-row-open');action('stack-row-height',120);};
 // Unlimited-depth tab stacks; only expanded branches are rendered.
 function renderStackTree(host,page){
  const data=page.stackData;if(!data?.stacks?.length)return;
