@@ -449,7 +449,7 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
  sidebarWidth=Math.max(64,Math.min(560,Number(store.getMeta('sidebarCustomWidth'))||330));
  win=new BrowserWindow({width:1360,height:900,minWidth:700,minHeight:400,title:'Hexora Workspace',autoHideMenuBar:true,backgroundColor:'#111215',webPreferences:{preload:path.join(__dirname,'preload.js'),contextIsolation:true,sandbox:true,nodeIntegration:false}});
  mainViewport=new View();win.contentView.addChildView(mainViewport);
- win.loadFile('toolbar.html');win.on('resize',bounds);win.webContents.on('did-finish-load',emit);
+ win.loadFile('toolbar.html');win.on('focus',()=>{if(nativeCodeHost)nativeCodeCommand('DIAG HEXORA_FOCUS');});win.on('blur',()=>{if(nativeCodeHost)nativeCodeCommand('DIAG HEXORA_BLUR');});win.on('resize',bounds);win.webContents.on('did-finish-load',emit);
  const last=Number(store.getMeta('activeId'));if(!last||!activate(last)){const backup=store.lastActiveId();if(!backup||!activate(backup))newTab();}
  // Reopen each detached tab at its saved screen position after the primary workspace starts.
  // Missing/deleted tab IDs are cleaned up, and one bad window cannot prevent startup.
@@ -659,11 +659,11 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
   menu.popup({window:win,x:Math.round(Math.max(0,Number(data?.x)||0)),y:Math.round(Math.max(0,Number(data?.y)||0))});
   return true;
  });
- ipcMain.handle('native-code:detach',async event=>{if(event.sender!==win.webContents)throw Error('Invalid caller');if(!nativeCodeHost)return {detached:false};nativeCodeDetached=true;nativeCodeActive=false;nativeCodeCommand('DETACH');restoreNativeWebView();return {detached:true};});
+ ipcMain.handle('native-code:detach',async event=>{if(event.sender!==win.webContents)throw Error('Invalid caller');if(!nativeCodeHost)return {detached:false};nativeCodeDetached=true;nativeCodeActive=false;nativeCodeCommand('DIAG BEFORE_DETACH');nativeCodeCommand('DETACH');restoreNativeWebView();return {detached:true};});
  ipcMain.handle('native-code:toggle',async event=>{
   if(event.sender!==win.webContents)throw Error('Invalid caller');
   if(process.platform!=='win32')throw Error('Native VS Code hosting requires Windows.');
-  if(nativeCodeHost){if(nativeCodeDetached){nativeCodeDetached=false;nativeCodeCommand('ATTACH');setTimeout(()=>{if(nativeCodeHost)nativeCodeCommand('FOCUS');},180);nativeCodeActive=true;const view=live.get(activeId);if(view)mainViewport.removeChildView(view);nativeCodeBounds();return {active:true};}nativeCodeActive=!nativeCodeActive;if(nativeCodeActive){const view=live.get(activeId);if(view)mainViewport.removeChildView(view);nativeCodeCommand('SHOW');nativeCodeBounds();setTimeout(()=>{if(nativeCodeActive)nativeCodeCommand('FOCUS');},180);}else{nativeCodeCommand('HIDE');restoreNativeWebView();}return {active:nativeCodeActive};}
+  if(nativeCodeHost){if(nativeCodeDetached){nativeCodeDetached=false;nativeCodeCommand('DIAG BEFORE_ATTACH');nativeCodeCommand('ATTACH');setTimeout(()=>{if(nativeCodeHost)nativeCodeCommand('FOCUS');},180);nativeCodeActive=true;const view=live.get(activeId);if(view)mainViewport.removeChildView(view);nativeCodeBounds();return {active:true};}nativeCodeActive=!nativeCodeActive;if(nativeCodeActive){const view=live.get(activeId);if(view)mainViewport.removeChildView(view);nativeCodeCommand('SHOW');nativeCodeBounds();setTimeout(()=>{if(nativeCodeActive)nativeCodeCommand('FOCUS');},180);}else{nativeCodeCommand('HIDE');restoreNativeWebView();}return {active:nativeCodeActive};}
   const script=path.join(__dirname,'experiments','vscode-hexora-host.ps1');
   const hwnd=win.getNativeWindowHandle().readBigUInt64LE(0).toString();
   const proc=spawn('powershell.exe',['-NoProfile','-STA','-ExecutionPolicy','Bypass','-File',script,'-ParentHwnd',hwnd],{stdio:['pipe','pipe','pipe'],windowsHide:true});
