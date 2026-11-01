@@ -189,48 +189,42 @@ function render(p){
  renderTabRow($('tabs'),p,null);
  $('tabs').classList.toggle('compact-titles', $('tabs').querySelectorAll(':scope > .tab').length>=11);
 }
-// Sidebar grip: pointer-captured resizing with one in-flight IPC update at a time.
+// Sidebar grip: one serialized resize stream, without competing layout updates.
 const sidebarGrip=$('sidebar-resize-handle');
-let sidebarDrag=null,sidebarRequested=null,sidebarResizeBusy=false;
-async function sendSidebarResize(){
- if(sidebarResizeBusy||sidebarRequested===null)return;
- sidebarResizeBusy=true;
- const width=sidebarRequested;sidebarRequested=null;
- try{await action('sidebar-resize',{width});}
- catch(error){console.error('Sidebar resize failed:',error);}
- finally{sidebarResizeBusy=false;if(sidebarRequested!==null)sendSidebarResize();}
-}
-function requestSidebarResize(width){
- sidebarRequested=width;
- // Immediate toolbar feedback, while the main process catches up.
- document.documentElement.style.setProperty('--hexora-panel-width',(width-64)+'px');
- document.documentElement.style.setProperty('--hexora-content-left',width+'px');
- sendSidebarResize();
+let sidebarDrag=null,sidebarDesired=null,sidebarWorker=null;
+const clampSidebarWidth=x=>Math.round(Math.max(240,Math.min(560,Math.max(240,window.innerWidth-420),x)));
+function queueSidebarResize(width){
+ sidebarDesired=clampSidebarWidth(width);
+ if(!sidebarWorker)sidebarWorker=(async()=>{
+  try{
+   while(sidebarDesired!==null){
+    const next=sidebarDesired;
+    sidebarDesired=null;
+    await action('sidebar-resize',{width:next});
+   }
+  }finally{sidebarWorker=null;}
+ })().catch(error=>console.error('Sidebar resize failed:',error));
+ return sidebarWorker;
 }
 sidebarGrip.addEventListener('pointerdown',event=>{
  if(event.button!==0||!sidebarOpen)return;
  event.preventDefault();
- sidebarDrag={pointerId:event.pointerId};
+ sidebarDrag={pointerId:event.pointerId,last:clampSidebarWidth(event.clientX)};
  sidebarGrip.setPointerCapture(event.pointerId);
  document.body.classList.add('resizing-sidebar');
 });
 sidebarGrip.addEventListener('pointermove',event=>{
  if(!sidebarDrag||sidebarDrag.pointerId!==event.pointerId)return;
- const width=Math.round(Math.max(240,Math.min(560,window.innerWidth-420,event.clientX)));
- requestSidebarResize(width);
+ sidebarDrag.last=clampSidebarWidth(event.clientX);
+ queueSidebarResize(sidebarDrag.last);
 });
 async function endSidebarResize(event){
  if(!sidebarDrag||sidebarDrag.pointerId!==event.pointerId)return;
+ const last=sidebarDrag.last;
  sidebarDrag=null;
  document.body.classList.remove('resizing-sidebar');
  if(sidebarGrip.hasPointerCapture(event.pointerId))sidebarGrip.releasePointerCapture(event.pointerId);
- // Run save after the final outstanding resize update completes.
- const latest=sidebarRequested;
- sidebarRequested=null;
- // Wait until the queued resize has completed to avoid an older IPC call
- // overwriting the final width before it is persisted.
- while(sidebarResizeBusy)await new Promise(resolve=>setTimeout(resolve,12));
- if(latest!==null)await action('sidebar-resize',{width:latest});
+ await queueSidebarResize(last);
  await action('sidebar-resize-save');
 }
 sidebarGrip.addEventListener('pointerup',endSidebarResize);
@@ -239,9 +233,9 @@ sidebarGrip.addEventListener('keydown',async event=>{
  if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key)||!sidebarOpen)return;
  event.preventDefault();
  const current=parseInt(getComputedStyle(document.documentElement).getPropertyValue('--hexora-content-left'),10)||330;
- const next=event.key==='Home'?240:event.key==='End'?Math.min(560,window.innerWidth-420):current+(event.key==='ArrowRight'?20:-20);
- const width=Math.round(Math.max(240,Math.min(560,window.innerWidth-420,next)));
- await action('sidebar-resize',{width});await action('sidebar-resize-save');
+ const next=event.key==='Home'?240:event.key==='End'?560:current+(event.key==='ArrowRight'?20:-20);
+ await queueSidebarResize(next);
+ await action('sidebar-resize-save');
 });
 function updateSidebar(persist=true){action('sidebar',!sidebarOpen);if(persist&&currentPage?.activeId)action('panel-mode',{id:currentPage.activeId,mode:sidebarOpen?'wide':'thin'});save();}
 for(const id of ['new','new-rail','new-sidebar','add-tab'])$(id).onclick=()=>action('new',activeWorkspace);
