@@ -397,8 +397,8 @@ window.addEventListener('pointerup',async e=>{
  finally{dropSaving=false;}
 });
 window.addEventListener('pointercancel',()=>{cancelTabPointer();refresh();});
-tabStrip.addEventListener('click',e=>{
- if(Date.now()<suppressTabClickUntil){e.preventDefault();e.stopPropagation();}
+document.addEventListener('click',e=>{
+ if(Date.now()<suppressTabClickUntil&&e.target.closest('.tab')){e.preventDefault();e.stopImmediatePropagation();}
 },true);
 // Native drag from an external detached window can still be docked here.
 tabStrip.addEventListener('dragover',e=>{e.preventDefault();e.dataTransfer.dropEffect='move';});
