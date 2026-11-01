@@ -598,7 +598,7 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
   return true;
  });
 
- let workspaceTooltipWindow=null;
+ let workspaceTooltipWindow=null,workspaceTooltipRequest=0;
  const tooltipHtml=`<!doctype html><html><head><meta charset="utf-8"><style>
  html,body{margin:0;background:transparent;overflow:hidden;font-family:Inter,system-ui,sans-serif}
  .tip{box-sizing:border-box;width:240px;height:66px;display:flex;align-items:center;gap:11px;padding:11px 13px;background:linear-gradient(135deg,#302a3b,#1e1d27);border:1px solid #665777;border-radius:12px;color:#eeeaf5;box-shadow:0 7px 20px #0008}
@@ -616,6 +616,7 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
  }
  ipcMain.handle('workspace:tooltip-show',async(event,data)=>{
   if(event.sender!==win.webContents)return;
+  const request=++workspaceTooltipRequest;
   const popup=ensureWorkspaceTooltip();
   const bounds=win.getContentBounds();
   const x=Math.max(bounds.x,Math.min(bounds.x+bounds.width-240,bounds.x+Math.round(Number(data?.x)||0)));
@@ -623,13 +624,15 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
   const label=String(data?.name||'Workspace').slice(0,120),glyph=String(data?.icon||'◇').slice(0,8);
   const count=Math.max(0,Math.floor(Number(data?.count)||0));
   if(popup.webContents.isLoadingMainFrame())await new Promise(resolve=>popup.webContents.once('did-finish-load',resolve));
-  if(popup.isDestroyed())return;
+  if(popup.isDestroyed()||request!==workspaceTooltipRequest)return;
   await popup.webContents.executeJavaScript('document.getElementById("glyph").textContent='+JSON.stringify(glyph)+';document.getElementById("name").textContent='+JSON.stringify(label)+';document.getElementById("count").textContent='+JSON.stringify(count+' saved '+(count===1?'tab':'tabs'))+';');
+  if(request!==workspaceTooltipRequest||popup.isDestroyed())return;
   popup.setBounds({x,y,width:240,height:66});
   popup.showInactive();
  });
  ipcMain.handle('workspace:tooltip-hide',event=>{
   if(event.sender!==win.webContents)return;
+  workspaceTooltipRequest++;
   if(workspaceTooltipWindow&&!workspaceTooltipWindow.isDestroyed())workspaceTooltipWindow.hide();
  });
  ipcMain.handle('workspace:context-menu',(event,data)=>{
