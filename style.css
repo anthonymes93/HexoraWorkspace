@@ -577,3 +577,6 @@ body.sidebar-trim-workspace-details:not(.sidebar-icons-only) .workspace{gap:6px}
 }
 #tab-menu-close-selected{color:#ffc6d0!important;background:#472d3a!important;border:1px solid #855365!important;border-radius:8px;margin:5px 6px;width:calc(100% - 12px)!important;font-weight:650}
 #tab-menu-close-selected:hover{background:#593544!important}
+
+/* VS Code is a native desktop-app tab, not a webpage favicon. */
+.native-code-tab-icon{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;width:18px;height:18px;margin-right:5px;border-radius:5px;color:var(--accent,#a7a9ff);background:rgba(120,130,170,.15);font-size:13px;line-height:1;pointer-events:none}

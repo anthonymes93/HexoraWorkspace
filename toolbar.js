@@ -172,12 +172,12 @@ function render(p){
  renderStackTree(conversations,p);
  for(const item of p.tabs){
   const el=document.createElement('button');el.className='chat-row'+(item.active?' active':'');
-  const symbol=document.createElement('span');symbol.className='symbol';symbol.textContent=item.suspended?'☾':'▤';
+  const symbol=document.createElement('span');symbol.className='symbol';symbol.textContent=item.nativeCode?'⌘':item.suspended?'☾':'▤';
   const name=document.createElement('span');name.className='label';name.textContent=item.title||'New tab';
   const mute=document.createElement('span');mute.className='quick-pin';mute.title=item.muted?'Unmute':'Mute';mute.textContent=item.muted?'◉':'♫';mute.onclick=e=>{e.stopPropagation();action('mute',item.id);};
   const detach=document.createElement('span');detach.className='quick-pin';detach.title='Detach into another window';detach.textContent='↗';detach.onclick=e=>{e.stopPropagation();action('detach',item.id);};
   const pin=document.createElement('span');pin.className='quick-pin';pin.title=item.pinned?'Unpin':'Pin';pin.textContent=item.pinned?'◆':'◇';pin.onclick=e=>{e.stopPropagation();action('pin',item.id);};
-  el.append(symbol,name,mute,pin,detach);el.onclick=()=>action('activate',item.id);el.addEventListener('contextmenu',e=>{e.preventDefault();e.stopPropagation();showTabMenu(e.clientX,e.clientY,item);});enableSidebarDrag(el,item.id,sidebarConversationOrderPrefix+activeWorkspace);conversations.append(el);
+  if(item.nativeCode)el.append(symbol,name,pin,detach);else el.append(symbol,name,mute,pin,detach);el.onclick=()=>action('activate',item.id);el.addEventListener('contextmenu',e=>{e.preventDefault();e.stopPropagation();showTabMenu(e.clientX,e.clientY,item);});enableSidebarDrag(el,item.id,sidebarConversationOrderPrefix+activeWorkspace);conversations.append(el);
  }
  const nav=document.createElement('div');nav.className='page-controls';
  const prev=document.createElement('button');prev.textContent='‹ Previous';prev.disabled=offset===0;prev.onclick=()=>{offset=Math.max(0,offset-50);refresh();};
@@ -188,6 +188,7 @@ function render(p){
  renderSecondTabRow(p);
  renderTabRow($('tabs'),p,null);
  $('tabs').classList.toggle('compact-titles', $('tabs').querySelectorAll(':scope > .tab').length>=11);
+  $('native-code-rail').classList.toggle('selected',!!p.active&&p.active.url==='hexora-native://vscode');
 }
 // Sidebar grip: one serialized resize stream, without competing layout updates.
 const sidebarGrip=$('sidebar-resize-handle');
@@ -377,6 +378,13 @@ function attachFaviconMarquee(img,tab){
  tab.addEventListener('pointerleave',stop);
 }
 function updateTabFavicon(el,tab){
+ if(tab.nativeCode){
+  el.querySelector('.tab-favicon')?.remove();
+  let badge=el.querySelector('.native-code-tab-icon');
+  if(!badge){badge=document.createElement('span');badge.className='native-code-tab-icon';badge.textContent='⌘';badge.setAttribute('aria-hidden','true');el.insertBefore(badge,el.querySelector('.tab-title-lines')||el.querySelector('.name')||el.firstChild);}
+  return;
+ }
+ el.querySelector('.native-code-tab-icon')?.remove();
  const preferred=tab.favicon||tab.faviconFallback;
  let img=el.querySelector('.tab-favicon');
  if(!preferred){img?.remove();return;}
@@ -803,10 +811,11 @@ function showTabMenu(x,y,item){
  $('tab-menu-close-selected').classList.toggle('hidden',!multi);
  $('tab-menu-close-selected').textContent='×  Close '+selectedTabIds.size+' selected tabs';
  $('tab-menu-current-title').textContent=item.title||'Untitled tab';
- $('tab-menu-url').value=item.url||'';
+ $('tab-menu-url').value=item.nativeCode?'':item.url||'';
  $('tab-menu-url-error').textContent='';
  action('modal',true);
  $('tab-menu-chrome').textContent=item.chromeMode?'✓ Disable Chrome compatibility':'◉ Enable Chrome compatibility';
+  $('tab-menu-chrome').disabled=!!item.nativeCode;
  const pref=item.panelPreference||{mode:item.panelMode,source:'default'};
  $('tab-menu-panel-wide').textContent=(pref.tabOverride==='wide'?'✓ ':'')+'This tab: Wide';
  $('tab-menu-panel-thin').textContent=(pref.tabOverride==='thin'?'✓ ':'')+'This tab: Thin';
@@ -1347,7 +1356,21 @@ v('vault-entry-form').onsubmit=async e=>{
 v('vault-delete').onclick=async()=>{if(!vaultSelected||!confirm('Delete this saved login permanently?'))return;await window.hexora.vault.delete(vaultSelected);vaultClearEditor();v('vault-entry-form').classList.add('hidden');await vaultLoad();};
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&vaultOpen)vaultClose();});
 
-// Experimental native Windows application overlay (not yet a persistent tab).
-$('native-code-rail').addEventListener('click',async e=>{try{if(e.shiftKey){await window.hexora.nativeCode.repair();return;}const state=await window.hexora.nativeCode.toggle();$('native-code-rail').classList.toggle('selected',state.active);if(state.active&&document.activeElement instanceof HTMLElement)document.activeElement.blur();}catch(error){alert('Native VS Code: '+error.message);}});
-$('native-code-rail').addEventListener('contextmenu',async e=>{e.preventDefault();try{const state=await window.hexora.nativeCode.detach();if(state.detached){$('native-code-rail').classList.remove('selected');$('native-code-rail').title='VS Code detached — click to reattach';}}catch(error){alert('Detach VS Code: '+error.message);}});
-window.hexora.nativeCode.onStopped(()=>$('native-code-rail').classList.remove('selected'));
+// Desktop VS Code now has a persistent SQLite-backed workspace tab.
+ $('native-code-rail').addEventListener('click',async event=>{
+  try{
+   if(event.shiftKey){await window.hexora.nativeCode.repair();return;}
+   const tab=await action('open-native-code',activeWorkspace);
+   if(tab.workspace!==activeWorkspace){activeWorkspace=tab.workspace;offset=0;save();}
+   await refresh();
+   if(document.activeElement instanceof HTMLElement)document.activeElement.blur();
+  }catch(error){alert('Native VS Code: '+error.message);}
+ });
+ $('native-code-rail').addEventListener('contextmenu',async event=>{
+  event.preventDefault();
+  try{
+   const state=await window.hexora.nativeCode.detach();
+   if(state.detached){$('native-code-rail').title='VS Code detached — click its tab to reattach';await refresh();}
+  }catch(error){alert('Detach VS Code: '+error.message);}
+ });
+ window.hexora.nativeCode.onStopped(()=>{$('native-code-rail').classList.remove('selected');});
