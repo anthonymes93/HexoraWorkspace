@@ -29,6 +29,23 @@ public static class NativeHost {
     }, IntPtr.Zero);
     return windows.ToArray();
   }
+  [DllImport("user32.dll")] public static extern IntPtr SetFocus(IntPtr hwnd);
+  [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hwnd);
+  [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
+  [DllImport("kernel32.dll")] public static extern uint GetCurrentThreadId();
+  [DllImport("user32.dll")] public static extern bool AttachThreadInput(uint idAttach, uint idAttachTo, bool attach);
+  public static bool FocusEmbedded(IntPtr hwnd) {
+    if (hwnd == IntPtr.Zero) return false;
+    uint childPid;
+    uint childThread = GetWindowThreadProcessId(hwnd, out childPid);
+    uint hostThread = GetCurrentThreadId();
+    bool attached = childThread != hostThread && AttachThreadInput(hostThread, childThread, true);
+    try {
+      SetForegroundWindow(hwnd);
+      SetFocus(hwnd);
+      return true;
+    } finally { if (attached) AttachThreadInput(hostThread, childThread, false); }
+  }
   [DllImport("user32.dll", SetLastError=true)] public static extern IntPtr SetParent(IntPtr child, IntPtr parent);
   [DllImport("user32.dll", SetLastError=true)] public static extern int GetWindowLong(IntPtr hwnd, int index);
   [DllImport("user32.dll", SetLastError=true)] public static extern int SetWindowLong(IntPtr hwnd, int index, int value);
@@ -60,6 +77,11 @@ $resize = {
   }
 }
 $panel.Add_Resize($resize)
+# Attempt to forward keyboard focus to the embedded cross-process window.
+# This is experimental: Windows/Electron may still reject focus or IME input.
+$panel.Add_MouseDown({ if ($script:child -ne [IntPtr]::Zero) { [void][NativeHost]::FocusEmbedded($script:child) } })
+$hostForm.Add_Activated({ if ($script:child -ne [IntPtr]::Zero) { [void][NativeHost]::FocusEmbedded($script:child) } })
+$hostForm.Add_KeyDown({ if ($script:child -ne [IntPtr]::Zero) { [void][NativeHost]::FocusEmbedded($script:child) } })
 $hostForm.Add_Shown({
   $existing = @([NativeHost]::CodeWindows() | ForEach-Object { $_.ToInt64() })
   Start-Process -FilePath $codeCommand.Source -ArgumentList '--new-window' | Out-Null
@@ -85,6 +107,7 @@ $hostForm.Add_Shown({
     return
   }
   [void][NativeHost]::SetWindowPos($script:child, [IntPtr]::Zero, 0, 0, $panel.ClientSize.Width, $panel.ClientSize.Height, $SWP_NOZORDER -bor $SWP_FRAMECHANGED)
+  [void][NativeHost]::FocusEmbedded($script:child)
 })
 $hostForm.Add_FormClosing({
   if ($script:child -ne [IntPtr]::Zero -and -not $script:detached) {
