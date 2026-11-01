@@ -6,6 +6,7 @@ on:
       - 'feature/vscode-active-file-session'
       - 'feature/vscode-auto-project-detection'
       - 'experiment/vscode-no-flash'
+      - 'feature/hexora-project-picker'
   pull_request:
     paths:
       - 'tab-store.js'
@@ -22,6 +23,13 @@ on:
       - 'experiments/vscode-companion-install.ps1'
       - 'scripts/test-code-projects.cjs'
       - 'package.json'
+      - 'code-project-picker.js'
+      - 'project-picker.js'
+      - 'project-picker.css'
+      - 'toolbar.html'
+      - 'toolbar.js'
+      - 'preload.js'
+      - 'scripts/test-project-picker.cjs'
       - '.github/workflows/vscode-project-tests.yml'
 jobs:
   project-persistence:
@@ -56,3 +64,7 @@ jobs:
         run: npm run test:code-auto-project
       - name: Verify fenced auto-detected project records
         run: npm run test:code-project-sync
+      - name: Verify real project browsing and saved favorites
+        run: npm run test:project-picker
+      - name: Check project picker and toolbar JavaScript syntax
+        run: npm run test:project-picker-ui

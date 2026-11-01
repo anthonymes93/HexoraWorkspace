@@ -11,7 +11,9 @@
     "test:code-session": "node --test scripts/test-code-session.cjs",
     "test:code-bridge": "node --test scripts/test-code-bridge.cjs",
     "test:code-auto-project": "node --test scripts/test-code-auto-project.cjs",
-    "test:code-project-sync": "node --test scripts/test-code-project-sync.cjs"
+    "test:code-project-sync": "node --test scripts/test-code-project-sync.cjs",
+    "test:project-picker": "node --test scripts/test-project-picker.cjs",
+    "test:project-picker-ui": "node --check project-picker.js && node --check toolbar.js && node --check main.js"
   },
   "devDependencies": {
     "electron": "^38.0.0"
