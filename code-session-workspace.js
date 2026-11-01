@@ -26,7 +26,9 @@ function workspaceForTab(userData,tabId,projectFolder){
  return workspace;
 }
 function clearSession(userData,tabId){
+ // Leave the workspace descriptor intact: when Hexora closes a tab it
+ // deliberately detaches (rather than kills) a VS Code window that may
+ // still be using this file. A future launch rewrites it to the new project.
  fs.rmSync(sessionFile(userData,tabId),{force:true});
- fs.rmSync(path.join(codeSessionDirectory(userData),'tab-'+validTabId(tabId)+'.code-workspace'),{force:true});
 }
 module.exports={workspaceForTab,sessionFile,clearSession,codeSessionDirectory};
