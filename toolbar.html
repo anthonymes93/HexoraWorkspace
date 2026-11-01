@@ -49,18 +49,32 @@
  <p class="hint">Hourly backups run only while Hexora is open and recovery is unlocked. Confirm files really sync off this computer.</p>
  </div></div>
 <div id="new-tab-overlay" class="overlay hidden">
- <div class="dialog new-tab-dialog" role="dialog" aria-modal="true" aria-label="Open a new tab">
-  <div class="dialog-header"><b>Open a new tab</b><button id="new-tab-close" type="button" aria-label="Close">×</button></div>
-  <form id="new-tab-form"><label for="new-tab-address" class="new-tab-label">Website address</label><div class="new-tab-address-row"><input id="new-tab-address" type="text" autocomplete="off" spellcheck="false" placeholder="Paste a URL or type example.com" aria-label="Website address"/><button class="pill primary" type="submit">Open ↗</button></div></form>
-  <div class="new-tab-label">Quick launch</div>
-  <div class="new-tab-shortcuts">
-   <button type="button" id="new-tab-chatgpt">✦ <span>ChatGPT</span></button>
-   <button type="button" data-new-tab-url="https://app.notion.com/" data-new-tab-title="Notion">▣ <span>Notion</span></button>
-   <button type="button" data-new-tab-url="https://github.com/" data-new-tab-title="GitHub">⌘ <span>GitHub</span></button>
-   <button type="button" data-new-tab-url="https://www.google.com/" data-new-tab-title="Google">◎ <span>Google</span></button>
-   <button type="button" data-new-tab-url="https://www.youtube.com/" data-new-tab-title="YouTube">▶ <span>YouTube</span></button>
+ <div class="dialog new-tab-dialog" role="dialog" aria-modal="true" aria-labelledby="new-tab-heading">
+  <div class="new-tab-hero">
+   <div class="new-tab-hero-icon" aria-hidden="true">✦</div>
+   <div class="new-tab-hero-copy"><h2 id="new-tab-heading">Open a new tab</h2><p>Your workspace, one click away</p></div>
+   <button id="new-tab-close" class="new-tab-close" type="button" aria-label="Close new tab launcher">×</button>
   </div>
-  <p id="new-tab-error" class="hint" role="status" aria-live="polite"></p>
+  <div class="new-tab-content">
+   <form id="new-tab-form">
+    <label for="new-tab-address" class="new-tab-label">WEBSITE ADDRESS</label>
+    <div class="new-tab-address-row">
+     <span class="new-tab-address-icon" aria-hidden="true">⌕</span>
+     <input id="new-tab-address" type="text" autocomplete="off" spellcheck="false" placeholder="Paste a URL or type example.com" aria-label="Website address"/>
+     <button class="new-tab-go" type="submit">Open <span aria-hidden="true">↗</span></button>
+    </div>
+   </form>
+   <div class="new-tab-section-head"><span class="new-tab-label">QUICK LAUNCH</span><span class="new-tab-section-hint">Your everyday destinations</span></div>
+   <div class="new-tab-shortcuts">
+    <button type="button" id="new-tab-chatgpt"><span class="new-tab-site-icon">✦</span><span>ChatGPT</span></button>
+    <button type="button" data-new-tab-url="https://app.notion.com/" data-new-tab-title="Notion"><span class="new-tab-site-icon">▣</span><span>Notion</span></button>
+    <button type="button" data-new-tab-url="https://github.com/" data-new-tab-title="GitHub"><span class="new-tab-site-icon">⌘</span><span>GitHub</span></button>
+    <button type="button" data-new-tab-url="https://www.google.com/" data-new-tab-title="Google"><span class="new-tab-site-icon">◎</span><span>Google</span></button>
+    <button type="button" data-new-tab-url="https://www.youtube.com/" data-new-tab-title="YouTube"><span class="new-tab-site-icon">▶</span><span>YouTube</span></button>
+   </div>
+   <p id="new-tab-error" class="new-tab-error" role="status" aria-live="polite"></p>
+  </div>
+  <div class="new-tab-footer"><span>↵ &nbsp;Enter to open a URL</span><span>Esc to close</span></div>
  </div>
 </div>
 <div id="search-overlay" class="overlay hidden"><div class="dialog"><div class="dialog-header"><b>Search open conversations</b><button id="search-close">×</button></div><input id="search-input" placeholder="Find a tab by title..."/><div id="search-results"></div><p class="hint">Searches currently open tabs, not your full ChatGPT history.</p></div></div>
