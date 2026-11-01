@@ -8,6 +8,7 @@ const fs=require('node:fs');
 const os=require('node:os');
 const {spawn}=require('node:child_process');
 const {workspaceForTab,clearSession,codeSessionDirectory}=require('./code-session-workspace');
+const {syncCodeProjects}=require('./code-project-sync');
 const {buildCompanionVsix,BRIDGE_VERSION}=require('./code-session-vsix');
 // Each native VS Code tab owns its own PowerShell host and reparented window.
 const nativeCodeHosts=new Map();
@@ -392,6 +393,24 @@ function pumpNativeCodeLaunchQueue(){
   nativeCodeLaunchingId=tabId;startNativeCodeHost(tabId,entry);return;
  }
 }
+// Apply project records at startup and while editors are running. A record
+// belongs to one Hexora tab and is ignored if its native host was superseded.
+function syncNativeCodeProjects(){
+ if(!store||tabStoreClosing||quitting)return;
+ syncCodeProjects({
+  userData:app.getPath('userData'),store,
+  eligible:id=>isCodeTab(store.get(id))&&!nativeCodeHosts.get(id)?.ignoreProjectSync,
+  onProject:(id,project)=>{
+   if(!store.getMeta('tabCustomTitle:'+id)){
+    const row=toModel(store.get(id));
+    row.title=('VS Code · '+path.basename(project)).slice(0,100);
+    store.save(row);
+   }
+   emit();
+   console.log('[Native VS Code tab '+id+'] Project automatically saved:',project);
+  }
+ });
+}
 function startNativeCodeHost(tabId,entry){
  const script=path.join(__dirname,'experiments','vscode-hexora-host.ps1');
  const hwnd=win.getNativeWindowHandle().readBigUInt64LE(0).toString();
@@ -399,13 +418,12 @@ function startNativeCodeHost(tabId,entry){
  // PowerShell (rather than interpolating into a command) avoids shell injection.
  const configured=store.getCodeProject(tabId)?.project_path;
  let projectPath=null;
- if(configured){
-  try{
-   // A unique .code-workspace per Hexora tab gives the companion extension a
-   // stable identity even when two native tabs open the very same folder.
-   projectPath=workspaceForTab(app.getPath('userData'),tabId,configured);
-  }catch(error){console.warn('[Native VS Code tab '+tabId+'] Saved project unavailable; opening Code without a folder:',configured,error.message);}
- }
+ try{
+  const projectFolder=configured&&fs.existsSync(configured)&&fs.statSync(configured).isDirectory()?configured:null;
+  // Always launch a stable .code-workspace, even when a user hasn't chosen
+  // any folder yet. The companion can then capture a later folder selection.
+  projectPath=workspaceForTab(app.getPath('userData'),tabId,projectFolder);
+ }catch(error){console.warn('[Native VS Code tab '+tabId+'] Could not prepare session workspace:',error.message);}
  let companionVsix=null;
  if(projectPath&&store.getMeta('nativeCodeBridgeInstalledVersion')!==BRIDGE_VERSION){
   try{companionVsix=buildCompanionVsix(codeSessionDirectory(app.getPath('userData')));}
@@ -599,6 +617,9 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
  restoreExtensions().catch(err=>console.error('Extension initialization failed:',err));
  store=new TabStore(dataDir);
  store.importLegacy(path.join(app.getPath('userData'),'hexora-tabs.json'));
+ // Apply any project saved by VS Code immediately before the prior shutdown,
+ // before activating its native tab and regenerating its workspace file.
+ syncNativeCodeProjects();
  sidebarWidth=Math.max(64,Math.min(560,Number(store.getMeta('sidebarCustomWidth'))||330));
  win=new BrowserWindow({width:1360,height:900,minWidth:700,minHeight:400,title:'Hexora Workspace',autoHideMenuBar:true,backgroundColor:'#111215',webPreferences:{preload:path.join(__dirname,'preload.js'),contextIsolation:true,sandbox:true,nodeIntegration:false}});
  mainViewport=new View();win.contentView.addChildView(mainViewport);
@@ -835,6 +856,7 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
   if(previous&&path.normalize(previous).toLowerCase()!==path.normalize(selectedPath).toLowerCase()){
    try{clearSession(app.getPath('userData'),tabId);}catch(error){console.warn('Could not clear previous VS Code editor state:',error.message);}
   }
+  if(nativeCodeHosts.has(tabId))nativeCodeHosts.get(tabId).ignoreProjectSync=true;
   store.setCodeProject(tabId,selectedPath);
   if(!store.getMeta('tabCustomTitle:'+tabId)){
    const updated=toModel(store.get(tabId));
@@ -848,6 +870,7 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
   if(event.sender!==win.webContents)throw new Error('Invalid caller');
   const tabId=Number(id),row=store.get(tabId);
   if(!Number.isSafeInteger(tabId)||!isCodeTab(row))throw new Error('VS Code tab no longer exists.');
+  if(nativeCodeHosts.has(tabId))nativeCodeHosts.get(tabId).ignoreProjectSync=true;
   store.clearCodeProject(tabId);
   try{clearSession(app.getPath('userData'),tabId);}catch(error){console.warn('Could not clear VS Code editor state:',error.message);}
   if(!store.getMeta('tabCustomTitle:'+tabId)){const updated=toModel(row);updated.title='Visual Studio Code';store.save(updated);}
@@ -1000,6 +1023,8 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
   emit();return true;
  });
  setInterval(sweep,60*1000).unref();
+ syncNativeCodeProjects();
+ setInterval(syncNativeCodeProjects,1000).unref();
  win.on('closed',()=>{if(nativeCodeLifecycleTimer){clearTimeout(nativeCodeLifecycleTimer);nativeCodeLifecycleTimer=null;}quitting=true;stopAllNativeCode();for(const folder of [...extensionPopups.keys()])closeExtensionPopup(folder);if(sidebarAnimation)clearInterval(sidebarAnimation);for(const popup of detached.values())if(!popup.isDestroyed())popup.close();detached.clear();clearInterval(recoveryTimer);recoveryPassword=null;clearTimeout(stateTimer);win=null;for(const id of Array.from(live.keys()))discard(id);vault?.lock();tabStoreClosing=true;store.close();});
  // Register every IPC handler before the renderer can issue actions.
  win.loadFile('toolbar.html').catch(err=>console.error('[Hexora] Toolbar load failed:',err));

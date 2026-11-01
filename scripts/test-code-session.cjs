@@ -4,7 +4,7 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const os=require('node:os');
 const path=require('node:path');
-const {workspaceForTab,sessionFile,clearSession}=require('../code-session-workspace');
+const {workspaceForTab,sessionFile,projectUpdateFile,ownerFile,clearSession}=require('../code-session-workspace');
 const {buildCompanionVsix,BRIDGE_VERSION}=require('../code-session-vsix');
 
 test('editor workspace identities remain independent across VS Code tabs',()=>{
@@ -12,6 +12,8 @@ test('editor workspace identities remain independent across VS Code tabs',()=>{
  try {
   const project=path.join(data,'Test Project');
   fs.mkdirSync(project);
+  const blank=workspaceForTab(data,9,null);
+  assert.deepEqual(JSON.parse(fs.readFileSync(blank,'utf8')).folders,[]);
   const first=workspaceForTab(data,10,project);
   const second=workspaceForTab(data,11,project);
   assert.notEqual(first,second);
@@ -23,8 +25,12 @@ test('editor workspace identities remain independent across VS Code tabs',()=>{
   assert.equal(workspaceForTab(data,10,project),first);
   const state=sessionFile(data,10);
   fs.writeFileSync(state,JSON.stringify({path:path.join(project,'index.js')}));
+  fs.writeFileSync(projectUpdateFile(data,10),JSON.stringify({version:1,projectPath:project}));
+  fs.writeFileSync(ownerFile(data,10),'temporary-owner');
   clearSession(data,10);
   assert.equal(fs.existsSync(state),false);
+  assert.equal(fs.existsSync(projectUpdateFile(data,10)),false);
+  assert.equal(fs.existsSync(ownerFile(data,10)),false);
   assert.equal(fs.existsSync(first),true,'keep workspace descriptor safe for detached VS Code window');
   assert.equal(fs.existsSync(second),true);
   assert.throws(()=>workspaceForTab(data,0,project),/Invalid/);

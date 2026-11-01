@@ -4,6 +4,7 @@ on:
     branches:
       - 'feature/vscode-project-session-restore'
       - 'feature/vscode-active-file-session'
+      - 'feature/vscode-auto-project-detection'
       - 'experiment/vscode-no-flash'
   pull_request:
     paths:
@@ -11,9 +12,12 @@ on:
       - 'main.js'
       - 'code-session-vsix.js'
       - 'code-session-workspace.js'
+      - 'code-project-sync.js'
+      - 'scripts/test-code-project-sync.cjs'
       - 'integrations/vscode-session-bridge/**'
       - 'scripts/test-code-session.cjs'
       - 'scripts/test-code-bridge.cjs'
+      - 'scripts/test-code-auto-project.cjs'
       - 'experiments/vscode-hexora-host.ps1'
       - 'scripts/test-code-projects.cjs'
       - 'package.json'
@@ -43,3 +47,7 @@ jobs:
           $errors = $null
           [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $PWD 'experiments/vscode-hexora-host.ps1'), [ref]$tokens, [ref]$errors) | Out-Null
           if ($errors.Count -gt 0) { $errors | Format-List; exit 1 }
+      - name: Verify automatic VS Code project discovery
+        run: npm run test:code-auto-project
+      - name: Verify fenced auto-detected project records
+        run: npm run test:code-project-sync

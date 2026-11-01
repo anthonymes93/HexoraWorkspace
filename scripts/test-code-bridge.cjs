@@ -25,16 +25,20 @@ test('companion persists active file/caret and restores them on next activation'
   const fake={
    workspace:{
     workspaceFile:{scheme:'file',fsPath:workspaceFile},
-    workspaceFolders:[{uri:{fsPath:root}}],
+    workspaceFolders:[{uri:{scheme:'file',fsPath:root}}],
+    onDidChangeWorkspaceFolders:cb=>{events.folders=cb;return{dispose(){}};},
     fs:{stat:async uri=>fs.promises.stat(uri.fsPath)},
     openTextDocument:async uri=>{assert.equal(uri.fsPath,file);return editor.document;}
    },
    window:{
     activeTextEditor:editor,
+    createStatusBarItem:()=>({show(){},dispose(){},text:'',tooltip:'',command:''}),
     onDidChangeActiveTextEditor:cb=>{events.active=cb;return{dispose(){}};},
     onDidChangeTextEditorSelection:cb=>{events.selection=cb;return{dispose(){}};},
     showTextDocument:async(_document,_opts)=>{openCount++;return editor;}
    },
+   commands:{executeCommand:async()=>{},registerCommand:(_name,cb)=>{events.chooseProject=cb;return{dispose(){}};}},
+   StatusBarAlignment:{Left:1},
    Uri:{file:p=>({scheme:'file',fsPath:p})},
    Selection:class{constructor(line,character){this.active={line,character};this.anchor={line,character};}},
    TextEditorRevealType:{InCenterIfOutsideViewport:2}

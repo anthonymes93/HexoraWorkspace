@@ -1,9 +1,9 @@
 {
   "name": "hexora-session-bridge",
   "displayName": "Hexora Session Bridge",
-  "description": "Restores the last active editor and cursor for Hexora-managed VS Code workspaces.",
+  "description": "Automatically associates a Hexora VS Code tab with its project and restores the last active editor.",
   "publisher": "hexora",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "engines": {
     "vscode": "^1.85.0"
@@ -22,5 +22,22 @@
     "untrustedWorkspaces": {
       "supported": true
     }
+  },
+  "contributes": {
+    "commands": [
+      {
+        "command": "hexoraSession.openProject",
+        "title": "Open Project in This Tab",
+        "category": "Hexora"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "hexoraSession.openProject",
+        "key": "ctrl+k ctrl+o",
+        "mac": "cmd+k cmd+o",
+        "when": "hexoraSession.active"
+      }
+    ]
   }
 }
