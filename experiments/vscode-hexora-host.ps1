@@ -32,6 +32,10 @@ public static class HexoraNative {
  public static void FocusHosted(IntPtr parent,IntPtr child) {uint pid;uint childThread=GetWindowThreadProcessId(child,out pid);uint parentThread=GetWindowThreadProcessId(parent,out pid);uint own=GetCurrentThreadId();bool linkChild=childThread!=own&&AttachThreadInput(own,childThread,true);bool linkParent=parentThread!=own&&parentThread!=childThread&&AttachThreadInput(own,parentThread,true);try{SetForegroundWindow(parent);SetFocus(child);}finally{if(linkParent)AttachThreadInput(own,parentThread,false);if(linkChild)AttachThreadInput(own,childThread,false);} }
  public static void ActivateHosted(IntPtr parent,IntPtr child) {uint pid;uint childThread=GetWindowThreadProcessId(child,out pid);uint parentThread=GetWindowThreadProcessId(parent,out pid);uint own=GetCurrentThreadId();bool linkChild=childThread!=own&&AttachThreadInput(own,childThread,true);bool linkParent=parentThread!=own&&parentThread!=childThread&&AttachThreadInput(own,parentThread,true);try{SetForegroundWindow(parent);SetActiveWindow(parent);SetFocus(child);}finally{if(linkParent)AttachThreadInput(own,parentThread,false);if(linkChild)AttachThreadInput(own,childThread,false);} }
  public static string Diagnostic(IntPtr h) {var foreground=GetForegroundWindow();uint pid;uint thread=GetWindowThreadProcessId(h,out pid);uint own=GetCurrentThreadId();bool linked=thread!=own&&AttachThreadInput(own,thread,true);try{return "child="+h.ToInt64()+" foreground="+foreground.ToInt64()+" focus="+GetFocus().ToInt64()+" parent="+GetParent(h).ToInt64()+" valid="+IsWindow(h)+" visible="+IsWindowVisible(h)+" active="+GetActiveWindow().ToInt64()+" childThread="+thread+" hostThread="+own;}finally{if(linked)AttachThreadInput(own,thread,false);}}
+ [StructLayout(LayoutKind.Sequential)] public struct GUITHREADINFO {public uint cbSize;public uint flags;public IntPtr hwndActive;public IntPtr hwndFocus;public IntPtr hwndCapture;public IntPtr hwndMenuOwner;public IntPtr hwndMoveSize;public IntPtr hwndCaret;public System.Drawing.Rectangle rcCaret;}
+ [DllImport("user32.dll",SetLastError=true)] public static extern bool GetGUIThreadInfo(uint idThread,ref GUITHREADINFO info);
+ public static string ThreadInfo(uint thread) {var i=new GUITHREADINFO();i.cbSize=(uint)Marshal.SizeOf(typeof(GUITHREADINFO));bool ok=GetGUIThreadInfo(thread,ref i);return "thread="+thread+" ok="+ok+" active="+i.hwndActive.ToInt64()+" focus="+i.hwndFocus.ToInt64()+" capture="+i.hwndCapture.ToInt64()+" flags="+i.flags;}
+ public static string FocusTrace(IntPtr parent,IntPtr child) {uint pid;uint ct=GetWindowThreadProcessId(child,out pid);uint pt=GetWindowThreadProcessId(parent,out pid);uint fg=GetWindowThreadProcessId(GetForegroundWindow(),out pid);return "foreground="+GetForegroundWindow().ToInt64()+" foregroundThread="+fg+" child="+child.ToInt64()+" parent="+parent.ToInt64()+" childGUI=["+ThreadInfo(ct)+"] parentGUI=["+ThreadInfo(pt)+"] foregroundGUI=["+ThreadInfo(fg)+"]";}
  public static long[] Windows() {var found=new List<long>();EnumWindows((h,lp)=>{if(!IsWindowVisible(h))return true;var title=new StringBuilder(512);GetWindowText(h,title,512);uint pid;GetWindowThreadProcessId(h,out pid);try{if(title.Length>0&&System.Diagnostics.Process.GetProcessById((int)pid).ProcessName.Equals("Code",StringComparison.OrdinalIgnoreCase))found.Add(h.ToInt64());}catch{}return true;},IntPtr.Zero);return found.ToArray();}
 }
 '@
@@ -58,6 +62,7 @@ try {
  $attached=$true
  [HexoraNative]::FocusHosted($parent,$child)
  Write-Output ('DIAG READY '+[HexoraNative]::Diagnostic($child))
+ Write-Output ('FOCUS_TRACE READY '+[HexoraNative]::FocusTrace($parent,$child))
  Write-Output 'READY'
  while($null -ne ($line=[Console]::ReadLine())){
   $parts=$line.Trim().Split(' ')
@@ -67,6 +72,7 @@ try {
    'FOCUS' {[HexoraNative]::FocusHosted($parent,$child);Write-Output ('DIAG FOCUS '+[HexoraNative]::Diagnostic($child))}
    'ACTIVATE' {if(-not $detached -and [HexoraNative]::IsWindow($child) -and [HexoraNative]::GetParent($child) -eq $parent -and [HexoraNative]::GetForegroundWindow() -eq $parent){[HexoraNative]::ActivateHosted($parent,$child);Write-Output ('DIAG ACTIVATED '+[HexoraNative]::Diagnostic($child))}}
    'CHECK' {if(-not $detached -and [HexoraNative]::IsWindow($child) -and [HexoraNative]::GetParent($child) -eq $parent -and [HexoraNative]::GetForegroundWindow() -eq $parent){$state=[HexoraNative]::Diagnostic($child);if($state -match ('focus='+$parent.ToInt64()+'(\s|$)')){[HexoraNative]::FocusHosted($parent,$child);Write-Output ('DIAG REPAIRED '+[HexoraNative]::Diagnostic($child))}}}
+   'TRACE' {Write-Output ('FOCUS_TRACE '+($parts[1..($parts.Length-1)] -join ' ')+' '+[HexoraNative]::FocusTrace($parent,$child))}
    'DIAG' {Write-Output ('DIAG '+($parts[1..($parts.Length-1)] -join ' ')+' '+[HexoraNative]::Diagnostic($child))}
    'HIDE' {[void][HexoraNative]::ShowWindow($child,0)}
    'DETACH' {if(-not $detached){[void][HexoraNative]::SetParent($child,[IntPtr]::Zero);[void][HexoraNative]::SetWindowLong($child,-16,$oldStyle);[void][HexoraNative]::SetWindowPos($child,[IntPtr]::Zero,120,120,1000,700,0x0024 -bor 0x0020);[void][HexoraNative]::ShowWindow($child,5);[HexoraNative]::Focus($child);$detached=$true;Write-Output ('DIAG DETACHED '+[HexoraNative]::Diagnostic($child));Write-Output 'DETACHED'}}
