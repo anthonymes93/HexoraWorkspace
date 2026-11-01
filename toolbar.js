@@ -971,9 +971,14 @@ function showWorkspaceMenu(e,w){
  // Position the menu in the toolbar header area so it is never clipped by the native website view.
  document.body.append(menu);
  menu.classList.remove('hidden');
+ // WebContentsView renders above the toolbar outside the sidebar.
+ // Keep this context menu inside the actual sidebar bounds so neither the
+ // website nor the menu needs to disappear.
+ const sidebar=$('sidebar').getBoundingClientRect();
+ menu.style.width=Math.max(80,sidebar.width-12)+'px';
+ menu.style.left=Math.round(sidebar.left+6)+'px';
  const rect=menu.getBoundingClientRect();
- menu.style.left=Math.max(67,Math.min(e.clientX,window.innerWidth-rect.width-12))+'px';
- menu.style.top=Math.max(15,Math.min(e.clientY,window.innerHeight-rect.height-12))+'px';
+ menu.style.top=Math.max(24,Math.min(e.clientY,window.innerHeight-rect.height-12))+'px';
 }
 $('workspace-context-open').onclick=async()=>{
  const id=workspaceMenuId;if(!id)return;hideWorkspaceMenu();
