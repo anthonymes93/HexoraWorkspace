@@ -237,7 +237,7 @@ tabStrip.addEventListener('drop',e=>{
 });
 
 // Right-click any tab to turn it into a website, or open a website in a separate tab.
-function hideTabMenu(restore=true){ const wasOpen=!$('tab-context-menu').classList.contains('hidden');$('tab-context-menu').classList.add('hidden');contextTab=null;if(wasOpen&&restore&&!websiteTarget)action('modal',false); }
+function hideTabMenu(restore=true){ $('tab-workspace-submenu').classList.add('hidden');$('tab-menu-move').setAttribute('aria-expanded','false'); const wasOpen=!$('tab-context-menu').classList.contains('hidden');$('tab-context-menu').classList.add('hidden');contextTab=null;if(wasOpen&&restore&&!websiteTarget)action('modal',false); }
 function showTabMenu(x,y,item){
  contextTab=item;
  action('modal',true);
@@ -251,6 +251,7 @@ function showTabMenu(x,y,item){
  $('tab-menu-domain-label').textContent=pref.domain?'Domain: '+pref.domain:'No domain';
  $('tab-menu-domain-wide').disabled=!pref.domain;
  $('tab-menu-domain-thin').disabled=!pref.domain;
+ renderWorkspaceSubmenu(item);
  const menu=$('tab-context-menu');menu.classList.remove('hidden');
  menu.style.left=Math.max(8,Math.min(x,innerWidth-menu.offsetWidth-8))+'px';
  menu.style.top=Math.max(8,Math.min(y,innerHeight-menu.offsetHeight-8))+'px';
@@ -272,7 +273,36 @@ for(const mode of ['wide','thin']){
  $('tab-menu-domain-'+mode).onclick=async()=>{if(!contextTab)return;const id=contextTab.id;hideTabMenu();try{await action('panel-domain-mode',{id,mode});refresh();}catch(err){alert(err.message);}};
 }
 $('tab-menu-panel-inherit').onclick=async()=>{if(!contextTab)return;const id=contextTab.id;hideTabMenu();try{await action('panel-tab-inherit',id);refresh();}catch(err){alert(err.message);}};
-$('tab-menu-move').onclick=async()=>{if(!contextTab)return;const id=contextTab.id;hideTabMenu();const list=workspaces.map((w,i)=>(i+1)+': '+w.name).join('\n');const answer=prompt('Move tab to which workspace?\n'+list);if(answer===null)return;const idx=Number(answer)-1;if(!Number.isInteger(idx)||!workspaces[idx])return alert('Choose a workspace number from the list.');try{await action('move-tab',{id,workspace:workspaces[idx].id});if(id===currentPage?.activeId&&workspaces[idx].id!==activeWorkspace){activeWorkspace=workspaces[idx].id;offset=0;save();}refresh();}catch(err){alert(err.message);}};
+function renderWorkspaceSubmenu(tab){
+ const host=$('tab-workspace-submenu');host.replaceChildren();
+ for(const workspace of workspaces){
+  const button=document.createElement('button');button.type='button';button.className='workspace-target';
+  button.setAttribute('role','menuitem');
+  button.textContent=workspace.emoji+'  '+workspace.name+(tab.workspace===workspace.id?'  ✓':'');
+  button.disabled=tab.workspace===workspace.id;
+  button.onclick=async e=>{
+   e.stopPropagation();const id=tab.id,destination=workspace.id;
+   hideTabMenu();
+   try{
+    await action('move-tab',{id,workspace:destination});
+    if(id===currentPage?.activeId){activeWorkspace=destination;offset=0;save();}
+    await refresh();
+   }catch(error){alert('Could not move tab: '+error.message);}
+  };
+  host.append(button);
+ }
+}
+function showWorkspaceSubmenu(){
+ if(!contextTab)return;
+ const submenu=$('tab-workspace-submenu'),open=submenu.classList.contains('hidden');
+ submenu.classList.toggle('hidden',!open);
+ $('tab-menu-move').setAttribute('aria-expanded',String(open));
+}
+$('tab-menu-move').onclick=e=>{e.stopPropagation();showWorkspaceSubmenu();};
+$('tab-menu-move-wrap').addEventListener('mouseenter',()=>{
+ if(contextTab&&$('tab-workspace-submenu').classList.contains('hidden'))showWorkspaceSubmenu();
+});
+
 $('tab-menu-quick-jump').onclick=()=>{const tab=contextTab;hideTabMenu();if(tab)addQuickJump(tab);};
 $('tab-menu-chrome').onclick=async()=>{
  if(!contextTab)return;
