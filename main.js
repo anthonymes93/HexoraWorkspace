@@ -7,7 +7,7 @@ const {PasswordVault}=require('./password-vault');
 const fs=require('node:fs');
 const os=require('node:os');
 const {spawn}=require('node:child_process');
-let nativeCodeHost=null,nativeCodeActive=false;
+let nativeCodeHost=null,nativeCodeActive=false,nativeCodeDetached=false;
 function nativeCodeCommand(message){if(nativeCodeHost?.stdin?.writable)nativeCodeHost.stdin.write(message+'\n');}
 function nativeCodeBounds(){if(!win||win.isDestroyed()||!nativeCodeHost)return;const [w,h]=win.getContentSize();nativeCodeCommand('RECT '+sidebarWidth+' '+TOP_HEIGHT+' '+Math.max(0,w-sidebarWidth)+' '+Math.max(0,h-TOP_HEIGHT));}
 function restoreNativeWebView(){if(win&&!win.isDestroyed()&&mainViewport){const view=live.get(activeId);if(view&&!modalVisible){mainViewport.addChildView(view);bounds();}}}
@@ -658,18 +658,19 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
   menu.popup({window:win,x:Math.round(Math.max(0,Number(data?.x)||0)),y:Math.round(Math.max(0,Number(data?.y)||0))});
   return true;
  });
+ ipcMain.handle('native-code:detach',async event=>{if(event.sender!==win.webContents)throw Error('Invalid caller');if(!nativeCodeHost)return {detached:false};nativeCodeDetached=true;nativeCodeActive=false;nativeCodeCommand('DETACH');restoreNativeWebView();return {detached:true};});
  ipcMain.handle('native-code:toggle',async event=>{
   if(event.sender!==win.webContents)throw Error('Invalid caller');
   if(process.platform!=='win32')throw Error('Native VS Code hosting requires Windows.');
-  if(nativeCodeHost){nativeCodeActive=!nativeCodeActive;if(nativeCodeActive){const view=live.get(activeId);if(view)mainViewport.removeChildView(view);nativeCodeCommand('SHOW');nativeCodeBounds();}else{nativeCodeCommand('HIDE');restoreNativeWebView();}return {active:nativeCodeActive};}
+  if(nativeCodeHost){if(nativeCodeDetached){nativeCodeDetached=false;nativeCodeCommand('ATTACH');nativeCodeActive=true;const view=live.get(activeId);if(view)mainViewport.removeChildView(view);nativeCodeBounds();return {active:true};}nativeCodeActive=!nativeCodeActive;if(nativeCodeActive){const view=live.get(activeId);if(view)mainViewport.removeChildView(view);nativeCodeCommand('SHOW');nativeCodeBounds();}else{nativeCodeCommand('HIDE');restoreNativeWebView();}return {active:nativeCodeActive};}
   const script=path.join(__dirname,'experiments','vscode-hexora-host.ps1');
   const hwnd=win.getNativeWindowHandle().readBigUInt64LE(0).toString();
   const proc=spawn('powershell.exe',['-NoProfile','-STA','-ExecutionPolicy','Bypass','-File',script,'-ParentHwnd',hwnd],{stdio:['pipe','pipe','pipe'],windowsHide:true});
-  nativeCodeHost=proc;nativeCodeActive=true;
+  nativeCodeHost=proc;nativeCodeActive=true;nativeCodeDetached=false;
   const webView=live.get(activeId);if(webView)mainViewport.removeChildView(webView);
   proc.stdout.on('data',data=>console.log('[Native VS Code]',String(data).trim()));
   proc.stderr.on('data',data=>console.error('[Native VS Code]',String(data).trim()));
-  proc.on('error',error=>{console.error('Native VS Code host failed',error);if(nativeCodeHost===proc){nativeCodeHost=null;nativeCodeActive=false;restoreNativeWebView();}win?.webContents?.send('native-code:stopped');});
+  proc.on('error',error=>{console.error('Native VS Code host failed',error);if(nativeCodeHost===proc){nativeCodeHost=null;nativeCodeActive=false;nativeCodeDetached=false;restoreNativeWebView();}win?.webContents?.send('native-code:stopped');});
   proc.on('exit',()=>{if(nativeCodeHost===proc){nativeCodeHost=null;nativeCodeActive=false;restoreNativeWebView();}if(win&&!win.isDestroyed())win.webContents.send('native-code:stopped');});
   nativeCodeBounds();return {active:true};
  });
