@@ -16,7 +16,8 @@
   return icon;
  }
  const shortPath=path=>String(path||'').split(/[\\/]/).filter(Boolean).slice(-2).join(' / ')||String(path||'');
- let opened=false,finish=null,where=null,mode='recent',rows=[],recent=[],favorites=[],shortcuts=[],home='',selected=null;
+ let opened=false,finish=null,where=null,mode='recent',rows=[],recent=[],favorites=[],shortcuts=[],drives=[],home='',selected=null;
+ let currentCounts={folderCount:0,fileCount:0,truncated:false,total:0},searchTimer=null;
  let history=[],historyIndex=-1,sequence=0,loading=false;
 
  function error(message){
@@ -32,6 +33,7 @@
  }
  function setSelected(location){
   selected=location;
+  if(location)q('hpp-path').value=location;
   q('hpp-open').disabled=loading||!selected;
   q('hpp-hint').textContent=location?'Selected: '+shortPath(location):'Ctrl-click VS Code to open a blank tab';
   // Do not replace clicked DOM nodes: that breaks double-click to navigate.
@@ -65,6 +67,7 @@
   const host=q('hpp-sidebar');host.replaceChildren();
   const links=[
    {id:'recent',name:'Recent',icon:'◷'},
+   {id:'computer',name:'This PC',icon:'▣'},
    ...shortcuts.map(s=>({...s,icon:({home:'⌂',projects:'▤',clients:'♧',downloads:'↓',desktop:'▣'})[s.id]||'▤'})),
    {id:'favorites',name:'Favorites',icon:'☆'}
   ];
@@ -80,7 +83,7 @@
   const host=q('hpp-breadcrumbs');host.replaceChildren();
   if(mode!=='browse'){
    const text=document.createElement('span');text.className='hpp-current-crumb';
-   text.textContent=mode==='favorites'?'Favorites':'Recent projects';host.append(text);return;
+   text.textContent=mode==='favorites'?'Favorites':mode==='computer'?'This PC':'Recent projects';host.append(text);return;
   }
   if(!where)return;
   // Use each progressively longer ancestor path for clickable crumbs.
@@ -145,7 +148,7 @@
  }
  async function loadLocations(){
   const data=await window.hexora.codePicker.locations();
-  home=data.home;recent=data.recent;favorites=data.favorites;shortcuts=data.shortcuts;
+  home=data.home;recent=data.recent;favorites=data.favorites;shortcuts=data.shortcuts;drives=data.drives||[];
   renderCards();renderSidebar();
  }
  async function navigate(path,record=true){
@@ -180,7 +183,7 @@
  }
  function close(value){
   if(!opened)return;
-  opened=false;sequence++;
+  opened=false;sequence++;clearTimeout(searchTimer);
   root.classList.add('hidden');root.removeEventListener('keydown',onKeydown);
   const resolve=finish;finish=null;
   // Complete the native HWND visibility transition before creating a new
@@ -226,7 +229,7 @@
   if(opened)return null;
   opened=true;sequence++;where=null;rows=[];selected=null;mode='recent';history=[];historyIndex=-1;
   error('');root.classList.remove('hidden');root.addEventListener('keydown',onKeydown);
-  q('hpp-search-input').value='';q('hpp-path-form').classList.add('hidden');q('hpp-open').disabled=true;
+  q('hpp-search-input').value='';q('hpp-path').value='';q('hpp-open').disabled=true;
   const promise=new Promise(resolve=>{finish=resolve;});
   try{
    // Hide attached native VS Code HWND while its toolbar owns the modal.
@@ -234,6 +237,7 @@
    if(!opened)return promise;
    await loadLocations();
    if(!opened)return promise;
+   q('hpp-path').value=home;
    if(recent.length)showCollection('recent');
    else await navigate(shortcuts.find(s=>s.id==='projects')?.path||home);
    q('hpp-search-input').focus();
