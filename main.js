@@ -18,7 +18,7 @@ if(!hasSingleInstanceLock){
 }
 const HOME='https://chatgpt.com/';
 const DETACHED_HEADER=44;
-const TOP_HEIGHT=120,IDLE_MS=24*60*60*1000,MAX_LIVE=8;
+const TOP_HEIGHT=164,IDLE_MS=24*60*60*1000,MAX_LIVE=8;
 let recoveryWindow=null;
 const detached=new Map();
 let quitting=false;
