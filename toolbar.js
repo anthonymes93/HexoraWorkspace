@@ -982,7 +982,7 @@ function attachWorkspaceHoverTip(el,w,count){
    const tip=workspaceHoverTip.getBoundingClientRect();
    workspaceHoverTip.style.left=Math.min(window.innerWidth-tip.width-12,Math.max(68,icon.right+12))+'px';
    workspaceHoverTip.style.top=Math.max(12,Math.min(window.innerHeight-tip.height-12,icon.top+(icon.height-tip.height)/2))+'px';
-  },550);
+  },517);
  });
  el.addEventListener('pointerleave',hideWorkspaceHoverTip);
  el.addEventListener('pointerdown',hideWorkspaceHoverTip);
