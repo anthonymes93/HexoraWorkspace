@@ -357,6 +357,11 @@ window.addEventListener('pointerup',async()=>{
   }else if(source===null){
    const ids=[...tabStrip.querySelectorAll('.tab')].map(el=>Number(el.dataset.tabId)).filter(Number.isSafeInteger);
    await action('reorder-tabs',{workspace:d.workspace,ids});
+  }else if(source!==null){
+   const row=document.querySelector('.stack-tabs[data-stack-id="'+source+'"]');
+   const ids=row?[...row.querySelectorAll('.tab[data-tab-id]')].map(el=>Number(el.dataset.tabId)):[];
+   if(ids.length)await action('reorder-stack',{stackId:source,ids});
+   else await refresh();
   }else await refresh();
  }catch(error){console.error('Could not move stacked tab',error);refresh();}
  finally{dropSaving=false;}
