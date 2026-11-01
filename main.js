@@ -1,5 +1,5 @@
 'use strict';
-const {app,BrowserWindow,WebContentsView,View,session,ipcMain,shell,dialog,clipboard}=require('electron');
+const {app,BrowserWindow,WebContentsView,View,session,ipcMain,shell,dialog,clipboard,safeStorage}=require('electron');
 const path=require('node:path');
 const {screen}=require('electron');
 const {TabStore}=require('./tab-store');
@@ -403,6 +403,7 @@ function sendPage(payload){const w=typeof payload?.workspace==='string'?payload.
 if(hasSingleInstanceLock)app.whenReady().then(()=>{
  const dataDir=app.getPath('userData');
  vault=new PasswordVault(dataDir);
+ vault.restoreDeviceUnlock(safeStorage);
  try{applyPending(dataDir);}catch(err){dialog.showErrorBox('Hexora restore could not be applied',err.message);}
  try{const prefs=JSON.parse(fs.readFileSync(path.join(dataDir,'hexora-recovery-config.json'),'utf8'));if(prefs.directory)recoveryDir=prefs.directory;}catch{}
  extensionConfigFile=path.join(dataDir,'hexora-extensions.json');
@@ -565,9 +566,9 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
   const fill='(()=>{const c='+values+';const visible=e=>e.getClientRects().length&&!e.disabled&&!e.readOnly;const all=[...document.querySelectorAll("input")].filter(visible);const pass=all.find(e=>e.type==="password");if(!pass)return{filled:false,reason:"No visible password field."};const user=all.find(e=>e!==pass&&["email","text","tel"].includes(e.type)&&/user|email|login|account/i.test([e.name,e.id,e.placeholder,e.autocomplete].join(" ")))||all.find(e=>e!==pass&&["email","text"].includes(e.type));const set=(el,value)=>{if(!el)return;const descriptor=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,"value");descriptor.set.call(el,value);el.dispatchEvent(new Event("input",{bubbles:true}));el.dispatchEvent(new Event("change",{bubbles:true}));};set(user,c.username);set(pass,c.password);return{filled:true,username:!!user};})()';
   return sender.executeJavaScriptInIsolatedWorld(1001,[{code:fill}],true);
  });
- ipcMain.handle('vault:status',()=>vault.status());
- ipcMain.handle('vault:unlock',(_e,password)=>vault.unlock(password));
- ipcMain.handle('vault:lock',()=>{vault.lock();return true;});
+ ipcMain.handle('vault:status',()=>({...vault.status(),deviceUnlockEnabled:vault.deviceUnlockEnabled(),deviceUnlockAvailable:safeStorage.isEncryptionAvailable()}));
+ ipcMain.handle('vault:unlock',(_e,args)=>{const password=typeof args==='string'?args:args?.password;const result=vault.unlock(password);if(args?.remember===true)vault.enableDeviceUnlock(safeStorage);return result;});
+ ipcMain.handle('vault:lock',()=>{vault.forgetDeviceUnlock();vault.lock();return true;});
  ipcMain.handle('vault:list',()=>vault.list());
  ipcMain.handle('vault:get',(_e,id)=>vault.get(id));
  ipcMain.handle('vault:save',(_e,entry)=>vault.save(entry));
