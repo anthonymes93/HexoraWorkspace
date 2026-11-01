@@ -237,9 +237,7 @@
    event.preventDefault();q('hpp-path').focus();q('hpp-path').select();return;
   }
   if(event.key==='Escape'){
-   event.preventDefault();
-   if(!q('hpp-path-form').classList.contains('hidden'))q('hpp-path-form').classList.add('hidden');
-   else close(null);
+   event.preventDefault();close(null);return;
   }
   if(event.altKey&&event.key==='ArrowLeft'){event.preventDefault();goHistory(-1);}
   if(event.altKey&&event.key==='ArrowRight'){event.preventDefault();goHistory(1);}
@@ -265,7 +263,9 @@
  q('hpp-path').addEventListener('focus',()=>{
   // Native child HWNDs can retain OS keyboard focus after showing an
   // Electron overlay. Explicitly return focus to Hexora before typing.
-  window.hexora.codePicker.focus().catch(()=>{});
+  window.hexora.codePicker.focus().then(()=>{
+   if(opened&&document.activeElement!==q('hpp-path'))q('hpp-path').focus();
+  }).catch(()=>{});
  });
  q('hpp-path').addEventListener('input',()=>{
   selected=null;
