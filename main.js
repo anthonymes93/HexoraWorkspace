@@ -18,7 +18,7 @@ if(!hasSingleInstanceLock){
 }
 const HOME='https://chatgpt.com/';
 const DETACHED_HEADER=44;
-const TOP_HEIGHT=164,IDLE_MS=24*60*60*1000,MAX_LIVE=8;
+let TOP_HEIGHT=120;const IDLE_MS=24*60*60*1000,MAX_LIVE=8;
 let recoveryWindow=null;
 const detached=new Map();
 let quitting=false;
@@ -474,6 +474,7 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
    if(candidate)activate(candidate);else newTab(workspace);
    return true;
   }
+  else if(action==='stack-row-height'){TOP_HEIGHT=arg===164?164:120;bounds();return true;}
   else if(action==='stack-create'){const id=store.createStack(arg?.workspace,arg?.name,arg?.tabId??null,arg?.parentId??null);emit();return id;}
   else if(action==='stack-assign'){store.putTabInStack(Number(arg?.tabId),arg?.stackId===null?null:Number(arg?.stackId));emit();return true;}
   else if(action==='stack-nest'){store.moveStack(Number(arg?.id),arg?.parentId===null?null:Number(arg?.parentId));emit();return true;}
