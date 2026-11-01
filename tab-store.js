@@ -43,6 +43,26 @@ class TabStore {
  nextId(){return this.q.max.get().max+1;}
  get(id){return this.q.get.get(id)||null;}
  save(t){this.q.put.run({id:t.id,url:t.url,title:t.title,workspace:t.workspace,pinned:+!!t.pinned,muted:+!!t.muted,last_active:t.lastActive||Date.now(),ordinal:t.ordinal||t.id});}
+ insertAfter(tab,anchorId){
+  const anchor=this.get(anchorId);
+  if(!anchor||anchor.workspace!==tab.workspace)throw Error('Active tab is unavailable');
+  const members=this.db.prepare('SELECT stack_id FROM tab_stack_members WHERE tab_id=?').get(anchorId);
+  const ids=members
+   ?this.db.prepare('SELECT t.id FROM tabs t JOIN tab_stack_members m ON m.tab_id=t.id WHERE m.stack_id=? ORDER BY t.ordinal DESC,t.id DESC').all(members.stack_id).map(x=>x.id)
+   :this.db.prepare('SELECT t.id FROM tabs t LEFT JOIN tab_stack_members m ON m.tab_id=t.id WHERE t.workspace=? AND m.tab_id IS NULL ORDER BY t.ordinal DESC,t.id DESC').all(tab.workspace).map(x=>x.id);
+  const index=ids.indexOf(anchorId);
+  if(index<0)throw Error('Active tab cannot be located');
+  ids.splice(index+1,0,tab.id);
+  this.db.exec('BEGIN');
+  try{
+   this.save(tab);
+   if(members)this.db.prepare('INSERT INTO tab_stack_members(tab_id,stack_id) VALUES(?,?)').run(tab.id,members.stack_id);
+   const max=this.db.prepare('SELECT COALESCE(MAX(ordinal),0) AS n FROM tabs').get().n;
+   const update=this.db.prepare('UPDATE tabs SET ordinal=? WHERE id=?');
+   ids.forEach((id,i)=>update.run(max+ids.length-i,id));
+   this.db.exec('COMMIT');
+  }catch(e){this.db.exec('ROLLBACK');throw e;}
+ }
  delete(id){this.db.prepare('DELETE FROM tab_stack_members WHERE tab_id=?').run(id);this.q.del.run(id);}
  reorderVisible(workspace,ids){
   if(typeof workspace!=='string'||!Array.isArray(ids)||ids.length<2||ids.length>16||!ids.every(Number.isSafeInteger)||new Set(ids).size!==ids.length)throw new Error('Invalid tab order');
