@@ -323,7 +323,7 @@ function renderTabRow(host,page,parentId){
     const title=(tab.pinned?'◆ ':'')+(tab.title||'New Tab');
     if(label&&label.textContent!==title)label.textContent=title;
     updateTabFavicon(el,tab);
-    el.title=tab.url||'Open tab';
+    el.removeAttribute('title');
    }
    if(stack){const title='▤ '+stack.name;if(el.textContent!==title)el.textContent=title;}
   }
@@ -352,7 +352,7 @@ function renderTabRow(host,page,parentId){
     lines.append(micro,name);el.append(lines,close);
    }else el.append(name,close);
    updateTabFavicon(el,item.tab);
-   el.title=item.tab.url||'Open tab';
+   el.removeAttribute('title');
    el.onclick=()=>{selectedRootTabId=null;selectedStackId=parentId;stackRowsDismissed=parentId===null;action('activate',item.id);};
    el.addEventListener('contextmenu',e=>{e.preventDefault();showTabMenu(e.clientX,e.clientY,item.tab);});
   }
