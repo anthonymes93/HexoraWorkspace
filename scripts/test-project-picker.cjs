@@ -25,10 +25,10 @@ test('Hexora project picker navigates real folders and persists recents/favorite
   assert.equal(expandFolderPath(a),a);
   assert.throws(()=>validateFolder('https://example.com'),/web URL/);
   assert.throws(()=>validateFolder(''),/folder path/);
-  assert.throws(()=>validateFolder('relative/path'),/absolute/);
+  assert.throws(()=>validateFolder('relative/path'),/full folder path/);
   assert.throws(()=>validateFolder(path.join(root,'not-a-folder.txt')),/not a folder/);
   assert.throws(()=>validateFolder(path.join(root,'missing')),/ENOENT/);
-  assert.throws(()=>validateFolder('../'),/absolute/);
+  assert.throws(()=>validateFolder('../'),/full folder path/);
 
   let view=listFolders(root,[]);
   assert.deepEqual(view.rows.map(x=>x.name),['.hidden','Alpha Project','beta','not-a-folder.txt']);
