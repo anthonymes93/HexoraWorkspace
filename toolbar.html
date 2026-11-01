@@ -19,7 +19,12 @@
   <div class="sidebar-title"><strong>Hexora <em>Workspace</em></strong><div class="sidebar-title-actions"><button id="add-workspace" title="New workspace">＋</button><button id="collapse-sidebar" title="Collapse workspace panel" aria-label="Collapse workspace panel">‹</button></div></div>
   <div class="eyebrow">Workspaces</div><div id="workspaces" class="workspaces"></div>
   <div class="conversation-head"><button id="toggle-conversations" class="conversation-collapse" type="button" aria-controls="conversations" aria-expanded="true" title="Collapse open conversations"><span class="eyebrow">Open conversations</span><span id="conversations-chevron" aria-hidden="true">⌄</span></button><button id="new-sidebar" title="New tab">＋</button></div>
-  <div id="conversations" class="conversation-list"></div>
+  <div id="workspace-context-menu" class="workspace-context-menu hidden" role="menu" aria-label="Workspace details">
+ <div class="workspace-context-top"><span id="workspace-context-icon" class="workspace-context-icon"></span><div class="workspace-context-info"><strong id="workspace-context-name"></strong><small id="workspace-context-count"></small></div></div>
+ <button id="workspace-context-open" type="button" role="menuitem">↗ &nbsp; Open workspace</button>
+ <button id="workspace-context-rename" type="button" role="menuitem">✎ &nbsp; Rename / customize</button>
+ </div>
+ <div id="conversations" class="conversation-list"></div>
   <div id="quick-jumps" class="quick-jumps" aria-label="Quick Jump shortcuts"></div>
   <div class="profile"><span class="avatar">H</span><div><strong>ChatGPT</strong><small>Live account · Electron</small></div></div>
 </aside>
