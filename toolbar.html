@@ -48,6 +48,21 @@
  <p id="recovery-message" class="hint"></p>
  <p class="hint">Hourly backups run only while Hexora is open and recovery is unlocked. Confirm files really sync off this computer.</p>
  </div></div>
+<div id="new-tab-overlay" class="overlay hidden">
+ <div class="dialog new-tab-dialog" role="dialog" aria-modal="true" aria-label="Open a new tab">
+  <div class="dialog-header"><b>Open a new tab</b><button id="new-tab-close" type="button" aria-label="Close">×</button></div>
+  <form id="new-tab-form"><label for="new-tab-address" class="new-tab-label">Website address</label><div class="new-tab-address-row"><input id="new-tab-address" type="text" autocomplete="off" spellcheck="false" placeholder="Paste a URL or type example.com" aria-label="Website address"/><button class="pill primary" type="submit">Open ↗</button></div></form>
+  <div class="new-tab-label">Quick launch</div>
+  <div class="new-tab-shortcuts">
+   <button type="button" id="new-tab-chatgpt">✦ <span>ChatGPT</span></button>
+   <button type="button" data-new-tab-url="https://app.notion.com/" data-new-tab-title="Notion">▣ <span>Notion</span></button>
+   <button type="button" data-new-tab-url="https://github.com/" data-new-tab-title="GitHub">⌘ <span>GitHub</span></button>
+   <button type="button" data-new-tab-url="https://www.google.com/" data-new-tab-title="Google">◎ <span>Google</span></button>
+   <button type="button" data-new-tab-url="https://www.youtube.com/" data-new-tab-title="YouTube">▶ <span>YouTube</span></button>
+  </div>
+  <p id="new-tab-error" class="hint" role="status" aria-live="polite"></p>
+ </div>
+</div>
 <div id="search-overlay" class="overlay hidden"><div class="dialog"><div class="dialog-header"><b>Search open conversations</b><button id="search-close">×</button></div><input id="search-input" placeholder="Find a tab by title..."/><div id="search-results"></div><p class="hint">Searches currently open tabs, not your full ChatGPT history.</p></div></div>
 <div id="tab-row-context-menu" class="tab-context-menu tab-row-context-menu hidden" role="menu" aria-label="Tab row actions"><div class="tab-menu-heading">WORKSPACE TABS</div><button id="tab-row-menu-new" role="menuitem"><span class="menu-glyph">＋</span> New Tab</button></div>
 <div id="tab-context-menu" class="tab-context-menu hidden" role="menu" aria-label="Tab actions">

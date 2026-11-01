@@ -269,7 +269,37 @@ sidebarGrip.addEventListener('keydown',async event=>{
  sidebarOpen=next>65;
 });
 function updateSidebar(persist=true){action('sidebar',!sidebarOpen);if(persist&&currentPage?.activeId)action('panel-mode',{id:currentPage.activeId,mode:sidebarOpen?'wide':'thin'});save();}
-for(const id of ['new','new-rail','new-sidebar','add-tab'])$(id).onclick=()=>action('new',activeWorkspace);
+// New Tab launcher: explicit choices, no surprise navigation or new tab until selection.
+const newTabOverlay=$('new-tab-overlay'),newTabAddress=$('new-tab-address'),newTabError=$('new-tab-error');
+function closeNewTabLauncher(){newTabOverlay.classList.add('hidden');action('modal',false);}
+function openNewTabLauncher(){
+ newTabError.textContent='';
+ newTabAddress.value='';
+ newTabOverlay.classList.remove('hidden');
+ action('modal',true);
+ newTabAddress.focus();
+}
+async function launchNewTab(url,title){
+ try{
+  newTabError.textContent='';
+  const raw=String(url||'').trim();
+  if(!raw){newTabError.textContent='Enter a website address.';return;}
+  let parsed;
+  try{parsed=new URL(/^[a-z][a-z0-9+.-]*:/i.test(raw)?raw:'https://'+raw);}
+  catch{newTabError.textContent='Enter a valid website address.';return;}
+  if(!['https:','http:'].includes(parsed.protocol)||!parsed.hostname){newTabError.textContent='Only HTTP and HTTPS websites can be opened.';return;}
+  await action('open-website',{url:parsed.href,title:title||parsed.hostname,newTab:true,workspace:activeWorkspace});
+  closeNewTabLauncher();
+ }catch(error){newTabError.textContent='Could not open website: '+error.message;}
+}
+for(const id of ['new','new-rail','new-sidebar','add-tab'])$(id).onclick=openNewTabLauncher;
+$('new-tab-close').onclick=closeNewTabLauncher;
+newTabOverlay.onclick=e=>{if(e.target===newTabOverlay)closeNewTabLauncher();};
+$('new-tab-form').onsubmit=e=>{e.preventDefault();launchNewTab(newTabAddress.value);};
+$('new-tab-chatgpt').onclick=()=>action('new',activeWorkspace).then(closeNewTabLauncher).catch(e=>newTabError.textContent=e.message);
+for(const el of document.querySelectorAll('[data-new-tab-url]'))el.addEventListener('click',()=>launchNewTab(el.dataset.newTabUrl,el.dataset.newTabTitle));
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!newTabOverlay.classList.contains('hidden'))closeNewTabLauncher();});
+
 // Open Notion's Action Center as a separate saved web tab in this workspace.
 const NOTION_ACTION_CENTER_URL='https://app.notion.com/p/anthonymeszaros/Action-Center-348a372875a78084a961fd11848b2880';
 $('notion-rail').onclick=async()=>{
@@ -302,7 +332,7 @@ async function filterTabs(){const seq=++searchSeq;const items=await window.hexor
 function hideSearch(){$('search-overlay').classList.add('hidden');action('modal',false);}
 $('search').onclick=showSearch;$('search-rail').onclick=showSearch;$('search-close').onclick=hideSearch;$('search-input').oninput=filterTabs;
 $('search-overlay').onclick=e=>{if(e.target===$('search-overlay'))hideSearch();};
-document.addEventListener('keydown',e=>{if(e.key==='Escape')hideSearch();if(e.ctrlKey&&e.key.toLowerCase()==='k'){e.preventDefault();showSearch();}if(e.ctrlKey&&e.key.toLowerCase()==='t'){e.preventDefault();action('new',activeWorkspace);}});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')hideSearch();if(e.ctrlKey&&e.key.toLowerCase()==='k'){e.preventDefault();showSearch();}if(e.ctrlKey&&e.key.toLowerCase()==='t'){e.preventDefault();openNewTabLauncher();}});
 function linkToast(message){
  let toast=$('hexora-link-toast');
  if(!toast){toast=document.createElement('div');toast.id='hexora-link-toast';toast.className='hexora-link-toast';toast.setAttribute('role','status');document.body.append(toast);}
