@@ -13,7 +13,8 @@
     "test:code-auto-project": "node --test scripts/test-code-auto-project.cjs",
     "test:code-project-sync": "node --test scripts/test-code-project-sync.cjs",
     "test:project-picker": "node --test scripts/test-project-picker.cjs",
-    "test:project-picker-ui": "node --check project-picker.js && node --check toolbar.js && node --check main.js"
+    "test:project-picker-ui": "node --check project-picker.js && node --check toolbar.js && node --check main.js",
+    "test:taskbar": "node --test scripts/test-taskbar-identity.cjs"
   },
   "devDependencies": {
     "electron": "^38.0.0"
