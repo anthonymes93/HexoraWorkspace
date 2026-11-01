@@ -255,14 +255,15 @@ function bounds(){
   // or late correction when the workspace panel finishes moving.
   view.setBounds({x:0,y:0,width:visibleWidth,height:visibleHeight});
  }
- win.webContents.send('sidebar:frame',sidebarWidth,sidebarTransitioning);
+ win.webContents.send('sidebar:frame',sidebarWidth,sidebarTransitioning,sidebarTransitionTarget);
 }
-let sidebarAnimation=null,sidebarTransitioning=false;
+let sidebarAnimation=null,sidebarTransitioning=false,sidebarTransitionTarget=null;
 function setSidebarWidth(collapsed){
  const saved=Math.max(220,Math.min(560,Number(store?.getMeta('sidebarLastExpandedWidth'))||Number(store?.getMeta('sidebarCustomWidth'))||330));
  const start=sidebarWidth,target=collapsed?64:saved;
  if(sidebarAnimation){clearInterval(sidebarAnimation);sidebarAnimation=null;}
  sidebarTransitioning=start!==target;
+ sidebarTransitionTarget=sidebarTransitioning?target:null;
  if(start===target){bounds();return;}
  // Resize the embedded browser together with the panel on every frame.
  // Geometry is contiguous: viewport and web content always share the same edges.
@@ -274,7 +275,7 @@ function setSidebarWidth(collapsed){
   const next=progress===1?target:Math.round(start+(target-start)*ease(progress));
   if(next!==sidebarWidth){sidebarWidth=next;}
   bounds();
-  if(progress===1){clearInterval(sidebarAnimation);sidebarAnimation=null;sidebarWidth=target;sidebarTransitioning=false;bounds();}
+  if(progress===1){clearInterval(sidebarAnimation);sidebarAnimation=null;sidebarWidth=target;sidebarTransitioning=false;sidebarTransitionTarget=null;bounds();}
  }
  sidebarAnimation=setInterval(frame,16);
  frame();
@@ -688,7 +689,7 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
   else if(action==='open-external')shell.openExternal(current?.url||HOME);
   else if(action==='sidebar-resize'){
    if(sidebarAnimation){clearInterval(sidebarAnimation);sidebarAnimation=null;}
-   sidebarTransitioning=false;
+   sidebarTransitioning=false;sidebarTransitionTarget=null;
    const max=Math.min(560,Math.max(64,win.getContentSize()[0]-420));
    sidebarWidth=Math.round(Math.max(64,Math.min(max,Number(arg?.width)??330)));
    bounds();return sidebarWidth;
