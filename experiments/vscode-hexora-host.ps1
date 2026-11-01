@@ -100,7 +100,33 @@ public static class HexoraNative {
    }catch(Exception error){Console.WriteLine("MOUSE_PROBE_ERROR "+error.Message);}
   });
  }
- public static long[] Windows() {var found=new List<long>();EnumWindows((h,lp)=>{if(!IsWindowVisible(h))return true;var title=new StringBuilder(512);GetWindowText(h,title,512);uint pid;GetWindowThreadProcessId(h,out pid);try{if(title.Length>0&&System.Diagnostics.Process.GetProcessById((int)pid).ProcessName.Equals("Code",StringComparison.OrdinalIgnoreCase))found.Add(h.ToInt64());}catch{}return true;},IntPtr.Zero);return found.ToArray();}
+ // Capture VS Code's top-level Chromium window as soon as the HWND exists.
+ // Waiting for IsWindowVisible and a non-empty title is what caused the desktop flash.
+ // Chrome_WidgetWin_1 plus a resizable/captioned frame distinguishes the main window
+ // from helper windows, splash widgets, and tooltips.
+ public static long[] Windows() {
+  var found=new List<long>();
+  EnumWindows((h,lp)=>{
+   uint pid;GetWindowThreadProcessId(h,out pid);
+   try{
+    var process=System.Diagnostics.Process.GetProcessById((int)pid);
+    if(!process.ProcessName.Equals("Code",StringComparison.OrdinalIgnoreCase))return true;
+    var cls=new StringBuilder(128);GetClassName(h,cls,cls.Capacity);
+    if(!cls.ToString().Equals("Chrome_WidgetWin_1",StringComparison.Ordinal))return true;
+    int style=GetWindowLong(h,-16);
+    var title=new StringBuilder(512);GetWindowText(h,title,title.Capacity);
+    bool primaryFrame=(style&0x00C00000)!=0||(style&0x00040000)!=0;
+    if(primaryFrame||title.Length>0)found.Add(h.ToInt64());
+   }catch{}
+   return true;
+  },IntPtr.Zero);
+  return found.ToArray();
+ }
+ public static string WindowCaptureState(IntPtr h){
+  var title=new StringBuilder(512);GetWindowText(h,title,title.Capacity);
+  var cls=new StringBuilder(128);GetClassName(h,cls,cls.Capacity);
+  return "visible="+IsWindowVisible(h)+" class="+cls+" titleSet="+(title.Length>0)+" style=0x"+GetWindowLong(h,-16).ToString("X8");
+ }
 }
 '@
 $parent=[IntPtr]([long]::Parse($ParentHwnd))
@@ -122,13 +148,18 @@ if($null -eq $launcher){throw 'VS Code CLI launcher could not start'}
 $deadline=[DateTime]::UtcNow.AddSeconds(25)
 $child=[IntPtr]::Zero
 do {
- Start-Sleep -Milliseconds 40
+ # The Chromium top-level HWND is generally created before VS Code calls ShowWindow.
+ # Never wait for a visible window before trying to claim it for Hexora.
  $candidate=[HexoraNative]::Windows() | Where-Object {$_ -notin $existing} | Select-Object -First 1
- if($candidate){$child=[IntPtr]([long]$candidate)}
-} until ($child -ne [IntPtr]::Zero -or [DateTime]::UtcNow -gt $deadline)
+ if($candidate){$child=[IntPtr]([long]$candidate);break}
+ Start-Sleep -Milliseconds 12
+} until ([DateTime]::UtcNow -gt $deadline)
 if($child -eq [IntPtr]::Zero){throw 'No new VS Code window detected'}
 $captureElapsedMs=[int](([DateTime]::UtcNow-$launchBegan).TotalMilliseconds)
-Write-Output ('WINDOW_CAPTURED hwnd='+$child.ToInt64()+' elapsedMs='+$captureElapsedMs)
+Write-Output ('WINDOW_CAPTURED hwnd='+$child.ToInt64()+' elapsedMs='+$captureElapsedMs+' '+[HexoraNative]::WindowCaptureState($child))
+# Hide immediately, BEFORE editing styles or attaching. If captured pre-show,
+# VS Code never receives a chance to display its initial floating frame.
+[void][HexoraNative]::ShowWindow($child,0)
 $oldStyle=[HexoraNative]::GetWindowLong($child,-16)
 $newStyle=($oldStyle -band (-bnot ([int]0x80000000 -bor 0x00C00000 -bor 0x00040000))) -bor 0x40000000
 $attached=$false
