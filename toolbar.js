@@ -416,6 +416,34 @@ function scheduleMicroTitles(){
  microTitleFrame=requestAnimationFrame(()=>{microTitleFrame=0;syncFirstRowMicroTitles();});
 }
 new ResizeObserver(scheduleMicroTitles).observe($('tabs'));
+// Desktop-style multi-selection for tab rows.
+const selectedTabIds=new Set();
+let tabSelectionAnchor=null;
+function paintSelectedTabs(){
+ for(const el of document.querySelectorAll('.tab[data-tab-id]')){
+  const selected=selectedTabIds.has(Number(el.dataset.tabId));
+  el.classList.toggle('multi-selected',selected);
+  el.setAttribute('aria-selected',String(selected));
+ }
+}
+function selectTabWithModifiers(event,id,host){
+ const tabs=[...host.querySelectorAll(':scope > .tab[data-tab-id]')].map(el=>Number(el.dataset.tabId));
+ if(event.shiftKey){
+  const anchor=tabs.includes(tabSelectionAnchor)?tabSelectionAnchor:id;
+  const first=tabs.indexOf(anchor),last=tabs.indexOf(id);
+  if(!event.ctrlKey)selectedTabIds.clear();
+  for(const tabId of tabs.slice(Math.min(first,last),Math.max(first,last)+1))selectedTabIds.add(tabId);
+ }else if(event.ctrlKey||event.metaKey){
+  if(selectedTabIds.has(id))selectedTabIds.delete(id);else selectedTabIds.add(id);
+  tabSelectionAnchor=id;
+ }else{
+  selectedTabIds.clear();
+  tabSelectionAnchor=id;
+  return false;
+ }
+ paintSelectedTabs();
+ return true;
+}
 function renderTabRow(host,page,parentId){
  const data=page.stackData||{stacks:[],members:[]};
  const memberOf=new Map(data.members.map(m=>[m.tab_id,m.stack_id]));
@@ -448,6 +476,7 @@ function renderTabRow(host,page,parentId){
    }
    if(stack){const title='▤ '+stack.name;if(el.textContent!==title)el.textContent=title;}
   }
+  paintSelectedTabs();
   if(parentId===null)scheduleMicroTitles();
   return;
  }
@@ -474,12 +503,13 @@ function renderTabRow(host,page,parentId){
    }else el.append(name,close);
    updateTabFavicon(el,item.tab);
    el.removeAttribute('title');
-   el.onclick=()=>{selectedRootTabId=null;selectedStackId=parentId;stackRowsDismissed=parentId===null;action('activate',item.id);};
-   el.addEventListener('contextmenu',e=>{e.preventDefault();showTabMenu(e.clientX,e.clientY,item.tab);});
+   el.onclick=e=>{if(selectTabWithModifiers(e,item.id,host))return;selectedRootTabId=null;selectedStackId=parentId;stackRowsDismissed=parentId===null;action('activate',item.id);};
+   el.addEventListener('contextmenu',e=>{e.preventDefault();if(!selectedTabIds.has(item.id)){selectedTabIds.clear();selectedTabIds.add(item.id);tabSelectionAnchor=item.id;paintSelectedTabs();}showTabMenu(e.clientX,e.clientY,item.tab);});
   }
   el.addEventListener('pointerdown',beginTabPointerDrag);
   host.append(el);
  }
+ paintSelectedTabs();
  if(parentId===null)scheduleMicroTitles();
 }
 function renderSecondTabRow(page){
@@ -769,6 +799,9 @@ tabStrip.addEventListener('drop',e=>{
 function hideTabMenu(restore=true){ $('tab-workspace-submenu').classList.add('hidden');$('tab-menu-move').setAttribute('aria-expanded','false'); const wasOpen=!$('tab-context-menu').classList.contains('hidden');$('tab-context-menu').classList.add('hidden');contextTab=null;if(wasOpen&&restore&&!websiteTarget)action('modal',false); }
 function showTabMenu(x,y,item){
  contextTab=item;
+ const multi=selectedTabIds.size>1;
+ $('tab-menu-close-selected').classList.toggle('hidden',!multi);
+ $('tab-menu-close-selected').textContent='×  Close '+selectedTabIds.size+' selected tabs';
  $('tab-menu-current-title').textContent=item.title||'Untitled tab';
  $('tab-menu-url').value=item.url||'';
  $('tab-menu-url-error').textContent='';
@@ -788,6 +821,13 @@ function showTabMenu(x,y,item){
  menu.style.left=Math.max(8,Math.min(x,innerWidth-menu.offsetWidth-8))+'px';
  menu.style.top=Math.max(8,Math.min(y,innerHeight-menu.offsetHeight-8))+'px';
 }
+$('tab-menu-close-selected').onclick=async()=>{
+ const ids=[...selectedTabIds];if(ids.length<2)return;
+ hideTabMenu();
+ if(!confirm('Close '+ids.length+' selected tabs? This will discard unsaved page data.'))return;
+ try{await action('close-many',ids);selectedTabIds.clear();tabSelectionAnchor=null;refresh();}
+ catch(error){alert('Could not close tabs: '+error.message);}
+};
 function showWebsiteModal(newTab){
  if(!contextTab)return;
  websiteTarget={id:contextTab.id,newTab,workspace:activeWorkspace};hideTabMenu(false);
