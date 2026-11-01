@@ -308,20 +308,32 @@ window.addEventListener('pointermove',e=>{
  const desiredLeft=e.clientX-d.grabOffset;
  const slotLeft=d.tab.getBoundingClientRect().left-parseFloat(d.tab.style.getPropertyValue('--drag-x')||'0');
  d.tab.style.setProperty('--drag-x',(desiredLeft-slotLeft)+'px');
- const under=document.elementFromPoint(e.clientX,e.clientY);
- const targetTab=under?.closest('.tab[data-tab-id]');
- const targetId=targetTab&&targetTab!==d.tab?Number(targetTab.dataset.tabId):null;
- const targetRow=under?.closest('.stack-tabs');
- d.targetRow=targetRow?Number(targetRow.dataset.stackId):under?.closest('#tabs')?null:undefined;
- if(d.targetRow===undefined){d.hoverId=null;d.hoverSince=0;}
- if(targetId&&targetId!==d.id){
+ // Hit-test actual tab rectangles rather than relying on the browser's
+ // elementFromPoint during translated, dynamically reordered tabs.
+ const allRows=[tabStrip,...document.querySelectorAll('.stack-tabs')];
+ const hitRow=allRows.find(row=>{const r=row.getBoundingClientRect();return e.clientY>=r.top&&e.clientY<=r.bottom&&e.clientX>=r.left&&e.clientX<=r.right;});
+ d.targetRow=hitRow?(hitRow===tabStrip?null:Number(hitRow.dataset.stackId)):undefined;
+ const targetTab=hitRow?[...hitRow.querySelectorAll('.tab[data-tab-id]')].find(el=>{
+  if(el===d.tab)return false;
+  const r=el.getBoundingClientRect();
+  return e.clientX>=r.left&&e.clientX<=r.right;
+ }):null;
+ const targetId=targetTab?Number(targetTab.dataset.tabId):null;
+ // Deliberately entering the middle of another tab means STACK;
+ // a quick sweep over its edge continues to mean REORDER.
+ let inStackZone=false;
+ if(targetTab){
+  const r=targetTab.getBoundingClientRect();
+  inStackZone=e.clientX>=r.left+r.width*.22&&e.clientX<=r.right-r.width*.22;
+ }
+ if(targetId&&inStackZone){
   if(d.hoverId!==targetId){d.hoverId=targetId;d.hoverSince=performance.now();}
  }else{d.hoverId=null;d.hoverSince=0;}
  for(const node of document.querySelectorAll('.stack-drop-target'))node.classList.remove('stack-drop-target');
- if(d.hoverId&&performance.now()-d.hoverSince>420)targetTab?.classList.add('stack-drop-target');
- // Preserve the original fluid 10%-overlap reorder within each row.
+ if(d.hoverId&&performance.now()-d.hoverSince>=250)targetTab.classList.add('stack-drop-target');
  if(d.targetRow!==d.sourceStack)return;
- if(d.hoverId&&performance.now()-d.hoverSince>150)return;
+ // Holding over the center of a tab should NEVER relocate the source.
+ if(d.hoverId)return;
  const direction=Math.sign(e.clientX-d.lastX);d.lastX=e.clientX;
  const sibling=direction>0?d.tab.nextElementSibling:direction<0?d.tab.previousElementSibling:null;
  if(sibling&&sibling.classList.contains('tab')){
@@ -347,7 +359,7 @@ window.addEventListener('pointerup',async()=>{
  const d=tabPointer;if(!d)return;
  if(d.moving)suppressTabClickUntil=Date.now()+300;
  const moving=d.moving;
- const targetId=d.hoverId&&performance.now()-d.hoverSince>=420?d.hoverId:null;
+ const targetId=d.hoverId&&performance.now()-d.hoverSince>=250?d.hoverId:null;
  const destination=d.targetRow;
  const source=d.sourceStack;
  for(const node of document.querySelectorAll('.stack-drop-target'))node.classList.remove('stack-drop-target');
