@@ -280,6 +280,16 @@ $('notion-rail').onclick=async()=>{
   window.alert('Could not open Notion: '+error.message);
  }
 };
+const notionSidebarDemo=$('notion-sidebar-demo');
+notionSidebarDemo.onclick=async()=>{
+ notionSidebarDemo.disabled=true;
+ try{
+  const result=await action('notion-sidebar-demo');
+  notionSidebarDemo.title=result?.ok?'Notion sidebar '+result.action+' (demo)':result?.reason||'Notion sidebar toggle unavailable';
+  if(!result?.ok)window.alert(notionSidebarDemo.title);
+ }catch(error){window.alert('Notion sidebar demo: '+error.message);}
+ finally{notionSidebarDemo.disabled=false;}
+};
 for(const id of ['back','forward','reload'])$(id).onclick=()=>action(id);
 for(const id of ['external','settings-rail'])$(id).onclick=()=>action('open-external');
 const toggleSidebar=()=>{sidebarOpen=!sidebarOpen;updateSidebar();};
