@@ -195,8 +195,8 @@ let sidebarDrag=null,sidebarDesired=null,sidebarWorker=null;
 const clampSidebarWidth=x=>Math.round(Math.max(64,Math.min(560,Math.max(64,window.innerWidth-420),x)));
 function snapSidebarWidth(width,drag){
  // Hysteresis avoids a sliver of tiny, clipped icons and prevents edge flicker.
- if(drag.snapClosed){if(width<123)return 64;drag.snapClosed=false;}
- else if(width<=106){drag.snapClosed=true;return 64;}
+ if(drag.snapClosed){if(width<105)return 64;drag.snapClosed=false;}
+ else if(width<=88){drag.snapClosed=true;return 64;}
  return width;
 }
 function queueSidebarResize(width){
