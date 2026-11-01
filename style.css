@@ -422,33 +422,23 @@ body.panel-collapsed #sidebar-resize-handle{display:none}
 /* No sidebar easing while the native web view and renderer resize together. */
 body.resizing-sidebar .sidebar,body.resizing-sidebar .sidebar.hidden{transition:none!important}
 
-/* Adaptive compact sidebar: preserve content instead of clipping a 242px layout. */
-body.sidebar-compact .sidebar{padding:17px 8px 12px;gap:10px}
-body.sidebar-compact .sidebar>*{min-width:0;width:100%;max-width:100%;box-sizing:border-box}
-body.sidebar-compact .sidebar-title{padding:0 3px;margin-bottom:4px;gap:3px}
-body.sidebar-compact .sidebar-title strong{font-size:12px;letter-spacing:-.3px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-body.sidebar-compact .sidebar-title-actions{display:flex;flex:none;gap:0}
-body.sidebar-compact .sidebar-title-actions button{width:22px;height:26px;font-size:17px}
-body.sidebar-compact .eyebrow{font-size:9px;letter-spacing:.75px;margin-left:4px}
-body.sidebar-compact .workspace,body.sidebar-compact .chat-row{min-width:0;width:100%;gap:6px;padding:9px 7px}
-body.sidebar-compact .workspace .emoji,body.sidebar-compact .chat-row .symbol{flex:none}
-body.sidebar-compact .workspace .name,body.sidebar-compact .chat-row .label{min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px}
-body.sidebar-compact .workspace .count{font-size:10px;flex:none}
-body.sidebar-compact .workspace .workspace-edit,body.sidebar-compact .workspace .workspace-menu{font-size:14px;padding:1px}
-body.sidebar-compact .conversation-head{margin-top:4px;padding-top:9px;gap:3px}
-body.sidebar-compact .conversation-head button#new-sidebar{width:22px;height:26px;font-size:19px;flex:none}
-body.sidebar-compact .conversation-collapse{min-width:0;padding:4px 2px;gap:2px}
-body.sidebar-compact .conversation-collapse .eyebrow{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-body.sidebar-compact .conversation-list{min-height:0}
-body.sidebar-compact .page-controls{gap:2px;padding:7px 0;font-size:10px}
-body.sidebar-compact .page-controls button{padding:5px 3px;font-size:9px}
-body.sidebar-compact .quick-jumps{padding:9px 2px;gap:5px}
-body.sidebar-compact .quick-jump{width:29px;height:29px;font-size:16px}
-body.sidebar-compact .profile{padding:12px 3px 3px;gap:7px}
-body.sidebar-compact .profile .avatar{width:26px;height:26px;flex:none;font-size:11px}
-body.sidebar-compact .profile>div{min-width:0}
-body.sidebar-compact .profile strong,body.sidebar-compact .profile small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-body.sidebar-compact .profile strong{font-size:10px}
-body.sidebar-compact .profile small{font-size:9px}
-/* Remove the fixed child width for all expanded widths too. */
-.sidebar>*{max-width:100%;box-sizing:border-box}
+/* Fluid sidebar sizing: no abrupt breakpoint jumps while dragging. */
+:root{--hexora-sidebar-fluid:1}
+.sidebar,.sidebar.hidden{padding-left:clamp(8px,calc(8px + 4px * var(--hexora-sidebar-fluid)),12px);padding-right:clamp(8px,calc(8px + 4px * var(--hexora-sidebar-fluid)),12px);gap:clamp(10px,calc(10px + 4px * var(--hexora-sidebar-fluid)),14px)}
+.sidebar>*{min-width:0;max-width:100%;box-sizing:border-box}
+.sidebar-title{min-width:0;gap:5px}
+.sidebar-title strong{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:clamp(12px,calc(12px + 5px * var(--hexora-sidebar-fluid)),17px)}
+.sidebar-title-actions{flex:none;display:flex;gap:1px}
+.sidebar-title-actions button{width:clamp(22px,calc(22px + 8px * var(--hexora-sidebar-fluid)),30px);height:28px;font-size:clamp(17px,calc(17px + 7px * var(--hexora-sidebar-fluid)),24px)}
+.sidebar .eyebrow{font-size:clamp(9px,calc(9px + 2px * var(--hexora-sidebar-fluid)),11px);letter-spacing:clamp(.75px,calc(.75px + .55px * var(--hexora-sidebar-fluid)),1.3px)}
+.sidebar .workspace,.sidebar .chat-row{min-width:0;width:100%;gap:clamp(6px,calc(6px + 5px * var(--hexora-sidebar-fluid)),11px);padding:clamp(7px,calc(7px + 4px * var(--hexora-sidebar-fluid)),11px)}
+.sidebar .workspace .name,.sidebar .chat-row .label{min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:clamp(11px,calc(11px + 2px * var(--hexora-sidebar-fluid)),13px)}
+.sidebar .workspace .count{flex:none;font-size:10px}
+.sidebar .conversation-head{gap:3px}
+.sidebar .conversation-collapse{min-width:0;gap:3px}
+.sidebar .conversation-collapse .eyebrow{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.sidebar .quick-jumps{gap:clamp(5px,calc(5px + 2px * var(--hexora-sidebar-fluid)),7px)}
+.sidebar .quick-jump{width:clamp(29px,calc(29px + 3px * var(--hexora-sidebar-fluid)),32px);height:clamp(29px,calc(29px + 3px * var(--hexora-sidebar-fluid)),32px);font-size:clamp(16px,calc(16px + 2px * var(--hexora-sidebar-fluid)),18px)}
+.sidebar .profile{gap:7px;min-width:0}
+.sidebar .profile>div{min-width:0}
+.sidebar .profile strong,.sidebar .profile small{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
