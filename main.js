@@ -547,6 +547,16 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
  ipcMain.handle('vault:get',(_e,id)=>vault.get(id));
  ipcMain.handle('vault:save',(_e,entry)=>vault.save(entry));
  ipcMain.handle('vault:delete',(_e,id)=>vault.remove(id));
+ ipcMain.handle('vault:autofill',async(_e,id)=>{
+  if(vault.status().locked)throw Error('Unlock the vault first.');
+  const entry=vault.get(id),tab=store.get(activeId),view=live.get(activeId);
+  if(!tab||!view||view.webContents.isDestroyed())throw Error('No active website is loaded.');
+  const target=new URL(view.webContents.getURL()),saved=new URL(entry.site);
+  if(target.protocol!=='https:'||saved.protocol!=='https:'||target.hostname!==saved.hostname)throw Error('Saved login domain does not match the current HTTPS website.');
+  const credentials={username:entry.username,password:entry.password};
+  const script='(()=>{const c='+JSON.stringify(credentials)+';const visible=e=>e&&e.getClientRects().length&&!e.disabled&&!e.readOnly;const fields=[...document.querySelectorAll("input")].filter(visible);const pass=fields.find(e=>e.type==="password");if(!pass)return{filled:false,reason:"No visible password field found."};const user=fields.filter(e=>e!==pass&&["text","email","tel"].includes(e.type)).find(e=>/user|email|login|account|identifier/i.test([e.name,e.id,e.autocomplete,e.placeholder].join(" ")))||fields.filter(e=>e!==pass&&["text","email"].includes(e.type)).find(e=>{const a=e.compareDocumentPosition(pass);return !!(a&Node.DOCUMENT_POSITION_FOLLOWING);});const set=(el,value)=>{if(!el)return;const descriptor=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,"value");descriptor.set.call(el,value);el.dispatchEvent(new Event("input",{bubbles:true}));el.dispatchEvent(new Event("change",{bubbles:true}));};set(user,c.username);set(pass,c.password);return{filled:true,username:!!user};})()';
+  return view.webContents.executeJavaScript(script,true);
+ });
  ipcMain.handle('vault:copy',(_e,args)=>{
   if(vault.status().locked)throw Error('Vault locked');
   const entry=vault.get(args?.id);
