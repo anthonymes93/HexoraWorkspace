@@ -1,5 +1,57 @@
 const $=id=>document.getElementById(id);
 const workspaces=[{id:'web',name:'Web Development',emoji:'◈'},{id:'business',name:'Business',emoji:'▤'},{id:'personal',name:'Personal',emoji:'☼'},{id:'ideas',name:'Ideas Lab',emoji:'✦'}];
+const sidebarWorkspaceOrderKey='hexora-sidebar-workspace-order';
+const sidebarConversationOrderPrefix='hexora-sidebar-conversation-order:';
+function sidebarOrder(key){
+ try{const ids=JSON.parse(localStorage.getItem(key)||'[]');return Array.isArray(ids)?ids:[];}catch{return [];}
+}
+function orderSidebarItems(items,key,identify){
+ const desired=sidebarOrder(key),indices=new Map(desired.map((id,i)=>[String(id),i]));
+ return [...items].sort((a,b)=>{
+  const ai=indices.get(String(identify(a))),bi=indices.get(String(identify(b)));
+  return (ai===undefined?Number.MAX_SAFE_INTEGER:ai)-(bi===undefined?Number.MAX_SAFE_INTEGER:bi);
+ });
+}
+function saveSidebarReorder(key,from,to){
+ const items=key===sidebarWorkspaceOrderKey
+  ?[...document.querySelectorAll('#workspaces > .workspace[data-reorder-id]')]
+  :[...document.querySelectorAll('#conversations > .chat-row[data-reorder-id]')];
+ const ids=items.map(el=>el.dataset.reorderId),source=ids.indexOf(from),target=ids.indexOf(to);
+ if(source<0||target<0||source===target)return;
+ ids.splice(target,0,ids.splice(source,1)[0]);
+ // Keep the current page's order and retain entries on other pages.
+ const existing=sidebarOrder(key).map(String).filter(id=>!ids.includes(id));
+ localStorage.setItem(key,JSON.stringify([...ids,...existing]));
+ refresh();
+}
+function enableSidebarDrag(el,id,key){
+ el.dataset.reorderId=String(id);
+ el.draggable=true;
+ el.addEventListener('dragstart',event=>{
+  if(event.target.closest('.workspace-edit,.quick-pin')){event.preventDefault();return;}
+  event.dataTransfer.effectAllowed='move';
+  event.dataTransfer.setData('text/x-hexora-sidebar',JSON.stringify({key,id:String(id)}));
+  el.classList.add('sidebar-dragging');
+ });
+ el.addEventListener('dragend',()=>{
+  document.querySelectorAll('.sidebar-drop-target,.sidebar-dragging').forEach(node=>node.classList.remove('sidebar-drop-target','sidebar-dragging'));
+ });
+ el.addEventListener('dragover',event=>{
+  const data=event.dataTransfer.types;
+  if(!data.includes('text/x-hexora-sidebar'))return;
+  event.preventDefault();event.dataTransfer.dropEffect='move';
+  document.querySelectorAll('.sidebar-drop-target').forEach(node=>node.classList.remove('sidebar-drop-target'));
+  el.classList.add('sidebar-drop-target');
+ });
+ el.addEventListener('dragleave',event=>{if(!el.contains(event.relatedTarget))el.classList.remove('sidebar-drop-target');});
+ el.addEventListener('drop',event=>{
+  event.preventDefault();event.stopPropagation();
+  document.querySelectorAll('.sidebar-drop-target').forEach(node=>node.classList.remove('sidebar-drop-target'));
+  let payload;try{payload=JSON.parse(event.dataTransfer.getData('text/x-hexora-sidebar'));}catch{return;}
+  if(payload.key!==key)return;
+  saveSidebarReorder(key,payload.id,String(id));
+ });
+}
 let activeWorkspace='web',sidebarOpen=true,offset=0,currentPage=null,refreshing=false,refreshPending=false;
 let contextTab=null,websiteTarget=null,workspaceEditing=null;
 let selectedStackId=null;
@@ -87,24 +139,24 @@ function render(p){
  const workspace=workspaces.find(w=>w.id===activeWorkspace)||workspaces[0];
  $('current-workspace').textContent=workspace.emoji+'  '+workspace.name;
  const container=$('workspaces');container.replaceChildren();
- for(const w of workspaces){
+ for(const w of orderSidebarItems(workspaces,sidebarWorkspaceOrderKey,w=>w.id)){
   const el=document.createElement('button');el.className='workspace'+(w.id===activeWorkspace?' selected':'');
   const symbol=document.createElement('span');symbol.className='emoji';symbol.textContent=w.emoji;
   const label=document.createElement('span');label.className='name';label.textContent=w.name;
   const count=document.createElement('span');count.className='count';count.textContent=p.counts.find(x=>x.workspace===w.id)?.count||0;
   const edit=document.createElement('span');edit.className='workspace-edit';edit.title='Edit workspace';edit.textContent='⋯';edit.onclick=e=>{e.stopPropagation();openWorkspaceEditor(w.id);};
-  el.append(symbol,label,count,edit);el.onclick=async()=>{activeWorkspace=w.id;offset=0;save();await action('switch-workspace',w.id);refresh();};container.append(el);
+  el.append(symbol,label,count,edit);el.onclick=async()=>{activeWorkspace=w.id;offset=0;save();await action('switch-workspace',w.id);refresh();};enableSidebarDrag(el,w.id,sidebarWorkspaceOrderKey);container.append(el);
  }
  const conversations=$('conversations');conversations.replaceChildren();
  renderStackTree(conversations,p);
- for(const item of p.tabs){
+ for(const item of orderSidebarItems(p.tabs,sidebarConversationOrderPrefix+activeWorkspace,t=>t.id)){
   const el=document.createElement('button');el.className='chat-row'+(item.active?' active':'');
   const symbol=document.createElement('span');symbol.className='symbol';symbol.textContent=item.suspended?'☾':'▤';
   const name=document.createElement('span');name.className='label';name.textContent=item.title||'New tab';
   const mute=document.createElement('span');mute.className='quick-pin';mute.title=item.muted?'Unmute':'Mute';mute.textContent=item.muted?'◉':'♫';mute.onclick=e=>{e.stopPropagation();action('mute',item.id);};
   const detach=document.createElement('span');detach.className='quick-pin';detach.title='Detach into another window';detach.textContent='↗';detach.onclick=e=>{e.stopPropagation();action('detach',item.id);};
   const pin=document.createElement('span');pin.className='quick-pin';pin.title=item.pinned?'Unpin':'Pin';pin.textContent=item.pinned?'◆':'◇';pin.onclick=e=>{e.stopPropagation();action('pin',item.id);};
-  el.append(symbol,name,mute,pin,detach);el.onclick=()=>action('activate',item.id);el.addEventListener('contextmenu',e=>{e.preventDefault();e.stopPropagation();showTabMenu(e.clientX,e.clientY,item);});conversations.append(el);
+  el.append(symbol,name,mute,pin,detach);el.onclick=()=>action('activate',item.id);el.addEventListener('contextmenu',e=>{e.preventDefault();e.stopPropagation();showTabMenu(e.clientX,e.clientY,item);});enableSidebarDrag(el,item.id,sidebarConversationOrderPrefix+activeWorkspace);conversations.append(el);
  }
  const nav=document.createElement('div');nav.className='page-controls';
  const prev=document.createElement('button');prev.textContent='‹ Previous';prev.disabled=offset===0;prev.onclick=()=>{offset=Math.max(0,offset-50);refresh();};
