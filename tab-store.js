@@ -78,6 +78,20 @@ class TabStore {
    this.db.exec('COMMIT');return id;
   }catch(e){this.db.exec('ROLLBACK');throw e;}
  }
+ createStackPair(workspace,name,sourceId,targetId,parentId){
+  if(sourceId===targetId)throw Error('Choose two distinct tabs');
+  if(this.get(sourceId)?.workspace!==workspace||this.get(targetId)?.workspace!==workspace)throw Error('Tabs must belong to the same workspace');
+  this.db.exec('BEGIN');
+  try{
+   const row=parentId===null?null:this.db.prepare('SELECT workspace FROM tab_stacks WHERE id=?').get(parentId);
+   if(parentId!==null&&row?.workspace!==workspace)throw Error('Invalid parent stack');
+   const result=this.db.prepare('INSERT INTO tab_stacks(workspace,name,parent_id) VALUES(?,?,?)').run(workspace,name,parentId);
+   const id=Number(result.lastInsertRowid);
+   const move=this.db.prepare('INSERT INTO tab_stack_members(tab_id,stack_id) VALUES(?,?) ON CONFLICT(tab_id) DO UPDATE SET stack_id=excluded.stack_id');
+   move.run(targetId,id);move.run(sourceId,id);
+   this.db.exec('COMMIT');return id;
+  }catch(error){this.db.exec('ROLLBACK');throw error;}
+ }
  putTabInStack(tabId,stackId){
   const tab=this.get(tabId);if(!tab)throw Error('Tab not found');
   if(stackId===null){this.db.prepare('DELETE FROM tab_stack_members WHERE tab_id=?').run(tabId);return;}
