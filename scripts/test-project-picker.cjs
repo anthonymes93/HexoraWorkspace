@@ -70,3 +70,18 @@ test('Hexora project picker navigates real folders and persists recents/favorite
   fs.rmSync(root,{recursive:true,force:true});
  }
 });
+
+
+test('project modal exposes a permanent editable address field and real folder browsing',()=>{
+ const html=fs.readFileSync(path.join(__dirname,'..','toolbar.html'),'utf8');
+ const js=fs.readFileSync(path.join(__dirname,'..','project-picker.js'),'utf8');
+ const source=fs.readFileSync(path.join(__dirname,'..','main.js'),'utf8');
+ assert.match(html,/<form id="hpp-path-form" class="hpp-path-form">/,'address bar must not start hidden');
+ assert.match(html,/id="hpp-path" type="text"/);
+ assert.match(js,/codePicker\.validate\(typed\)/,'Open Project validates typed paths');
+ assert.match(js,/codePicker\.focus\(\)/,'native editor focus should be reclaimed for typing');
+ assert.match(js,/event\.ctrlKey&&event\.key\.toLowerCase\(\)==='l'/,'Ctrl+L opens the address field');
+ assert.match(source,/code-picker:focus/);
+ assert.match(source,/code-picker:list/);
+ assert.match(js,/name==='computer'/,'This PC drive list must be connected');
+});
