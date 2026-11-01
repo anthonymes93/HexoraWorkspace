@@ -166,7 +166,7 @@ function render(p){
   const label=document.createElement('span');label.className='name';label.textContent=w.name;
   const count=document.createElement('span');count.className='count';count.textContent=p.counts.find(x=>x.workspace===w.id)?.count||0;
   const edit=document.createElement('span');edit.className='workspace-edit';edit.title='Edit workspace';edit.textContent='⋯';edit.onclick=e=>{e.stopPropagation();openWorkspaceEditor(w.id);};
-  el.append(symbol,label,count,edit);el.addEventListener('contextmenu',e=>showWorkspaceMenu(e,w));el.onclick=async()=>{activeWorkspace=w.id;offset=0;save();await action('switch-workspace',w.id);refresh();};enableSidebarDrag(el,w.id,sidebarWorkspaceOrderKey);container.append(el);
+  el.append(symbol,label,count,edit);attachWorkspaceHoverTip(el,w,Number(count.textContent)||0);el.addEventListener('contextmenu',e=>showWorkspaceMenu(e,w));el.onclick=async()=>{activeWorkspace=w.id;offset=0;save();await action('switch-workspace',w.id);refresh();};enableSidebarDrag(el,w.id,sidebarWorkspaceOrderKey);container.append(el);
  }
  const conversations=$('conversations');conversations.replaceChildren();
  renderStackTree(conversations,p);
@@ -956,6 +956,38 @@ window.hexora.onSidebarFrame((width,transitioning=false,target=null)=>{
  }
 });
 
+let workspaceHoverTimer=null;
+const workspaceHoverTip=document.createElement('div');
+workspaceHoverTip.className='workspace-hover-tip hidden';
+workspaceHoverTip.setAttribute('role','tooltip');
+workspaceHoverTip.innerHTML='<span class="workspace-tip-icon"></span><span class="workspace-tip-details"><strong></strong><small></small></span>';
+document.body.append(workspaceHoverTip);
+function hideWorkspaceHoverTip(){
+ clearTimeout(workspaceHoverTimer);workspaceHoverTimer=null;
+ workspaceHoverTip.classList.add('hidden');
+}
+function attachWorkspaceHoverTip(el,w,count){
+ el.removeAttribute('title');
+ el.addEventListener('pointerenter',e=>{
+  if(e.pointerType==='touch')return;
+  hideWorkspaceHoverTip();
+  if(!document.body.classList.contains('sidebar-icons-only'))return;
+  workspaceHoverTimer=setTimeout(()=>{
+   if(!el.isConnected||!el.matches(':hover')||!document.body.classList.contains('sidebar-icons-only'))return;
+   workspaceHoverTip.querySelector('.workspace-tip-icon').textContent=w.emoji;
+   workspaceHoverTip.querySelector('strong').textContent=w.name;
+   workspaceHoverTip.querySelector('small').textContent=count+' saved '+(count===1?'tab':'tabs');
+   workspaceHoverTip.classList.remove('hidden');
+   const icon=el.getBoundingClientRect();
+   const tip=workspaceHoverTip.getBoundingClientRect();
+   workspaceHoverTip.style.left=Math.min(window.innerWidth-tip.width-12,Math.max(68,icon.right+12))+'px';
+   workspaceHoverTip.style.top=Math.max(12,Math.min(window.innerHeight-tip.height-12,icon.top+(icon.height-tip.height)/2))+'px';
+  },240);
+ });
+ el.addEventListener('pointerleave',hideWorkspaceHoverTip);
+ el.addEventListener('pointerdown',hideWorkspaceHoverTip);
+ el.addEventListener('contextmenu',hideWorkspaceHoverTip);
+}
 function showWorkspaceMenu(event,workspace){
  event.preventDefault();event.stopPropagation();
  const count=currentPage?.counts.find(x=>x.workspace===workspace.id)?.count||0;
