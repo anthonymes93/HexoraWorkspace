@@ -6,9 +6,13 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "benchmark:tabs": "node --experimental-sqlite scripts/benchmark-tabs.cjs"
+    "benchmark:tabs": "node --experimental-sqlite scripts/benchmark-tabs.cjs",
+    "test:editor": "node --test integrations/code/editor-provider.test.cjs"
   },
   "devDependencies": {
     "electron": "^38.0.0"
+  },
+  "dependencies": {
+    "code-server": "^4.99.3"
   }
 }

@@ -2,6 +2,7 @@
 const {app,BrowserWindow,WebContentsView,View,session,ipcMain,shell,dialog,clipboard,safeStorage,Menu}=require('electron');
 const path=require('node:path');
 const {EditorSession,CAPABILITIES}=require('./integrations/code/editor-provider');
+const {LocalEditorRuntime}=require('./integrations/code/local-editor-runtime');
 const {screen}=require('electron');
 const {TabStore}=require('./tab-store');
 const {PasswordVault}=require('./password-vault');
@@ -28,6 +29,7 @@ const LAYOUT_KEY='detachedWindowIds';
 function savedDetachedIds(){try{const values=JSON.parse(store.getMeta(LAYOUT_KEY)||'[]');return Array.isArray(values)?values.filter(x=>Number.isSafeInteger(x)&&x>0).slice(0,32):[];}catch{return [];}}
 function setDetachedSaved(id,present){const ids=new Set(savedDetachedIds());if(present)ids.add(id);else ids.delete(id);store.setMeta(LAYOUT_KEY,JSON.stringify([...ids]));}
 let editorView=null,editorSession=null,editorVisible=false;
+const editorRuntime=new LocalEditorRuntime();
 let mainViewport=null,win,store,activeId=null,sidebarWidth=330,live=new Map(),favicons=new Map(),loading=new Map(),stateTimer=null,modalVisible=false,recoveryPassword=null,recoveryDir=null,recoveryTimer=null,recoveryBusy=false,lastBackup=null;
 const extensionPartition='persist:hexora-chatgpt';
 let extensionRecords=[],extensionLoaded=new Map(),extensionSession=null,extensionConfigFile=null;
@@ -417,7 +419,7 @@ async function toggleEditor(address){
   const current=live.get(activeId);if(current&&!modalVisible){mainViewport.addChildView(current);bounds();current.webContents.focus();}
   return {visible:false};
  }
- const url=localEditorAddress(address);
+ const url=address?localEditorAddress(address):await editorRuntime.start();
  if(!editorSession){
   editorSession=new EditorSession({id:'local-code-editor',capabilities:[CAPABILITIES.FOCUS,CAPABILITIES.EMBEDDED],
    async start(){editorView=new WebContentsView({webPreferences:{sandbox:true,contextIsolation:true,nodeIntegration:false}});editorView.webContents.setWindowOpenHandler(()=>({action:'deny'}));await editorView.webContents.loadURL(url);},
@@ -808,6 +810,6 @@ app.whenReady().then(()=>{
   emit();return true;
  });
  setInterval(sweep,60*1000).unref();
- win.on('closed',()=>{if(editorView){editorView.webContents.close();editorView=null;}editorSession=null;editorVisible=false;quitting=true;for(const folder of [...extensionPopups.keys()])closeExtensionPopup(folder);if(sidebarAnimation)clearInterval(sidebarAnimation);for(const popup of detached.values())if(!popup.isDestroyed())popup.close();detached.clear();clearInterval(recoveryTimer);recoveryPassword=null;clearTimeout(stateTimer);win=null;for(const id of Array.from(live.keys()))discard(id);vault?.lock();store.close();});
+ win.on('closed',()=>{editorRuntime.stop();if(editorView){editorView.webContents.close();editorView=null;}editorSession=null;editorVisible=false;quitting=true;for(const folder of [...extensionPopups.keys()])closeExtensionPopup(folder);if(sidebarAnimation)clearInterval(sidebarAnimation);for(const popup of detached.values())if(!popup.isDestroyed())popup.close();detached.clear();clearInterval(recoveryTimer);recoveryPassword=null;clearTimeout(stateTimer);win=null;for(const id of Array.from(live.keys()))discard(id);vault?.lock();store.close();});
 });
 app.on('window-all-closed',()=>{if(process.platform!=='darwin')app.quit();});

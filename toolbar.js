@@ -1348,10 +1348,10 @@ v('vault-delete').onclick=async()=>{if(!vaultSelected||!confirm('Delete this sav
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&vaultOpen)vaultClose();});
 
 document.getElementById('editor-rail').addEventListener('click',async()=>{
- try{const state=await window.hexora.editor.toggle(localStorage.getItem('hexora-editor-url')||'http://127.0.0.1:8080');document.getElementById('editor-rail').classList.toggle('selected',state.visible);}
- catch(e){alert('Code editor: '+e.message+'\nStart your local code-server or OpenVSCode Server first.');}
+ try{const state=await window.hexora.editor.toggle(localStorage.getItem('hexora-editor-url')||null);document.getElementById('editor-rail').classList.toggle('selected',state.visible);}
+ catch(e){alert('Code editor: '+e.message+'\nCheck that the bundled editor runtime was installed successfully.');}
 });
 document.getElementById('editor-rail').addEventListener('contextmenu',e=>{
- e.preventDefault();const url=prompt('Local code editor URL',localStorage.getItem('hexora-editor-url')||'http://127.0.0.1:8080');
- if(url!==null)localStorage.setItem('hexora-editor-url',url);
+ e.preventDefault();const url=prompt('Local code editor URL',localStorage.getItem('hexora-editor-url')||'');
+ if(url!==null){if(url.trim())localStorage.setItem('hexora-editor-url',url.trim());else localStorage.removeItem('hexora-editor-url');}
 });
