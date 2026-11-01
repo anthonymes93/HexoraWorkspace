@@ -151,7 +151,8 @@ function chromeUserAgent(wc){const ua=wc.getUserAgent();return ua.replace(/\s+(?
 const CHATGPT_DRAFT_GUARD=`(()=>{
  if(window.__hexoraDraftGuard)return;
  window.__hexoraDraftGuard=true;
- let ownDraft='',userEdited=false,writing=false,currentEditor=null;
+ let ownDraft=__HEXORA_SAVED_DRAFT__,userEdited=false,writing=false,currentEditor=null;
+ window.__hexoraReadDraft=()=>ownDraft;
  const selector='#prompt-textarea,[data-testid="composer-input"],textarea[placeholder*="Message"],[contenteditable="true"][role="textbox"]';
  const read=el=>el?.isContentEditable?(el.innerText||''):(el?.value||'');
  const write=(el,value)=>{
