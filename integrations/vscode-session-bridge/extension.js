@@ -33,7 +33,7 @@ function readSaved(file){
 function getEditorState(editor){
  if(!editor||editor.document.uri.scheme!=='file')return null;
  const position=editor.selection.active;
- return {version:1,path:editor.document.uri.fsPath,line:position.line,character:position.character,updatedAt:Date.now()};
+ return {version:1,path:editor.document.uri.fsPath,workspaceRoot:vscode.workspace.workspaceFolders?.[0]?.uri.fsPath||'',line:position.line,character:position.character,updatedAt:Date.now()};
 }
 function commitSnapshot(){
  timer=null;
@@ -57,6 +57,8 @@ function queueSnapshot(){
 async function restoreEditor(){
  const state=savedEditor;
  if(!state)return;
+ const currentRoot=vscode.workspace.workspaceFolders?.[0]?.uri.fsPath||'';
+ if(!currentRoot||!state.workspaceRoot||path.normalize(currentRoot).toLowerCase()!==path.normalize(state.workspaceRoot).toLowerCase())return;
  try{
   const uri=vscode.Uri.file(state.path);
   await vscode.workspace.fs.stat(uri);
