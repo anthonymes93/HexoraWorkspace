@@ -107,44 +107,63 @@
  function renderRows(){
   const host=q('hpp-folders');host.replaceChildren();
   const query=q('hpp-search-input').value.trim().toLocaleLowerCase();
-  const list=rows.filter(item=>item.name.toLocaleLowerCase().includes(query));
-  q('hpp-count').textContent=list.length+' '+(list.length===1?'folder':'folders');
+  // Browse-mode searches are sent to the main process so a match can be
+  // found even when it lies beyond the visible entry limit.
+  const list=mode==='browse'?rows:rows.filter(item=>item.name.toLocaleLowerCase().includes(query));
+  q('hpp-count').textContent=mode==='browse'
+   ?currentCounts.folderCount+' folders · '+currentCounts.fileCount+' files'+(currentCounts.truncated?' · more':'')
+   :list.length+' '+(list.length===1?'location':'locations');
   if(!list.length){
    const empty=document.createElement('p');empty.className='hpp-empty';
-   empty.textContent=loading?'Loading folders…':query?'No matching folders':'No folders to display';
+   empty.textContent=loading?'Loading files and folders…':query?'No matching files or folders':'No files or folders to display';
    host.append(empty);return;
   }
-  list.forEach(item=>{
-   // A div avoids invalid nested button elements around the favorite control.
-   const row=document.createElement('div');row.className='hpp-folder-row'+(selected===item.path?' selected':'');
-   row.tabIndex=0;row.setAttribute('role','option');row.setAttribute('aria-selected',String(selected===item.path));
+  for(const item of list){
+   const isFile=item.type==='file';
+   const row=document.createElement('div');
+   row.className='hpp-folder-row'+(!isFile&&selected===item.path?' selected':'')+(isFile?' hpp-file':'');
+   row.tabIndex=0;row.setAttribute('role','option');
+   row.setAttribute('aria-selected',String(!isFile&&selected===item.path));
    row.title=item.path;row.dataset.path=item.path;
    const name=document.createElement('span');name.className='hpp-row-name';
-   const icon=document.createElement('span');icon.className='hpp-folder-icon';icon.textContent='▰';
+   const icon=document.createElement('span');icon.className=isFile?'hpp-file-icon':'hpp-folder-icon';
+   icon.textContent=isFile?'▤':'▰';
    const label=document.createElement('span');label.textContent=item.name;
    name.append(icon,label);
    const date=document.createElement('span');date.className='hpp-row-date';date.textContent=formatDate(item.modified);
-   const favorite=button(item.favorite?'★':'☆','hpp-favorite'+(item.favorite?' active':''),item.favorite?'Remove favorite':'Add favorite');
-   favorite.setAttribute('aria-label',(item.favorite?'Unfavorite ':'Favorite ')+item.name);
-   favorite.onclick=async event=>{
-    event.stopPropagation();
-    try{
-     await window.hexora.codePicker.favorite(item.path);
-     await loadLocations();
-     if(mode==='favorites')rows=favorites;
-     else if(mode==='recent')rows=recent;
-     else rows=rows.map(row=>row.path===item.path?{...row,favorite:!row.favorite}:row);
-     renderRows();
-    }catch(e){error(e.message);}
+   let third;
+   if(isFile){
+    third=document.createElement('span');third.className='hpp-file-tag';third.textContent='File';
+   }else{
+    third=button(item.favorite?'★':'☆','hpp-favorite'+(item.favorite?' active':''),item.favorite?'Remove favorite':'Add favorite');
+    third.setAttribute('aria-label',(item.favorite?'Unfavorite ':'Favorite ')+item.name);
+    third.onclick=async event=>{
+     event.stopPropagation();
+     try{
+      await window.hexora.codePicker.favorite(item.path);
+      await loadLocations();
+      if(mode==='favorites')rows=favorites;
+      else if(mode==='recent')rows=recent;
+      else rows=rows.map(entry=>entry.path===item.path?{...entry,favorite:!entry.favorite}:entry);
+      renderRows();
+     }catch(e){error(e.message);}
+    };
+   }
+   row.append(name,date,third);
+   row.onclick=()=>{
+    if(isFile){error('This is a file. Choose a folder to open as a VS Code project.');return;}
+    error('');setSelected(item.path);
    };
-   row.append(name,date,favorite);
-   row.onclick=()=>setSelected(item.path);
-   row.ondblclick=()=>navigate(item.path);
+   row.ondblclick=()=>{if(!isFile)navigate(item.path);};
    row.onkeydown=event=>{
-    if(event.key==='Enter'||event.key==='ArrowRight'){event.preventDefault();navigate(item.path);}
+    if(event.key==='Enter'||event.key==='ArrowRight'){
+     event.preventDefault();
+     if(!isFile)navigate(item.path);
+     else error('Choose a folder, not a file.');
+    }
    };
    host.append(row);
-  });
+  }
  }
  async function loadLocations(){
   const data=await window.hexora.codePicker.locations();
