@@ -1,0 +1,39 @@
+'use strict';
+const {app,BrowserWindow,WebContentsView,ipcMain,session}=require('electron');
+const fs=require('fs'),path=require('path'),crypto=require('crypto');
+const SERVICES={gmail:'https://mail.google.com/mail/u/0/#inbox',outlook:'https://outlook.live.com/mail/',proton:'https://mail.proton.me/',custom:null};
+let windowRef=null,views=new Map(),active=null,panelOpen=false;
+const HEADER_HEIGHT=84;
+const EMAIL_APP_ID='com.hexora.workspace.email';
+const EMAIL_ICON_BASE64='AAABAAEAICAAAAAAIAACAQAAFgAAAIlQTkcNChoKAAAADUlIRFIAAAAgAAAAIAgGAAAAc3p69AAAAMlJREFUeJztlsEVgCAIhrPXGLVFzZf7OYaD1MmLAYLwpINcOpj8n4o/hv28n8UxVk/xCTABfgGwUYM5RTOh44JzBcgHLIVbIOQRYNRaURKgrL5M0kLUeerdBXegFu2F4OQBAaAakEJA/0N50RrQQHDFSQAKAgPBxqhb1TQibDK3TlpXmuWEOUXySLBVc/xEZMXcupAYmbgXtJJLXbSrGWEiPRbe3Q2LWP0dBmAhrgawiA+AVQfEQtSORwT4ICnh9iIaGe5HMAEmwAuyG1t3GpB6PgAAAABJRU5ErkJggg==';
+function emailIconPath(){
+ const dir=path.join(app.getPath('userData'),'icons');
+ const dest=path.join(dir,'hexora-email.ico');
+ if(!fs.existsSync(dest)){fs.mkdirSync(dir,{recursive:true});fs.writeFileSync(dest,Buffer.from(EMAIL_ICON_BASE64,'base64'));}
+ return dest;
+}
+
+const EMAIL_ZOOM=1; // Identical Electron zoom for every account; Gmail preferences remain account-specific.
+const file=()=>path.join(app.getPath('userData'),'hexora-email-accounts.json');
+function read(){try{const v=JSON.parse(fs.readFileSync(file(),'utf8'));return Array.isArray(v)?v.filter(x=>x&&/^[a-f0-9-]{36}$/.test(x.id)&&typeof x.url==='string'):[];}catch{return [];}}
+function write(items){const f=file();fs.mkdirSync(path.dirname(f),{recursive:true});fs.writeFileSync(f,JSON.stringify(items,null,2),{mode:0o600});}
+function publicState(){const view=views.get(active);return {accounts:read().map(({id,name,service,color})=>({id,name,service,color})),active,canBack:!!view?.webContents.navigationHistory?.canGoBack(),canForward:!!view?.webContents.navigationHistory?.canGoForward(),url:view?.webContents.getURL()||'',title:view?.webContents.getTitle()||'',maximized:!!windowRef?.isMaximized()};}
+function send(){if(windowRef&&!windowRef.isDestroyed())windowRef.webContents.send('email:changed',publicState());}
+function layout(){if(!windowRef||windowRef.isDestroyed())return;const [w,h]=windowRef.getContentSize();for(const [id,v] of views){v.setBounds({x:76,y:HEADER_HEIGHT,width:Math.max(1,w-76),height:Math.max(1,h-HEADER_HEIGHT)});v.setVisible(id===active&&!panelOpen);}}
+function show(id){const account=read().find(x=>x.id===id);if(!account||!windowRef||windowRef.isDestroyed())return;let view=views.get(id);if(!view){view=new WebContentsView({webPreferences:{partition:'persist:hexora-email-'+id,sandbox:true,contextIsolation:true,nodeIntegration:false}});// Match the Chrome User-Agent compatibility mode already used by Hexora tabs.
+const ua=view.webContents.getUserAgent().replace(/\s+(?:Electron|hexora-workspace)\/[^\s]+/gi,'').replace(/\s{2,}/g,' ').trim();
+view.webContents.setUserAgent(ua);
+views.set(id,view);windowRef.contentView.addChildView(view);view.webContents.setZoomFactor(EMAIL_ZOOM);view.webContents.on('did-finish-load',()=>view.webContents.setZoomFactor(EMAIL_ZOOM));view.webContents.on('did-navigate',()=>send());view.webContents.on('did-navigate-in-page',()=>send());view.webContents.on('page-title-updated',()=>send());view.webContents.setWindowOpenHandler(({url})=>{if(/^https:\/\//.test(url))require('electron').shell.openExternal(url);return {action:'deny'};});view.webContents.loadURL(account.url).catch(()=>{});}view.webContents.setZoomFactor(EMAIL_ZOOM);active=id;panelOpen=false;layout();send();}
+function open(){if(windowRef&&!windowRef.isDestroyed()){windowRef.show();windowRef.focus();return;}windowRef=new BrowserWindow({width:1280,height:840,minWidth:700,minHeight:450,title:'Hexora · Email',frame:false,titleBarStyle:'hidden',icon:emailIconPath(),backgroundColor:'#11131d',autoHideMenuBar:true,webPreferences:{preload:path.join(__dirname,'email-preload.js'),sandbox:true,contextIsolation:true,nodeIntegration:false}});if(process.platform==='win32')windowRef.setAppDetails({appId:EMAIL_APP_ID,appIconPath:emailIconPath(),appIconIndex:0,relaunchDisplayName:'Hexora Email'});
+windowRef.loadFile(path.join(__dirname,'email-window.html'));windowRef.on('resize',layout);windowRef.on('maximize',send);windowRef.on('unmaximize',send);windowRef.on('closed',()=>{for(const v of views.values())if(!v.webContents.isDestroyed())v.webContents.close();views.clear();active=null;panelOpen=false;windowRef=null;});windowRef.webContents.once('did-finish-load',()=>{const list=read();if(list.length)show(list[0].id);else send();});}
+function validate(data){const service=String(data?.service||'gmail');if(!Object.prototype.hasOwnProperty.call(SERVICES,service))throw Error('Unsupported email provider');const raw=service==='custom'?String(data?.url||''):SERVICES[service];let url;try{url=new URL(raw);}catch{throw Error('Invalid URL');}if(url.protocol!=='https:'||url.username||url.password)throw Error('An HTTPS URL without embedded credentials is required');const name=String(data?.name||service).trim().slice(0,48)||'Email';const color=/^#[0-9a-fA-F]{6}$/.test(data?.color)?data.color:'#1c347f';return {id:crypto.randomUUID(),service,url:url.href,name,color};}
+function register(main){ipcMain.handle('email:open',e=>{if(e.sender!==main.webContents)throw Error('Unauthorized');open();return true;});function authorized(e){if(!windowRef||e.sender!==windowRef.webContents)throw Error('Unauthorized email action');}
+ipcMain.handle('email:state',e=>{authorized(e);return publicState();});
+ipcMain.handle('email:panel',(e,isOpen)=>{authorized(e);panelOpen=!!isOpen;layout();return true;});
+ipcMain.handle('email:window',(e,cmd)=>{authorized(e);if(cmd==='minimize')windowRef.minimize();else if(cmd==='maximize')windowRef.isMaximized()?windowRef.unmaximize():windowRef.maximize();else if(cmd==='close')windowRef.close();else throw Error('Invalid window command');return true;});
+ipcMain.handle('email:navigate',(e,cmd,value)=>{authorized(e);const wc=views.get(active)?.webContents;if(!wc)return false;if(cmd==='back'&&wc.navigationHistory.canGoBack())wc.navigationHistory.goBack();else if(cmd==='forward'&&wc.navigationHistory.canGoForward())wc.navigationHistory.goForward();else if(cmd==='reload')wc.reload();else if(cmd==='home'){const item=read().find(x=>x.id===active);if(item)wc.loadURL(item.url);}else if(cmd==='url'){const u=new URL(String(value||''));if(u.protocol!=='https:'||u.username||u.password)throw Error('HTTPS required');wc.loadURL(u.href);}else if(!['back','forward','reload','home'].includes(cmd))throw Error('Invalid navigation');return true;});
+ipcMain.handle('email:add',(e,data)=>{authorized(e);const list=read();if(list.length>=50)throw Error('Maximum 50 accounts');const item=validate(data);list.push(item);write(list);show(item.id);return publicState();});
+ipcMain.handle('email:select',(e,id)=>{authorized(e);show(id);return publicState();});
+ipcMain.handle('email:update',(e,id,data)=>{authorized(e);const list=read(),item=list.find(x=>x.id===id);if(!item)throw Error('Account not found');if(data&&/^#[0-9a-fA-F]{6}$/.test(data.color))item.color=data.color;if(typeof data?.name==='string')item.name=data.name.trim().slice(0,48)||item.name;write(list);send();return publicState();});
+ipcMain.handle('email:remove',async(e,id)=>{authorized(e);const list=read();if(!list.some(x=>x.id===id))return publicState();write(list.filter(x=>x.id!==id));const v=views.get(id);if(v){windowRef.contentView.removeChildView(v);v.webContents.close();views.delete(id);}if(active===id){active=null;const next=read()[0];if(next)show(next.id);}send();return publicState();});}
+module.exports={register};

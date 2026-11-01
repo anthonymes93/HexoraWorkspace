@@ -467,7 +467,8 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
  sidebarWidth=Math.max(64,Math.min(560,Number(store.getMeta('sidebarCustomWidth'))||330));
  win=new BrowserWindow({width:1360,height:900,minWidth:700,minHeight:400,title:'Hexora Workspace',autoHideMenuBar:true,backgroundColor:'#111215',webPreferences:{preload:path.join(__dirname,'preload.js'),contextIsolation:true,sandbox:true,nodeIntegration:false}});
  mainViewport=new View();win.contentView.addChildView(mainViewport);
- win.loadFile('toolbar.html');win.on('resize',bounds);win.webContents.on('did-finish-load',emit);
+ win.loadFile('toolbar.html');
+ require('./email-app').register(win);win.on('resize',bounds);win.webContents.on('did-finish-load',emit);
   win.webContents.on('did-start-loading',()=>{deepLinkReady=false;});
   ipcMain.handle('deep-link:ready',event=>{
    if(event.sender!==win.webContents)throw Error('Invalid deep-link caller.');
