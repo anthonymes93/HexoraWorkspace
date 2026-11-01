@@ -8,7 +8,7 @@ const fs=require('node:fs');
 const os=require('node:os');
 const {spawn}=require('node:child_process');
 let nativeCodeHost=null,nativeCodeActive=false,nativeCodeDetached=false;
-function nativeCodeCommand(message){if(nativeCodeHost?.stdin?.writable)nativeCodeHost.stdin.write(message+'\n');}
+function nativeCodeCommand(message){const proc=nativeCodeHost;if(!proc||proc.exitCode!==null||proc.killed||proc.stdin?.destroyed||!proc.stdin?.writable)return false;try{proc.stdin.write(message+'\n',error=>{if(error&&error.code!=='EPIPE')console.error('[Native VS Code] stdin:',error.message);});return true;}catch(error){console.error('[Native VS Code] command failed:',error.message);return false;}}
 function nativeCodeBounds(){if(!win||win.isDestroyed()||!nativeCodeHost)return;const [w,h]=win.getContentSize();nativeCodeCommand('RECT '+sidebarWidth+' '+TOP_HEIGHT+' '+Math.max(0,w-sidebarWidth)+' '+Math.max(0,h-TOP_HEIGHT));}
 // Focus recovery is event-driven; avoid repeatedly stealing keyboard focus from VS Code.
 function restoreNativeWebView(){if(win&&!win.isDestroyed()&&mainViewport){const view=live.get(activeId);if(view&&!modalVisible){mainViewport.addChildView(view);bounds();}}}
@@ -668,13 +668,13 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
   const script=path.join(__dirname,'experiments','vscode-hexora-host.ps1');
   const hwnd=win.getNativeWindowHandle().readBigUInt64LE(0).toString();
   const proc=spawn('powershell.exe',['-NoProfile','-STA','-ExecutionPolicy','Bypass','-File',script,'-ParentHwnd',hwnd],{stdio:['pipe','pipe','pipe'],windowsHide:true});
-  nativeCodeHost=proc;nativeCodeActive=true;nativeCodeDetached=false;
-  const webView=live.get(activeId);if(webView)mainViewport.removeChildView(webView);
-  proc.stdout.on('data',data=>{const output=String(data).trim();console.log('[Native VS Code]',output);if(output.includes('READY')&&nativeCodeHost===proc){setTimeout(()=>{if(nativeCodeHost===proc&&nativeCodeActive)nativeCodeCommand('FOCUS');},250);}});
+  nativeCodeHost=proc;nativeCodeActive=false;nativeCodeDetached=false;
+  proc.stdin.on('error',error=>console.error('[Native VS Code] stdin pipe:',error.message));
+  proc.stdout.on('data',data=>{const output=String(data).trim();console.log('[Native VS Code]',output);if(output.split(/\r?\n/).some(line=>line.trim()==='READY')&&nativeCodeHost===proc){nativeCodeActive=true;const webView=live.get(activeId);if(webView)mainViewport.removeChildView(webView);nativeCodeBounds();setTimeout(()=>{if(nativeCodeHost===proc&&nativeCodeActive)nativeCodeCommand('FOCUS');},250);}});
   proc.stderr.on('data',data=>console.error('[Native VS Code]',String(data).trim()));
   proc.on('error',error=>{console.error('Native VS Code host failed',error);if(nativeCodeHost===proc){nativeCodeHost=null;nativeCodeActive=false;nativeCodeDetached=false;restoreNativeWebView();}win?.webContents?.send('native-code:stopped');});
-  proc.on('exit',()=>{if(nativeCodeHost===proc){nativeCodeHost=null;nativeCodeActive=false;restoreNativeWebView();}if(win&&!win.isDestroyed())win.webContents.send('native-code:stopped');});
-  nativeCodeBounds();return {active:true};
+  proc.on('exit',(code,signal)=>{console.error('[Native VS Code] host exited:',{code,signal});if(nativeCodeHost===proc){nativeCodeHost=null;nativeCodeActive=false;restoreNativeWebView();}if(win&&!win.isDestroyed())win.webContents.send('native-code:stopped');});
+  return {active:false,starting:true};
  });
  ipcMain.handle('tabs:page',(_e,arg)=>sendPage(arg));
  ipcMain.handle('tabs:search',(_e,term)=>store.search(term,50).map(pageRow));

@@ -1,6 +1,7 @@
 param([Parameter(Mandatory=$true)][string]$ParentHwnd)
 # Experimental VS Code window hosted inside the Hexora Electron BrowserWindow.
 # Control protocol on stdin: RECT x y width height, SHOW, HIDE, QUIT.
+$ErrorActionPreference='Stop'
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type @'
 using System;
