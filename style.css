@@ -172,3 +172,6 @@ body.reordering-tabs,body.reordering-tabs *{cursor:grabbing!important;user-selec
 
 /* Dynamic horizontally scrolling nested rows. */
 .top-main{height:var(--hexora-rows-height,120px)!important}.stack-rows{display:flex;flex-direction:column}.stack-tabs-row{flex:0 0 44px}.stack-tabs .tab{flex:0 0 auto;cursor:grab}.stack-tabs .tab.dragging{transform:translate3d(var(--drag-x,0px),0,0);will-change:transform;pointer-events:none;z-index:4;position:relative}
+
+/* Clear target indication and horizontal row hit areas. */
+.stack-tabs{min-height:38px;align-items:center}.stack-tabs-row{position:relative}.tab.stack-drop-target{outline:2px solid #b7a0ff;outline-offset:-2px;box-shadow:0 0 0 3px #a18aff40!important}
