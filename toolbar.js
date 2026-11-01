@@ -286,7 +286,7 @@ let tabPointer=null,dropSaving=false,suppressTabClickUntil=0;
 function beginTabPointerDrag(e){
  if(e.button!==0||!e.isPrimary||e.target.closest('.close'))return;
  const tab=e.currentTarget;
- tabPointer={tab,id:Number(tab.dataset.tabId),workspace:activeWorkspace,startX:e.clientX,startY:e.clientY,moving:false,originLeft:tab.getBoundingClientRect().left,visualLeft:tab.getBoundingClientRect().left,grabOffset:e.clientX-tab.getBoundingClientRect().left,lastX:e.clientX,sourceStack:tab.dataset.stackId?Number(tab.dataset.stackId):null};
+ tabPointer={tab,id:Number(tab.dataset.tabId),workspace:activeWorkspace,startX:e.clientX,startY:e.clientY,moving:false,originLeft:tab.getBoundingClientRect().left,visualLeft:tab.getBoundingClientRect().left,grabOffset:e.clientX-tab.getBoundingClientRect().left,lastX:e.clientX,sourceStack:tab.dataset.stackId?Number(tab.dataset.stackId):null,targets:[...tab.parentElement.querySelectorAll('.tab[data-tab-id]')].filter(el=>el!==tab).map(el=>({id:Number(el.dataset.tabId),rect:el.getBoundingClientRect()}))};
  // Do not capture until the movement threshold is met; a normal click still activates.
 }
 function animateReflow(before,dragged){
@@ -313,25 +313,23 @@ window.addEventListener('pointermove',e=>{
  const allRows=[tabStrip,...document.querySelectorAll('.stack-tabs')];
  const hitRow=allRows.find(row=>{const r=row.getBoundingClientRect();return e.clientY>=r.top&&e.clientY<=r.bottom&&e.clientX>=r.left&&e.clientX<=r.right;});
  d.targetRow=hitRow?(hitRow===tabStrip?null:Number(hitRow.dataset.stackId)):undefined;
- // Stack by actual overlap: the dragged tab must cover at least 35% of
- // another tab. No timer or precise mouse hover required.
- const candidates=hitRow?[...hitRow.querySelectorAll('.tab[data-tab-id]')].filter(el=>el!==d.tab):[];
- const draggedLeft=desiredLeft,draggedRight=desiredLeft+d.tab.offsetWidth;
- let targetTab=null,bestOverlap=0;
- for(const candidate of candidates){
-  const rect=candidate.getBoundingClientRect();
-  const overlap=Math.max(0,Math.min(draggedRight,rect.right)-Math.max(draggedLeft,rect.left));
-  const ratio=overlap/Math.min(d.tab.offsetWidth,rect.width);
-  if(ratio>bestOverlap){bestOverlap=ratio;targetTab=candidate;}
- }
- // The visual tab position, rather than the cursor, selects the destination.
- const targetId=bestOverlap>=.35&&targetTab?Number(targetTab.dataset.tabId):null;
- d.hoverId=targetId;
- d.hoverLocked=!!targetId;
+ // Hit-test stable original tab slots, not moving DOM nodes. Fast reordering
+ // changes element positions, so live overlap checks lose their target.
+ const targets=d.targetRow===d.sourceStack?d.targets:
+  (hitRow?[...hitRow.querySelectorAll('.tab[data-tab-id]')].filter(el=>el!==d.tab).map(el=>({id:Number(el.dataset.tabId),rect:el.getBoundingClientRect()})):[]);
+ const target=targets.find(item=>{
+  const r=item.rect;
+  return e.clientX>=r.left+r.width*.12&&e.clientX<=r.right-r.width*.12
+   &&e.clientY>=r.top&&e.clientY<=r.bottom;
+ });
+ d.hoverId=target?.id||null;
  for(const node of document.querySelectorAll('.stack-drop-target'))node.classList.remove('stack-drop-target');
- if(targetId)targetTab.classList.add('stack-drop-target');
+ if(d.hoverId){
+  const highlight=[...document.querySelectorAll('.tab[data-tab-id]')].find(el=>Number(el.dataset.tabId)===d.hoverId);
+  highlight?.classList.add('stack-drop-target');
+ }
  if(d.targetRow!==d.sourceStack)return;
- if(targetId)return;
+ if(d.hoverId)return;
  const direction=Math.sign(e.clientX-d.lastX);d.lastX=e.clientX;
  const sibling=direction>0?d.tab.nextElementSibling:direction<0?d.tab.previousElementSibling:null;
  if(sibling&&sibling.classList.contains('tab')){
