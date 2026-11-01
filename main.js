@@ -145,6 +145,54 @@ function panelPreference(id){const row=store.get(id);if(!row)return {mode:'wide'
 function panelMode(id){return panelPreference(id).mode;}
 function chromeMode(id){return store.getMeta('chromeMode:'+id)==='true';}
 function chromeUserAgent(wc){const ua=wc.getUserAgent();return ua.replace(/\s+(?:Electron|hexora-workspace)\/[^\s]+/gi,'').replace(/\s{2,}/g,' ').trim();}
+// ChatGPT can restore an unsent composer draft from origin-wide storage.
+// Keep the visible editor associated with this WebContents, not other tabs.
+// The user's actual cookies and login session remain shared.
+const CHATGPT_DRAFT_GUARD=`(()=>{
+ if(window.__hexoraDraftGuard)return;
+ window.__hexoraDraftGuard=true;
+ let ownDraft='',userEdited=false,writing=false,currentEditor=null;
+ const selector='#prompt-textarea,[data-testid="composer-input"],textarea[placeholder*="Message"],[contenteditable="true"][role="textbox"]';
+ const read=el=>el?.isContentEditable?(el.innerText||''):(el?.value||'');
+ const write=(el,value)=>{
+  if(!el||read(el)===value)return;
+  writing=true;
+  if(el.isContentEditable){
+   el.textContent=value;
+   el.dispatchEvent(new InputEvent('input',{bubbles:true,inputType:'insertText',data:value}));
+  }else{
+   const setter=Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value')?.set;
+   if(setter)setter.call(el,value);else el.value=value;
+   el.dispatchEvent(new Event('input',{bubbles:true}));
+  }
+  writing=false;
+ };
+ const find=()=>document.querySelector(selector);
+ document.addEventListener('input',e=>{
+  if(writing||!e.isTrusted)return;
+  const el=e.target;
+  if(el?.matches?.(selector)||el?.closest?.('#prompt-textarea,[data-testid="composer-input"]')){
+   ownDraft=read(el);userEdited=true;
+  }
+ },true);
+ document.addEventListener('keydown',e=>{
+  if(e.key==='Enter'&&!e.shiftKey&&e.target?.closest?.('#prompt-textarea,[data-testid="composer-input"]')){
+   ownDraft='';userEdited=false;
+  }
+ },true);
+ document.addEventListener('click',e=>{
+  if(e.target?.closest?.('[data-testid="send-button"],button[aria-label="Send prompt"],button[aria-label="Send message"]')){
+   ownDraft='';userEdited=false;
+  }
+ },true);
+ const timer=setInterval(()=>{
+  if(!location.hostname.endsWith('chatgpt.com')){clearInterval(timer);return;}
+  const el=find();if(!el||!el.isConnected)return;
+  if(el!==currentEditor){currentEditor=el;write(el,ownDraft);}
+  else if(read(el)!==ownDraft&&document.activeElement!==el)write(el,ownDraft);
+ },400);
+ window.addEventListener('pagehide',()=>clearInterval(timer),{once:true});
+})();`;
 function wire(t){const view=new WebContentsView({webPreferences:{partition:'persist:hexora-chatgpt',sandbox:true,contextIsolation:true,nodeIntegration:false,webSecurity:true,javascript:true}});const wc=view.webContents;
  wc.setAudioMuted(!!t.muted);
  if(chromeMode(t.id))wc.setUserAgent(chromeUserAgent(wc));
@@ -156,6 +204,7 @@ function wire(t){const view=new WebContentsView({webPreferences:{partition:'pers
  wc.on('did-navigate-in-page',()=>update());
  wc.on('did-start-loading',()=>{loading.set(t.id,true);emit();});
  wc.on('did-stop-loading',()=>{loading.delete(t.id);emit();});
+ wc.on('dom-ready',()=>{if(/^https:\/\/chatgpt\.com(?:\/|$)/.test(wc.getURL()))wc.executeJavaScript(CHATGPT_DRAFT_GUARD).catch(error=>console.warn('ChatGPT draft isolation unavailable:',error.message));});
  wc.on('render-process-gone',()=>{loading.delete(t.id);emit();});
  wc.setWindowOpenHandler(({url})=>/^https:\/\//.test(url)?{action:'allow',overrideBrowserWindowOptions:{width:540,height:750,autoHideMenuBar:true,webPreferences:{partition:'persist:hexora-chatgpt',sandbox:true,contextIsolation:true,nodeIntegration:false,webSecurity:true}}}:{action:'deny'});
  wc.loadURL(safeUrl(t.url)).catch(err=>console.error('Tab load error',err));
