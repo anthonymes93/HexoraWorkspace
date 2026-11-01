@@ -598,6 +598,40 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
   return true;
  });
 
+ let workspaceTooltipWindow=null;
+ const tooltipHtml=`<!doctype html><html><head><meta charset="utf-8"><style>
+ html,body{margin:0;background:transparent;overflow:hidden;font-family:Inter,system-ui,sans-serif}
+ .tip{box-sizing:border-box;width:240px;height:66px;display:flex;align-items:center;gap:11px;padding:11px 13px;background:linear-gradient(135deg,#302a3b,#1e1d27);border:1px solid #665777;border-radius:12px;color:#eeeaf5;box-shadow:0 7px 20px #0008}
+ .glyph{width:36px;height:36px;flex:0 0 36px;display:grid;place-items:center;border-radius:9px;background:#ad95ff24;color:#ad95ff;font-size:20px}
+ .details{min-width:0;display:flex;flex-direction:column;gap:5px}
+ strong{font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+ small{font-size:10px;color:#ada6bb}
+ </style></head><body><div class="tip"><span class="glyph" id="glyph"></span><span class="details"><strong id="name"></strong><small id="count"></small></span></div></body></html>`;
+ function ensureWorkspaceTooltip(){
+  if(workspaceTooltipWindow&&!workspaceTooltipWindow.isDestroyed())return workspaceTooltipWindow;
+  workspaceTooltipWindow=new BrowserWindow({parent:win,width:240,height:66,frame:false,transparent:true,show:false,focusable:false,skipTaskbar:true,resizable:false,movable:false,hasShadow:false,backgroundColor:'#00000000',webPreferences:{sandbox:true,contextIsolation:true,nodeIntegration:false}});
+  workspaceTooltipWindow.setIgnoreMouseEvents(true);
+  workspaceTooltipWindow.loadURL('data:text/html;charset=utf-8,'+encodeURIComponent(tooltipHtml));
+  return workspaceTooltipWindow;
+ }
+ ipcMain.handle('workspace:tooltip-show',async(event,data)=>{
+  if(event.sender!==win.webContents)return;
+  const popup=ensureWorkspaceTooltip();
+  const bounds=win.getContentBounds();
+  const x=Math.max(bounds.x,Math.min(bounds.x+bounds.width-240,bounds.x+Math.round(Number(data?.x)||0)));
+  const y=Math.max(bounds.y,Math.min(bounds.y+bounds.height-66,bounds.y+Math.round(Number(data?.y)||0)));
+  const label=String(data?.name||'Workspace').slice(0,120),glyph=String(data?.icon||'◇').slice(0,8);
+  const count=Math.max(0,Math.floor(Number(data?.count)||0));
+  if(popup.webContents.isLoadingMainFrame())await new Promise(resolve=>popup.webContents.once('did-finish-load',resolve));
+  if(popup.isDestroyed())return;
+  await popup.webContents.executeJavaScript('document.getElementById("glyph").textContent='+JSON.stringify(glyph)+';document.getElementById("name").textContent='+JSON.stringify(label)+';document.getElementById("count").textContent='+JSON.stringify(count+' saved '+(count===1?'tab':'tabs'))+';');
+  popup.setBounds({x,y,width:240,height:66});
+  popup.showInactive();
+ });
+ ipcMain.handle('workspace:tooltip-hide',event=>{
+  if(event.sender!==win.webContents)return;
+  if(workspaceTooltipWindow&&!workspaceTooltipWindow.isDestroyed())workspaceTooltipWindow.hide();
+ });
  ipcMain.handle('workspace:context-menu',(event,data)=>{
   if(event.sender!==win.webContents)throw Error('Invalid menu caller');
   const id=String(data?.id||'');
