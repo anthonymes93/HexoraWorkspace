@@ -520,16 +520,38 @@ function showWebsiteModal(newTab){
 function hideWebsiteModal(){
  $('website-overlay').classList.add('hidden');websiteTarget=null;action('modal',false);
 }
-$('tab-menu-rename').onclick=async()=>{
+$('tab-menu-rename').onclick=()=>{
  const tab=contextTab;if(!tab)return;
- hideTabMenu();
- const name=prompt('Rename tab:',tab.title||'New tab');
- if(name===null)return;
- const trimmed=name.trim();
- if(!trimmed){alert('Enter a tab name.');return;}
- if(trimmed.length>100){alert('Tab names must be 100 characters or less.');return;}
- try{await action('rename-tab',{id:tab.id,name:trimmed});await refresh();}
- catch(error){alert('Could not rename tab: '+error.message);}
+ hideTabMenu(false);
+ const veil=document.createElement('div');
+ veil.className='overlay';
+ veil.style.zIndex='99999';
+ const dialog=document.createElement('div');dialog.className='dialog';
+ dialog.setAttribute('role','dialog');dialog.setAttribute('aria-modal','true');
+ dialog.setAttribute('aria-label','Rename tab');
+ const header=document.createElement('div');header.className='dialog-header';
+ const heading=document.createElement('b');heading.textContent='Rename Tab';header.append(heading);
+ const form=document.createElement('form');
+ const label=document.createElement('label');label.textContent='Tab name';label.htmlFor='hexora-rename-tab-input';
+ const input=document.createElement('input');input.id='hexora-rename-tab-input';input.maxLength=100;input.required=true;input.value=tab.title||'New tab';input.autocomplete='off';
+ const error=document.createElement('p');error.className='website-error';
+ const actions=document.createElement('div');actions.className='website-actions';
+ const cancel=document.createElement('button');cancel.type='button';cancel.className='pill';cancel.textContent='Cancel';
+ const save=document.createElement('button');save.type='submit';save.className='pill primary';save.textContent='Save name';
+ actions.append(cancel,save);form.append(label,input,error,actions);dialog.append(header,form);veil.append(dialog);document.body.append(veil);
+ action('modal',true);
+ const finish=()=>{veil.remove();document.removeEventListener('keydown',escape);action('modal',false);};
+ const escape=e=>{if(e.key==='Escape'){e.preventDefault();finish();}};
+ document.addEventListener('keydown',escape);
+ cancel.onclick=finish;veil.onclick=e=>{if(e.target===veil)finish();};
+ form.onsubmit=async e=>{
+  e.preventDefault();const name=input.value.trim();
+  if(!name){error.textContent='Enter a tab name.';return;}
+  save.disabled=true;
+  try{await action('rename-tab',{id:tab.id,name});finish();await refresh();}
+  catch(err){error.textContent=err.message;save.disabled=false;}
+ };
+ requestAnimationFrame(()=>{input.focus();input.select();});
 };
 $('tab-menu-replace').onclick=()=>showWebsiteModal(false);
 $('tab-menu-new').onclick=()=>showWebsiteModal(true);
