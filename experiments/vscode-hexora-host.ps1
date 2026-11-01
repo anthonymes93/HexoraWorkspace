@@ -1,4 +1,7 @@
-param([Parameter(Mandatory=$true)][string]$ParentHwnd)
+param(
+ [Parameter(Mandatory=$true)][string]$ParentHwnd,
+ [string]$ProjectPath=''
+)
 # Experimental VS Code window hosted inside the Hexora Electron BrowserWindow.
 # Control protocol on stdin: RECT x y width height, SHOW, HIDE, QUIT.
 $ErrorActionPreference='Stop'
@@ -112,7 +115,17 @@ $existing=@([HexoraNative]::Windows())
 $launchBegan=[DateTime]::UtcNow
 $launch=New-Object System.Diagnostics.ProcessStartInfo
 $launch.FileName=$env:ComSpec
-$launch.Arguments=('/d /s /c ""{0}" --new-window"' -f $cmd.Source)
+if($ProjectPath){
+ if(-not (Test-Path -LiteralPath $ProjectPath -PathType Container)){throw 'Saved VS Code project directory does not exist'}
+ # Pass the chosen directory through a child-only environment variable rather
+ # than concatenating an arbitrary folder name into a cmd.exe command line.
+ # /v:off prevents delayed ! expansion, including paths with ! characters.
+ $launch.Arguments=('/d /v:off /s /c ""{0}" --new-window "%HEXORA_VSCODE_PROJECT%""' -f $cmd.Source)
+ $launch.EnvironmentVariables['HEXORA_VSCODE_PROJECT']=$ProjectPath
+ Write-Output 'LAUNCH_SAVED_PROJECT'
+}else{
+ $launch.Arguments=('/d /s /c ""{0}" --new-window"' -f $cmd.Source)
+}
 $launch.UseShellExecute=$false
 $launch.CreateNoWindow=$true
 $launch.WorkingDirectory=Split-Path -Path $cmd.Source -Parent

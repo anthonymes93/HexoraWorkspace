@@ -1,0 +1,27 @@
+name: VS Code project session tests
+on:
+  push:
+    branches:
+      - 'feature/vscode-project-session-restore'
+      - 'experiment/vscode-no-flash'
+  pull_request:
+    paths:
+      - 'tab-store.js'
+      - 'main.js'
+      - 'experiments/vscode-hexora-host.ps1'
+      - 'scripts/test-code-projects.cjs'
+      - 'package.json'
+      - '.github/workflows/vscode-project-tests.yml'
+jobs:
+  project-persistence:
+    strategy:
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify persistent VS Code project associations
+        run: npm run test:code-projects

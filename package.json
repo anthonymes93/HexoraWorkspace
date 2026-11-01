@@ -6,7 +6,8 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "benchmark:tabs": "node --experimental-sqlite scripts/benchmark-tabs.cjs"
+    "benchmark:tabs": "node --experimental-sqlite scripts/benchmark-tabs.cjs",
+    "test:code-projects": "node --experimental-sqlite --test scripts/test-code-projects.cjs"
   },
   "devDependencies": {
     "electron": "^38.0.0"
