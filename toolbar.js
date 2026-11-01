@@ -1679,7 +1679,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&vaultOpen)vaultClos
  const root=$('header-favorites'),icons=$('header-favorites-icons'),add=$('header-favorites-add'),panel=$('header-favorites-popover');
  if(!root||!icons||!add||!panel)return;
  const key='hexora:header-favorites:v1',limit=10,form=$('header-favorites-form'),urlInput=$('header-favorites-url'),nameInput=$('header-favorites-name'),error=$('header-favorites-error');
- function load(){try{const saved=JSON.parse(localStorage.getItem(key)||'[]');return Array.isArray(saved)?saved.filter(x=>x&&typeof x.url==='string'&&/^https?:\\/\\//.test(x.url)).slice(0,limit):[];}catch{return [];}}
+ function load(){try{const saved=JSON.parse(localStorage.getItem(key)||'[]');return Array.isArray(saved)?saved.filter(x=>x&&typeof x.url==='string'&&(x.url.startsWith('https://')||x.url.startsWith('http://'))).slice(0,limit):[];}catch{return [];}}
  function save(items){localStorage.setItem(key,JSON.stringify(items));render();}
  function favicon(url){try{return new URL('/favicon.ico',url).href;}catch{return '';}}
  function close(){panel.hidden=true;add.setAttribute('aria-expanded','false');error.textContent='';}
