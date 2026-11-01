@@ -24,10 +24,10 @@ It supports one local folder per Code tab. The existing Hexora right-click
 **Choose VS Code project folder…** remains as a fallback. Changing a project
 with that fallback while an editor is running takes effect on its next launch.
 
-The project association is saved in the existing SQLite \`native_code_projects\`
+The project association is saved in the existing SQLite `native_code_projects`
 table and is included in encrypted recovery backups. The active editor, caret,
 and companion project-update event are stored locally under
-\`<Hexora userData>/hexora-native-code\`, not in the project folder.
+`<Hexora userData>/hexora-native-code`, not in the project folder.
 Hexora checks a per-window owner token so a stale detached VS Code window
 cannot overwrite a newly activated tab's project association.
 
