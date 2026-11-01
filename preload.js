@@ -1,6 +1,7 @@
 const {contextBridge,ipcRenderer}=require('electron');
 contextBridge.exposeInMainWorld('hexora',{
  action:(name,arg)=>ipcRenderer.invoke('tabs:action',name,arg),
+ email:{open:()=>ipcRenderer.invoke('email:open')},
  page:(workspace,offset=0)=>ipcRenderer.invoke('tabs:page',{workspace,offset}),
  search:term=>ipcRenderer.invoke('tabs:search',term),
  lookupTab:id=>ipcRenderer.invoke('tabs:lookup',id),
