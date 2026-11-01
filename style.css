@@ -540,15 +540,3 @@ body.sidebar-icons-grid .quick-jump{
 }
 body.sidebar-icons-grid .workspace .emoji{font-size:18px!important}
 body.sidebar-icons-grid .quick-jumps{padding-top:11px!important}
-
-/* At the comfortable two-column breakpoint, let icon columns occupy the shelf. */
-body.sidebar-icons-grid .workspaces,
-body.sidebar-icons-grid .quick-jumps{
- grid-template-columns:repeat(2,34px)!important;
- justify-content:space-between!important;
- column-gap:clamp(4px,calc(var(--hexora-panel-width) - 88px),28px)!important;
- padding-left:clamp(2px,calc((var(--hexora-panel-width) - 110px) * .15),9px)!important;
- padding-right:clamp(2px,calc((var(--hexora-panel-width) - 110px) * .15),9px)!important;
- box-sizing:border-box;
-}
-body.sidebar-icons-grid .quick-jumps{padding-top:11px!important}
