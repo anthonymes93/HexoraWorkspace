@@ -10,6 +10,11 @@
   return el;
  };
  const formatDate=ms=>ms>0?new Date(ms).toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'}):'—';
+ function folderIcon(){
+  const icon=document.createElement('span');icon.className='hpp-folder-icon';
+  icon.innerHTML='<svg viewBox="0 0 28 23" width="26" height="22" aria-hidden="true"><path d="M2 5a3 3 0 0 1 3-3h6l3 3h9a3 3 0 0 1 3 3v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2Z" fill="#8869bb"/><path d="M2 9h24l-2 11a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2Z" fill="#bc9cf8"/><path d="M4 11h20" stroke="#f3e7ff" stroke-opacity=".43" stroke-width="1"/></svg>';
+  return icon;
+ }
  const shortPath=path=>String(path||'').split(/[\\/]/).filter(Boolean).slice(-2).join(' / ')||String(path||'');
  let opened=false,finish=null,where=null,mode='recent',rows=[],recent=[],favorites=[],shortcuts=[],home='',selected=null;
  let history=[],historyIndex=-1,sequence=0,loading=false;
@@ -25,11 +30,16 @@
   if(/^[A-Za-z]:/.test(trimmed)&&index<3)return trimmed.slice(0,2)+'\\';
   return trimmed.slice(0,index)||'/';
  }
- function setSelected(location,rerender=true){
+ function setSelected(location){
   selected=location;
   q('hpp-open').disabled=loading||!selected;
   q('hpp-hint').textContent=location?'Selected: '+shortPath(location):'Ctrl-click VS Code to open a blank tab';
-  if(rerender){renderRows();renderCards();}
+  // Do not replace clicked DOM nodes: that breaks double-click to navigate.
+  root.querySelectorAll('.hpp-folder-row').forEach(row=>{
+   const active=row.dataset.path===selected;
+   row.classList.toggle('selected',active);row.setAttribute('aria-selected',String(active));
+  });
+  root.querySelectorAll('.hpp-recent-card').forEach(card=>card.classList.toggle('selected',card.dataset.path===selected));
  }
  function renderCards(){
   const host=q('hpp-recents');host.replaceChildren();
@@ -40,7 +50,8 @@
   }
   recent.slice(0,4).forEach(item=>{
    const card=button('','hpp-recent-card'+(selected===item.path?' selected':''),item.path);
-   const icon=document.createElement('span');icon.className='hpp-folder-icon';icon.textContent='▰';
+   const icon=folderIcon();
+   card.dataset.path=item.path;
    const label=document.createElement('span');label.className='hpp-recent-name';
    const title=document.createElement('strong');title.textContent=item.name;
    const subtitle=document.createElement('small');subtitle.textContent=shortPath(item.path);
@@ -104,7 +115,7 @@
    // A div avoids invalid nested button elements around the favorite control.
    const row=document.createElement('div');row.className='hpp-folder-row'+(selected===item.path?' selected':'');
    row.tabIndex=0;row.setAttribute('role','option');row.setAttribute('aria-selected',String(selected===item.path));
-   row.title=item.path;
+   row.title=item.path;row.dataset.path=item.path;
    const name=document.createElement('span');name.className='hpp-row-name';
    const icon=document.createElement('span');icon.className='hpp-folder-icon';icon.textContent='▰';
    const label=document.createElement('span');label.textContent=item.name;
