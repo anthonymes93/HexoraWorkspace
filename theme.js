@@ -1,7 +1,7 @@
 'use strict';
 (() => {
   const key='hexora-appearance-theme';
-  const themes=new Set(['classic','obsidian']);
+  const themes=new Set(['classic','obsidian','white']);
   const safe=value=>themes.has(value)?value:'classic';
   const apply=value=>{
     const theme=safe(value);
@@ -13,7 +13,7 @@
       button.setAttribute('aria-pressed',String(selected));
     }
     const status=document.getElementById('appearance-status');
-    if(status)status.textContent='Active theme: '+(theme==='classic'?'Classic':'Obsidian');
+    if(status)status.textContent='Active theme: '+({classic:'Classic',obsidian:'Obsidian',white:'White'}[theme]);
   };
   const accentKey='hexora-appearance-accent';
   const accents=[
