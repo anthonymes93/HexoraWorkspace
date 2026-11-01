@@ -4,7 +4,8 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const os=require('node:os');
 const path=require('node:path');
-const {validateFolder,rememberProject,toggleFavorite,locations,listFolders,readPaths,RECENTS_KEY,FAVORITES_KEY}=require('../code-project-picker');
+const {pathToFileURL}=require('node:url');
+const {expandFolderPath,validateFolder,rememberProject,toggleFavorite,locations,listFolders,readPaths,RECENTS_KEY,FAVORITES_KEY}=require('../code-project-picker');
 
 test('Hexora project picker navigates real folders and persists recents/favorites',()=>{
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'hexora-picker-'));
@@ -17,16 +18,29 @@ test('Hexora project picker navigates real folders and persists recents/favorite
  try{
   const a=path.join(root,'Alpha Project'),b=path.join(root,'beta'),c=path.join(root,'.hidden');
   for(const folder of [a,b,c])fs.mkdirSync(folder);
-  fs.writeFileSync(path.join(root,'not-a-folder.txt'),'Test file should not show up.');
+  fs.writeFileSync(path.join(root,'not-a-folder.txt'),'Visible test file.');
   assert.equal(validateFolder(a),a);
+  assert.equal(validateFolder('"'+a+'"'),a,'pasted quoted folder paths are accepted');
+  assert.equal(validateFolder(pathToFileURL(a).href),a,'file:// links can be pasted');
+  assert.equal(expandFolderPath(a),a);
+  assert.throws(()=>validateFolder('https://example.com'),/web URL/);
+  assert.throws(()=>validateFolder(''),/folder path/);
   assert.throws(()=>validateFolder('relative/path'),/absolute/);
   assert.throws(()=>validateFolder(path.join(root,'not-a-folder.txt')),/not a folder/);
   assert.throws(()=>validateFolder(path.join(root,'missing')),/ENOENT/);
   assert.throws(()=>validateFolder('../'),/absolute/);
 
   let view=listFolders(root,[]);
-  assert.deepEqual(view.rows.map(x=>x.name),['.hidden','Alpha Project','beta']);
-  assert.equal(view.total,3);
+  assert.deepEqual(view.rows.map(x=>x.name),['.hidden','Alpha Project','beta','not-a-folder.txt']);
+  assert.deepEqual(view.rows.map(x=>x.type),['folder','folder','folder','file']);
+  assert.equal(view.total,4);
+  assert.equal(view.folderCount,3);
+  assert.equal(view.fileCount,1);
+  const searched=listFolders(root,[],100,'NOT-A');
+  assert.deepEqual(searched.rows.map(x=>x.name),['not-a-folder.txt']);
+  assert.equal(searched.total,1);
+  assert.equal(searched.folderCount,3,'counts describe all actual contents');
+  assert.equal(listFolders(root,[],100,'Alpha').rows[0].type,'folder');
   assert.equal(view.parent,path.dirname(root));
   assert.equal(listFolders(root,[],1).truncated,true);
 
@@ -41,10 +55,11 @@ test('Hexora project picker navigates real folders and persists recents/favorite
   view=listFolders(root,readPaths(store,FAVORITES_KEY,100));
   assert.equal(view.rows.find(x=>x.path===a).favorite,true);
   assert.equal(view.rows.find(x=>x.path===b).favorite,false);
+  assert.equal(view.rows.find(x=>x.type==='file').favorite,false);
   const data=locations(store);
   assert.deepEqual(data.recent.slice(0,2).map(x=>x.path),[a,b]);
   assert.deepEqual(data.favorites.map(x=>x.path),[a]);
-  // Persist to the same backing store and expose only real directories.
+  // Favorites and recent projects always point to real directories, never files.
   fs.rmSync(a,{recursive:true});
   assert.equal(locations(store).favorites.length,0);
   assert.deepEqual(locations(store).recent.map(x=>x.path),[b]);
