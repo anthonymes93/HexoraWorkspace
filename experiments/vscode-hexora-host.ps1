@@ -45,6 +45,7 @@ try {
  [void][HexoraNative]::SetWindowLong($child,-16,$newStyle)
  [void][HexoraNative]::SetParent($child,$parent)
  $attached=$true
+ [HexoraNative]::Focus($child)
  Write-Output 'READY'
  while($null -ne ($line=[Console]::ReadLine())){
   $parts=$line.Trim().Split(' ')
