@@ -1013,7 +1013,7 @@ async function vaultEdit(id=null){
 function vaultClose(){
  if(!vaultOpen)return;vaultOpen=false;v('vault-overlay').classList.add('hidden');
  v('vault-entry-form').classList.add('hidden');v('vault-password').value='';
- v('vault-master').value='';action('modal',false);
+ v('vault-master').value='';window.hexora.vault.lock().catch(()=>{});action('modal',false);
 }
 async function vaultShow(){
  vaultOpen=true;v('vault-overlay').classList.remove('hidden');action('modal',true);
@@ -1036,8 +1036,8 @@ v('vault-add').onclick=()=>vaultEdit();
 v('vault-search').oninput=vaultRenderList;
 v('vault-editor-cancel').onclick=()=>{vaultClearEditor();v('vault-entry-form').classList.add('hidden');vaultRenderList();};
 v('vault-reveal').onclick=()=>{const field=v('vault-password');field.type=field.type==='password'?'text':'password';v('vault-reveal').textContent=field.type==='password'?'Show':'Hide';};
-v('vault-copy-user').onclick=()=>{const value=v('vault-username').value;if(value)navigator.clipboard.writeText(value).catch(()=>{});};
-v('vault-copy-password').onclick=()=>{const value=v('vault-password').value;if(value)navigator.clipboard.writeText(value).catch(()=>{});};
+v('vault-copy-user').onclick=async()=>{if(!vaultSelected){v('vault-editor-error').textContent='Save this login first.';return;}try{await window.hexora.vault.copy(vaultSelected,'username');v('vault-editor-error').textContent='Username copied. Clipboard clears after 30 seconds.';}catch(err){v('vault-editor-error').textContent=err.message;}};
+v('vault-copy-password').onclick=async()=>{if(!vaultSelected){v('vault-editor-error').textContent='Save this login first.';return;}try{await window.hexora.vault.copy(vaultSelected,'password');v('vault-editor-error').textContent='Password copied. Clipboard clears after 30 seconds.';}catch(err){v('vault-editor-error').textContent=err.message;}};
 v('vault-entry-form').onsubmit=async e=>{
  e.preventDefault();v('vault-editor-error').textContent='';
  try{
