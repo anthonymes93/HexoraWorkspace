@@ -668,7 +668,7 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
   const proc=spawn('powershell.exe',['-NoProfile','-STA','-ExecutionPolicy','Bypass','-File',script,'-ParentHwnd',hwnd],{stdio:['pipe','pipe','pipe'],windowsHide:true});
   nativeCodeHost=proc;nativeCodeActive=true;nativeCodeDetached=false;
   const webView=live.get(activeId);if(webView)mainViewport.removeChildView(webView);
-  proc.stdout.on('data',data=>{const output=String(data).trim();console.log('[Native VS Code]',output);if(output.includes('READY')&&nativeCodeHost===proc){setTimeout(()=>{if(nativeCodeHost===proc&&nativeCodeActive&&!nativeCodeDetached)nativeCodeCommand('RESET');},1600);}});
+  proc.stdout.on('data',data=>console.log('[Native VS Code]',String(data).trim()));
   proc.stderr.on('data',data=>console.error('[Native VS Code]',String(data).trim()));
   proc.on('error',error=>{console.error('Native VS Code host failed',error);if(nativeCodeHost===proc){nativeCodeHost=null;nativeCodeActive=false;nativeCodeDetached=false;restoreNativeWebView();}win?.webContents?.send('native-code:stopped');});
   proc.on('exit',()=>{if(nativeCodeHost===proc){nativeCodeHost=null;nativeCodeActive=false;restoreNativeWebView();}if(win&&!win.isDestroyed())win.webContents.send('native-code:stopped');});
