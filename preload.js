@@ -5,6 +5,7 @@ contextBridge.exposeInMainWorld('hexora',{
  search:term=>ipcRenderer.invoke('tabs:search',term),
  lookupTab:id=>ipcRenderer.invoke('tabs:lookup',id),
  workspaceMenu:data=>ipcRenderer.invoke('workspace:context-menu',data),
+ workspaceTooltip:{show:data=>ipcRenderer.invoke('workspace:tooltip-show',data),hide:()=>ipcRenderer.invoke('workspace:tooltip-hide')},
  onWorkspaceMenuAction:callback=>ipcRenderer.on('workspace:menu-action',(_event,data)=>callback(data)),
  statistics:()=>ipcRenderer.invoke('statistics:snapshot'),
  vault:{status:()=>ipcRenderer.invoke('vault:status'),unlock:(password,remember=false)=>ipcRenderer.invoke('vault:unlock',{password,remember}),lock:()=>ipcRenderer.invoke('vault:lock'),list:()=>ipcRenderer.invoke('vault:list'),get:id=>ipcRenderer.invoke('vault:get',id),save:entry=>ipcRenderer.invoke('vault:save',entry),delete:id=>ipcRenderer.invoke('vault:delete',id),copy:(id,field)=>ipcRenderer.invoke('vault:copy',{id,field}),autofill:id=>ipcRenderer.invoke('vault:autofill',id)},
