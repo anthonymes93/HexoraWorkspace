@@ -1682,9 +1682,24 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&vaultOpen)vaultClos
  function load(){try{const saved=JSON.parse(localStorage.getItem(key)||'[]');return Array.isArray(saved)?saved.filter(x=>x&&typeof x.url==='string'&&(x.url.startsWith('https://')||x.url.startsWith('http://'))).slice(0,limit):[];}catch{return [];}}
  function save(items){localStorage.setItem(key,JSON.stringify(items));render();}
  function favicon(url){try{return new URL('/favicon.ico',url).href;}catch{return '';}}
+ // Match monochrome favicons to the actual header luminance, not just the theme name.
+ // Cross-origin favicons may block canvas inspection; known dark/light logos have a safe fallback.
+ function headerIsDark(){const color=getComputedStyle(document.querySelector('.top')||document.body).backgroundColor;const rgb=color.match(/[\\d.]+/g);if(!rgb||rgb.length<3||Number(rgb[3]||1)===0)return true;return (.2126*Number(rgb[0])+.7152*Number(rgb[1])+.0722*Number(rgb[2]))<128;}
+ function adjustFavoriteContrast(img,domain){
+  const dark=headerIsDark();let monochrome=false,light=false;
+  try{const canvas=document.createElement('canvas');canvas.width=16;canvas.height=16;const ctx=canvas.getContext('2d',{willReadFrequently:true});ctx.drawImage(img,0,0,16,16);const pixels=ctx.getImageData(0,0,16,16).data;let count=0,luma=0,colorfulness=0;for(let i=0;i<pixels.length;i+=4){if(pixels[i+3]<80)continue;const r=pixels[i],g=pixels[i+1],b=pixels[i+2];luma+=(r*.2126+g*.7152+b*.0722);colorfulness+=Math.max(r,g,b)-Math.min(r,g,b);count++;}if(count){monochrome=colorfulness/count<26;light=luma/count>145;}}
+  catch{ // Cross-origin image pixels are intentionally inaccessible.
+   monochrome=domain==='github.com';light=false;
+  }
+  img.classList.toggle('header-favicon-invert',monochrome&&(dark?!light:light));
+  img.classList.toggle('header-favicon-contrast-tile',!monochrome);
+ }
+ const favoriteImages=new Set();
+ function refreshFavoriteContrast(){for(const entry of favoriteImages){if(entry.img.isConnected&&entry.img.complete&&entry.img.naturalWidth)adjustFavoriteContrast(entry.img,entry.domain);}}
+ new MutationObserver(refreshFavoriteContrast).observe(document.documentElement,{attributes:true,attributeFilter:['data-hexora-theme','class','style']});
  function close(){if(panel.hidden)return;panel.hidden=true;add.setAttribute('aria-expanded','false');error.textContent='';action('modal',false);}
- function render(){const items=load();icons.replaceChildren();$('header-favorites-manage').replaceChildren();$('header-favorites-count').textContent=items.length+' / '+limit;add.disabled=false;add.title=items.length>=limit?'Manage favorites (10 / 10)':'Add favorite link';form.hidden=items.length>=limit;
-  items.forEach((item,index)=>{const button=document.createElement('button');button.type='button';button.className='header-favorite-icon';button.title=item.name+' — '+item.url;button.setAttribute('aria-label','Open '+item.name);const img=document.createElement('img');img.alt='';img.src=favicon(item.url);img.onerror=()=>{img.hidden=true;fallback.hidden=false;};const fallback=document.createElement('span');fallback.className='header-favorite-fallback';fallback.textContent=(item.name||'?').slice(0,1).toUpperCase();fallback.hidden=true;button.append(img,fallback);button.onclick=()=>launchNewTab(item.url,item.name);icons.append(button);
+ function render(){const items=load();favoriteImages.clear();icons.replaceChildren();$('header-favorites-manage').replaceChildren();$('header-favorites-count').textContent=items.length+' / '+limit;add.disabled=false;add.title=items.length>=limit?'Manage favorites (10 / 10)':'Add favorite link';form.hidden=items.length>=limit;
+  items.forEach((item,index)=>{const button=document.createElement('button');button.type='button';button.className='header-favorite-icon';button.title=item.name+' — '+item.url;button.setAttribute('aria-label','Open '+item.name);const img=document.createElement('img');img.alt='';img.src=favicon(item.url);const domain=new URL(item.url).hostname.toLowerCase().replace(/^www\\./,'');favoriteImages.add({img,domain});img.onload=()=>adjustFavoriteContrast(img,domain);img.onerror=()=>{img.hidden=true;fallback.hidden=false;};const fallback=document.createElement('span');fallback.className='header-favorite-fallback';fallback.textContent=(item.name||'?').slice(0,1).toUpperCase();fallback.hidden=true;button.append(img,fallback);button.onclick=()=>launchNewTab(item.url,item.name);icons.append(button);
    const row=document.createElement('div');row.className='header-favorites-manage-row';const label=document.createElement('span');label.textContent=item.name;label.title=item.url;const remove=document.createElement('button');remove.type='button';remove.textContent='×';remove.title='Remove '+item.name;remove.setAttribute('aria-label','Remove '+item.name);remove.onclick=()=>save(load().filter((_,i)=>i!==index));row.append(label,remove);$('header-favorites-manage').append(row);});
 
  }
