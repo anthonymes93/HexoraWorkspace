@@ -268,7 +268,11 @@ const CHATGPT_DRAFT_GUARD=`(()=>{
   if(!location.hostname.endsWith('chatgpt.com')){clearInterval(timer);return;}
   const el=find();if(!el||!el.isConnected)return;
   if(el!==currentEditor){currentEditor=el;write(el,ownDraft);}
-  else if(read(el)!==ownDraft&&document.activeElement!==el)write(el,ownDraft);
+  // ChatGPT owns composer updates after initial restoration. In particular,
+  // a successful send clears the editor asynchronously; never reinsert it.
+  else if(read(el)!==ownDraft&&document.activeElement!==el){
+   ownDraft=read(el);userEdited=false;
+  }
  },400);
  window.addEventListener('pagehide',()=>clearInterval(timer),{once:true});
 })();`;
