@@ -458,3 +458,12 @@ body.panel-collapsed .sidebar{visibility:hidden;pointer-events:none}
 body.panel-collapsed #sidebar-resize-handle{display:block;left:calc(var(--hexora-content-left,64px) - 4px);width:8px}
 body.panel-collapsed #sidebar-resize-handle::before{background:transparent}
 body.panel-collapsed #sidebar-resize-handle:hover::before{background:var(--hx-accent,#ad95ff)}
+
+/* Compact icon shelf: one centered column instead of a bulky two-column grid. */
+body.sidebar-icons-only .sidebar{padding:12px 4px 10px;gap:7px}
+body.sidebar-icons-only .sidebar-title{min-height:0;margin:0;padding:0}
+body.sidebar-icons-only .workspaces{gap:3px}
+body.sidebar-icons-only .workspace{width:36px;height:36px;border-radius:10px;padding:0}
+body.sidebar-icons-only .workspace .emoji{font-size:18px!important}
+body.sidebar-icons-only .quick-jumps{display:flex;flex-direction:column;flex-wrap:nowrap;align-items:center;justify-content:flex-start;gap:5px;min-height:0;padding:10px 0 4px;margin:3px auto 0;width:min(46px,100%);border-top:1px solid #393641}
+body.sidebar-icons-only .quick-jump{width:34px;height:34px;min-height:34px;flex:0 0 34px}
