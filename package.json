@@ -14,9 +14,20 @@
     "test:code-project-sync": "node --test scripts/test-code-project-sync.cjs",
     "test:project-picker": "node --test scripts/test-project-picker.cjs",
     "test:project-picker-ui": "node --check project-picker.js && node --check toolbar.js && node --check main.js",
-    "test:taskbar": "node --test scripts/test-taskbar-identity.cjs"
+    "test:taskbar": "node --test scripts/test-taskbar-identity.cjs",
+    "test:links": "node --test scripts/test-deep-links.cjs"
   },
   "devDependencies": {
     "electron": "^38.0.0"
+  },
+  "build": {
+    "protocols": [
+      {
+        "name": "Hexora Workspace",
+        "schemes": [
+          "hexora"
+        ]
+      }
+    ]
   }
 }
