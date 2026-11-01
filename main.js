@@ -10,6 +10,7 @@ const {spawn}=require('node:child_process');
 let nativeCodeHost=null,nativeCodeActive=false;
 function nativeCodeCommand(message){if(nativeCodeHost?.stdin?.writable)nativeCodeHost.stdin.write(message+'\n');}
 function nativeCodeBounds(){if(!win||win.isDestroyed()||!nativeCodeHost)return;const [w,h]=win.getContentSize();nativeCodeCommand('RECT '+sidebarWidth+' '+TOP_HEIGHT+' '+Math.max(0,w-sidebarWidth)+' '+Math.max(0,h-TOP_HEIGHT));}
+function restoreNativeWebView(){if(win&&!win.isDestroyed()&&mainViewport){const view=live.get(activeId);if(view&&!modalVisible){mainViewport.addChildView(view);bounds();}}}
 function stopNativeCode(){nativeCodeActive=false;nativeCodeCommand('QUIT');if(nativeCodeHost){const proc=nativeCodeHost;nativeCodeHost=null;setTimeout(()=>{if(proc.exitCode===null)proc.kill();},2500).unref();}}
 
 const {snapshot,stageRestore,applyPending,verifyBackup}=require('./recovery');
@@ -296,7 +297,7 @@ function activate(id){const raw=store.get(Number(id));if(!raw)return false;
  for(const [otherId,view] of live)if(otherId!==id&&!detached.has(otherId))mainViewport.removeChildView(view);
  activeId=raw.id;store.setMeta('workspaceActive:'+raw.workspace,String(activeId));const t=toModel(raw);t.lastActive=Date.now();store.save(t);store.setMeta('activeId',String(activeId));
  let view=live.get(id);if(!view){view=wire(t);live.set(id,view);}
- if(!modalVisible){mainViewport.addChildView(view);bounds();view.webContents.focus();}evict();emit();return true;
+ if(!modalVisible&&!nativeCodeActive){mainViewport.addChildView(view);bounds();view.webContents.focus();}evict();emit();return true;
 }
 function evict(){if(live.size<=MAX_LIVE)return;const candidates=Array.from(live.keys()).filter(id=>id!==activeId&&!detached.has(id)&&!store.get(id)?.pinned);
  candidates.sort((a,b)=>(store.get(a)?.last_active||0)-(store.get(b)?.last_active||0));
@@ -660,15 +661,16 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
  ipcMain.handle('native-code:toggle',async event=>{
   if(event.sender!==win.webContents)throw Error('Invalid caller');
   if(process.platform!=='win32')throw Error('Native VS Code hosting requires Windows.');
-  if(nativeCodeHost){nativeCodeActive=!nativeCodeActive;nativeCodeCommand(nativeCodeActive?'SHOW':'HIDE');if(nativeCodeActive)nativeCodeBounds();return {active:nativeCodeActive};}
+  if(nativeCodeHost){nativeCodeActive=!nativeCodeActive;if(nativeCodeActive){const view=live.get(activeId);if(view)mainViewport.removeChildView(view);nativeCodeCommand('SHOW');nativeCodeBounds();}else{nativeCodeCommand('HIDE');restoreNativeWebView();}return {active:nativeCodeActive};}
   const script=path.join(__dirname,'experiments','vscode-hexora-host.ps1');
   const hwnd=win.getNativeWindowHandle().readBigUInt64LE(0).toString();
   const proc=spawn('powershell.exe',['-NoProfile','-STA','-ExecutionPolicy','Bypass','-File',script,'-ParentHwnd',hwnd],{stdio:['pipe','pipe','pipe'],windowsHide:true});
   nativeCodeHost=proc;nativeCodeActive=true;
+  const webView=live.get(activeId);if(webView)mainViewport.removeChildView(webView);
   proc.stdout.on('data',data=>console.log('[Native VS Code]',String(data).trim()));
   proc.stderr.on('data',data=>console.error('[Native VS Code]',String(data).trim()));
-  proc.on('error',error=>{console.error('Native VS Code host failed',error);if(nativeCodeHost===proc){nativeCodeHost=null;nativeCodeActive=false;}win?.webContents?.send('native-code:stopped');});
-  proc.on('exit',()=>{if(nativeCodeHost===proc){nativeCodeHost=null;nativeCodeActive=false;}if(win&&!win.isDestroyed())win.webContents.send('native-code:stopped');});
+  proc.on('error',error=>{console.error('Native VS Code host failed',error);if(nativeCodeHost===proc){nativeCodeHost=null;nativeCodeActive=false;restoreNativeWebView();}win?.webContents?.send('native-code:stopped');});
+  proc.on('exit',()=>{if(nativeCodeHost===proc){nativeCodeHost=null;nativeCodeActive=false;restoreNativeWebView();}if(win&&!win.isDestroyed())win.webContents.send('native-code:stopped');});
   nativeCodeBounds();return {active:true};
  });
  ipcMain.handle('tabs:page',(_e,arg)=>sendPage(arg));
