@@ -730,9 +730,19 @@ $('website-form').onsubmit=async e=>{
   hideWebsiteModal();refresh();
  }catch(err){$('website-error').textContent=err.message||'Enter a valid HTTP or HTTPS address.';}
 };
+function hideTabRowMenu(){$('tab-row-context-menu').classList.add('hidden');}
+document.querySelector('.tabsbar').addEventListener('contextmenu',e=>{
+ if(e.target.closest('.tab,.tab-plus,.nav,.extension-actions,button'))return;
+ e.preventDefault();e.stopPropagation();
+ hideTabMenu();const menu=$('tab-row-context-menu');menu.classList.remove('hidden');
+ menu.style.left=Math.max(8,Math.min(e.clientX,innerWidth-menu.offsetWidth-8))+'px';
+ menu.style.top=Math.max(8,Math.min(e.clientY,innerHeight-menu.offsetHeight-8))+'px';
+});
+$('tab-row-menu-new').onclick=()=>{hideTabRowMenu();action('new',activeWorkspace);};
+document.addEventListener('pointerdown',e=>{if(!e.target.closest('#tab-row-context-menu'))hideTabRowMenu();},true);
 document.addEventListener('click',e=>{if(!e.target.closest('#tab-context-menu'))hideTabMenu();});
 document.addEventListener('contextmenu',e=>{if(!e.target.closest('.tab, .chat-row'))hideTabMenu();});
-document.addEventListener('keydown',e=>{if(e.key==='Escape'){hideTabMenu();if(websiteTarget)hideWebsiteModal();}});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){hideTabRowMenu();hideTabMenu();if(websiteTarget)hideWebsiteModal();}});
 
 // The main process owns one animation timeline for both the native browser view and the toolbar layout.
 window.hexora.onSidebarFrame(width=>{const value=Math.max(64,Math.min(330,width));document.documentElement.style.setProperty('--hexora-panel-width',(value-64)+'px');document.documentElement.style.setProperty('--hexora-content-left',value+'px');document.body.classList.toggle('panel-collapsed',value<=65);});
