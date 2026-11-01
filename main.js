@@ -560,6 +560,7 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
   else if(action==='stack-edit'){store.stackAction(Number(arg?.id),arg?.operation,arg?.value);emit();return true;}
   else if(action==='reorder-stack'){store.reorderStack(Number(arg?.stackId),arg?.ids);emit();return true;}
   else if(action==='reorder-row'){store.reorderRow(arg?.workspace,arg?.parentId??null,arg?.items);emit();return true;}
+  else if(action==='reorder-sidebar-tabs'){store.reorderSidebarTabs(arg?.workspace,arg?.ids);emit();return true;}
   else if(action==='reorder-tabs'){store.reorderVisible(arg?.workspace,arg?.ids);emit();return true;}
   else if(action==='move-tab'){
    const id=Number(arg?.id),workspace=arg?.workspace,raw=store.get(id);
