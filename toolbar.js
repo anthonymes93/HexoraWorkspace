@@ -161,6 +161,15 @@ const expandedStackNodes=new Set();
 let lastRowHeight=120;
 
 // Render each tab or container exactly once, in its actual parent row.
+async function renameStack(stack){
+ const next=prompt('Rename tab stack:',stack.name);
+ if(next===null)return;
+ const name=next.trim();
+ if(!name||name===stack.name)return;
+ if(name.length>80){alert('Stack names must be 80 characters or fewer.');return;}
+ try{await action('stack-edit',{id:stack.id,operation:'rename',value:name});await refresh();}
+ catch(error){alert('Unable to rename stack: '+error.message);}
+}
 function renderTabRow(host,page,parentId){
  const data=page.stackData||{stacks:[],members:[]};
  const memberOf=new Map(data.members.map(m=>[m.tab_id,m.stack_id]));
@@ -179,7 +188,8 @@ function renderTabRow(host,page,parentId){
   el.draggable=false;
   if(item.type==='stack'){
    el.dataset.stackContainerId=String(item.id);el.textContent='▤ '+item.stack.name;
-   el.title='Open stack: '+item.stack.name;
+   el.title='Open stack: '+item.stack.name+' (right-click to rename)';
+   el.addEventListener('contextmenu',e=>{e.preventDefault();e.stopPropagation();renameStack(item.stack);});
    el.onclick=()=>{selectedStackId=item.id;selectedRootTabId=null;stackRowsDismissed=false;refresh();};
   }else{
    el.dataset.tabId=String(item.id);
@@ -222,7 +232,7 @@ function renderSecondTabRow(page){
   const stack=stacks.get(openStackPath[depth]);if(!stack)continue;
   const row=document.createElement('div');row.className='stack-tabs-row';row.dataset.stackId=String(stack.id);
   const label=document.createElement('button');label.className='stack-tabs-label';label.textContent='▤ '+stack.name;
-  label.title='Show this stack';label.onclick=()=>{selectedStackId=stack.id;stackRowsDismissed=false;refresh();};
+  label.title='Show this stack (right-click to rename)';label.oncontextmenu=e=>{e.preventDefault();e.stopPropagation();renameStack(stack);};label.onclick=()=>{selectedStackId=stack.id;stackRowsDismissed=false;refresh();};
   const tabs=document.createElement('div');tabs.className='stack-tabs';tabs.dataset.stackId=String(stack.id);
   renderTabRow(tabs,page,stack.id);
   const close=document.createElement('button');close.className='stack-row-close';close.textContent='×';close.title='Hide stack rows';
@@ -248,18 +258,9 @@ function renderStackTree(host,page){
   const fold=document.createElement('button');fold.className='stack-fold';fold.textContent=expandedStackNodes.has(stack.id)?'▾':'▸';fold.title='Expand or collapse';
   const toggleNode=()=>{if(expandedStackNodes.has(stack.id))expandedStackNodes.delete(stack.id);else expandedStackNodes.add(stack.id);refresh();};
   fold.onclick=toggleNode;
-  const label=document.createElement('button');label.className='stack-label';label.textContent='▤ '+stack.name;label.title='Right-click for stack actions';
+  const label=document.createElement('button');label.className='stack-label';label.textContent='▤ '+stack.name;label.title='Right-click to rename this stack';
   label.onclick=()=>{selectedStackId=stack.id;selectedRootTabId=null;stackRowsDismissed=false;toggleNode();};
-  label.oncontextmenu=async e=>{
-   e.preventDefault();
-   const choice=prompt('Stack: '+stack.name+'\\n1 Rename\\n2 Move inside another stack\\n3 Move to top level\\n4 Delete stack (tabs remain)');
-   try{
-    if(choice==='1'){const name=prompt('Stack name:',stack.name);if(name)await action('stack-edit',{id:stack.id,operation:'rename',value:name});}
-    if(choice==='2'){const options=data.stacks.filter(x=>x.id!==stack.id);const raw=prompt('Move inside which stack?\\n'+options.map(x=>x.id+': '+x.name).join('\\n'));if(raw!==null)await action('stack-nest',{id:stack.id,parentId:Number(raw)});}
-    if(choice==='3')await action('stack-nest',{id:stack.id,parentId:null});
-    if(choice==='4'&&confirm('Delete stack '+stack.name+'? Tabs and nested stacks will be kept.'))await action('stack-edit',{id:stack.id,operation:'delete'});
-   }catch(err){alert(err.message);}
-  };
+  label.oncontextmenu=e=>{e.preventDefault();e.stopPropagation();renameStack(stack);};
   row.append(fold,label);host.append(row);
   if(!expandedStackNodes.has(stack.id))return;
   for(const child of children.get(stack.id)||[])renderNode(child,depth+1);
