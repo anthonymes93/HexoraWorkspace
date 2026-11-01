@@ -269,6 +269,16 @@ sidebarGrip.addEventListener('keydown',async event=>{
 });
 function updateSidebar(persist=true){action('sidebar',!sidebarOpen);if(persist&&currentPage?.activeId)action('panel-mode',{id:currentPage.activeId,mode:sidebarOpen?'wide':'thin'});save();}
 for(const id of ['new','new-rail','new-sidebar','add-tab'])$(id).onclick=()=>action('new',activeWorkspace);
+// Open an independent, persisted browser tab in the selected workspace on every click.
+const NOTION_ACTION_CENTER_URL='https://app.notion.com/p/anthonymeszaros/Action-Center-348a372875a78084a961fd11848b2880';
+$('notion-rail').onclick=async()=>{
+ try{
+  await action('open-website',{url:NOTION_ACTION_CENTER_URL,title:'Notion · Action Center',newTab:true,workspace:activeWorkspace});
+ }catch(error){
+  console.error('Could not open the Notion tab',error);
+  window.alert('Could not open Notion: '+error.message);
+ }
+};
 for(const id of ['back','forward','reload'])$(id).onclick=()=>action(id);
 for(const id of ['external','settings-rail'])$(id).onclick=()=>action('open-external');
 const toggleSidebar=()=>{sidebarOpen=!sidebarOpen;updateSidebar();};

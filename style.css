@@ -577,3 +577,7 @@ body.sidebar-trim-workspace-details:not(.sidebar-icons-only) .workspace{gap:6px}
 }
 #tab-menu-close-selected{color:#ffc6d0!important;background:#472d3a!important;border:1px solid #855365!important;border-radius:8px;margin:5px 6px;width:calc(100% - 12px)!important;font-weight:650}
 #tab-menu-close-selected:hover{background:#593544!important}
+
+/* Notion launcher — native rail size, recognizable monogram, theme-aware colors. */
+#notion-rail{display:grid;place-items:center}
+.notion-mark{display:grid;place-items:center;width:24px;height:24px;border:2px solid currentColor;border-radius:4px;font:900 18px/1 Georgia,serif;letter-spacing:-2px;padding-right:2px;transform:rotate(-5deg)}
