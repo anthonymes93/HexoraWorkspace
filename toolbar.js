@@ -253,6 +253,7 @@ async function endSidebarResize(event){
  await action('sidebar-resize-save');
  sidebarFastDrag=false;
  applySidebarBreakpoint(last);
+ document.body.classList.toggle('sidebar-trim-workspace-details',last>184&&last<=280);
  sidebarOpen=last>65;
 }
 sidebarGrip.addEventListener('pointerup',endSidebarResize);
@@ -947,6 +948,7 @@ window.hexora.onSidebarFrame((width,transitioning=false,target=null)=>{
  if(!transitioning){
   body.classList.remove('sidebar-auto-transition','sidebar-transition-icons');
   if(!sidebarFastDrag)applySidebarBreakpoint(value);
+  body.classList.toggle('sidebar-trim-workspace-details',value>184&&value<=280);
  }else{
   body.classList.remove('panel-collapsed');
   body.classList.toggle('sidebar-icons-only',body.classList.contains('sidebar-transition-icons'));
