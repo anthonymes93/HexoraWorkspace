@@ -18,6 +18,11 @@ class TabStore {
    CREATE INDEX IF NOT EXISTS idx_tabs_workspace_order ON tabs(workspace, ordinal DESC, id DESC);
    CREATE INDEX IF NOT EXISTS idx_tabs_workspace_active ON tabs(workspace, last_active DESC);
    CREATE TABLE IF NOT EXISTS meta(key TEXT PRIMARY KEY,value TEXT NOT NULL);`);
+  this.db.exec(`CREATE TABLE IF NOT EXISTS tab_stacks(id INTEGER PRIMARY KEY AUTOINCREMENT,workspace TEXT NOT NULL,name TEXT NOT NULL,parent_id INTEGER REFERENCES tab_stacks(id) ON DELETE SET NULL,collapsed INTEGER NOT NULL DEFAULT 0);
+   CREATE INDEX IF NOT EXISTS idx_stacks_parent ON tab_stacks(workspace,parent_id);
+   CREATE TABLE IF NOT EXISTS tab_stack_members(tab_id INTEGER PRIMARY KEY,stack_id INTEGER NOT NULL REFERENCES tab_stacks(id) ON DELETE CASCADE);
+   CREATE INDEX IF NOT EXISTS idx_stack_members ON tab_stack_members(stack_id);`);
+  this.db.exec('PRAGMA foreign_keys=ON');
   this.q={
    get:this.db.prepare('SELECT * FROM tabs WHERE id=?'),
    put:this.db.prepare(`INSERT INTO tabs(id,url,title,workspace,pinned,muted,last_active,ordinal)
@@ -38,7 +43,7 @@ class TabStore {
  nextId(){return this.q.max.get().max+1;}
  get(id){return this.q.get.get(id)||null;}
  save(t){this.q.put.run({id:t.id,url:t.url,title:t.title,workspace:t.workspace,pinned:+!!t.pinned,muted:+!!t.muted,last_active:t.lastActive||Date.now(),ordinal:t.ordinal||t.id});}
- delete(id){this.q.del.run(id);}
+ delete(id){this.db.prepare('DELETE FROM tab_stack_members WHERE tab_id=?').run(id);this.q.del.run(id);}
  reorderVisible(workspace,ids){
   if(typeof workspace!=='string'||!Array.isArray(ids)||ids.length<2||ids.length>16||!ids.every(Number.isSafeInteger)||new Set(ids).size!==ids.length)throw new Error('Invalid tab order');
   const rows=this.page(workspace,0,50);
@@ -58,6 +63,46 @@ class TabStore {
  page(workspace,offset=0,limit=50){return this.q.page.all(workspace,Math.min(100,Math.max(1,limit)),Math.max(0,offset));}
  counts(){return this.q.counts.all();}
  search(term,limit=40){const value='%'+String(term).replace(/[\\%_]/g,m=>'\\'+m)+'%';return this.q.search.all(value,value,Math.min(100,Math.max(1,limit)));}
+ stacks(workspace){
+  return {stacks:this.db.prepare('SELECT * FROM tab_stacks WHERE workspace=? ORDER BY id').all(workspace),
+   members:this.db.prepare('SELECT m.tab_id,m.stack_id FROM tab_stack_members m JOIN tabs t ON t.id=m.tab_id WHERE t.workspace=?').all(workspace)};
+ }
+ createStack(workspace,name,tabId=null,parentId=null){
+  if(typeof workspace!=='string'||!workspace||typeof name!=='string'||!name.trim()||name.length>80)throw Error('Invalid stack name');
+  if(parentId!==null&&this.db.prepare('SELECT workspace FROM tab_stacks WHERE id=?').get(parentId)?.workspace!==workspace)throw Error('Invalid parent stack');
+  if(tabId!==null&&this.get(tabId)?.workspace!==workspace)throw Error('Tab is in another workspace');
+  this.db.exec('BEGIN');
+  try{
+   const id=Number(this.db.prepare('INSERT INTO tab_stacks(workspace,name,parent_id) VALUES(?,?,?)').run(workspace,name.trim(),parentId).lastInsertRowid);
+   if(tabId!==null)this.db.prepare('INSERT INTO tab_stack_members(tab_id,stack_id) VALUES(?,?) ON CONFLICT(tab_id) DO UPDATE SET stack_id=excluded.stack_id').run(tabId,id);
+   this.db.exec('COMMIT');return id;
+  }catch(e){this.db.exec('ROLLBACK');throw e;}
+ }
+ putTabInStack(tabId,stackId){
+  const tab=this.get(tabId);if(!tab)throw Error('Tab not found');
+  if(stackId===null){this.db.prepare('DELETE FROM tab_stack_members WHERE tab_id=?').run(tabId);return;}
+  const stack=this.db.prepare('SELECT workspace FROM tab_stacks WHERE id=?').get(stackId);
+  if(!stack||stack.workspace!==tab.workspace)throw Error('Stack must be in the same workspace');
+  this.db.prepare('INSERT INTO tab_stack_members(tab_id,stack_id) VALUES(?,?) ON CONFLICT(tab_id) DO UPDATE SET stack_id=excluded.stack_id').run(tabId,stackId);
+ }
+ moveStack(id,parentId){
+  const stack=this.db.prepare('SELECT * FROM tab_stacks WHERE id=?').get(id);
+  if(!stack)throw Error('Stack not found');
+  if(parentId===null){this.db.prepare('UPDATE tab_stacks SET parent_id=NULL WHERE id=?').run(id);return;}
+  if(id===parentId)throw Error('Cannot nest a stack inside itself');
+  const parent=this.db.prepare('SELECT * FROM tab_stacks WHERE id=?').get(parentId);
+  if(!parent||parent.workspace!==stack.workspace)throw Error('Invalid destination');
+  const ancestors=new Set([id]);let node=parent;
+  while(node){if(ancestors.has(node.id))throw Error('A stack cannot contain itself');ancestors.add(node.id);node=node.parent_id===null?null:this.db.prepare('SELECT * FROM tab_stacks WHERE id=?').get(node.parent_id);}
+  this.db.prepare('UPDATE tab_stacks SET parent_id=? WHERE id=?').run(parentId,id);
+ }
+ stackAction(id,action,value){
+  const row=this.db.prepare('SELECT id FROM tab_stacks WHERE id=?').get(id);if(!row)throw Error('Stack not found');
+  if(action==='rename'){if(typeof value!=='string'||!value.trim()||value.length>80)throw Error('Invalid name');this.db.prepare('UPDATE tab_stacks SET name=? WHERE id=?').run(value.trim(),id);}
+  else if(action==='toggle')this.db.prepare('UPDATE tab_stacks SET collapsed=1-collapsed WHERE id=?').run(id);
+  else if(action==='delete'){this.db.prepare('UPDATE tab_stacks SET parent_id=(SELECT parent_id FROM tab_stacks WHERE id=?) WHERE parent_id=?').run(id,id);this.db.prepare('DELETE FROM tab_stacks WHERE id=?').run(id);}
+  else throw Error('Invalid stack operation');
+ }
  lastActiveId(){return this.q.latest.get()?.id||null;}
  moveWorkspace(source,destination){this.db.prepare('UPDATE tabs SET workspace=? WHERE workspace=?').run(destination,source);}
  getMeta(key){return this.q.metaGet.get(key)?.value||null;}
