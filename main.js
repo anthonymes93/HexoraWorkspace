@@ -921,9 +921,9 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
   if(event.sender!==win.webContents)throw Error('Invalid caller');
   return projectPicker.locations(store);
  });
- ipcMain.handle('code-picker:list',(event,folder)=>{
+ ipcMain.handle('code-picker:list',(event,folder,filter='')=>{
   if(event.sender!==win.webContents)throw Error('Invalid caller');
-  return projectPicker.listFolders(folder,projectPicker.readPaths(store,projectPicker.FAVORITES_KEY,100));
+  return projectPicker.listFolders(folder,projectPicker.readPaths(store,projectPicker.FAVORITES_KEY,100),1200,typeof filter==='string'?filter:'');
  });
  ipcMain.handle('code-picker:favorite',(event,folder)=>{
   if(event.sender!==win.webContents)throw Error('Invalid caller');
