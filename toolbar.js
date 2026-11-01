@@ -309,6 +309,10 @@ window.hexora.onDeepLink(async target=>{
   const destination=tab?.workspace||target.workspace;
   if(!workspaces.some(w=>w.id===destination)){linkToast('Workspace not found on this device');return;}
   activeWorkspace=destination;offset=0;save();
+  // A context menu can leave modalVisible set, detaching the webview.
+  // Release it before selecting the destination and returning keyboard focus.
+  hideTabMenu();
+  await action('modal',false);
   if(tab)await action('activate',tab.id);
   else await action('switch-workspace',destination);
   await refresh();
