@@ -226,8 +226,11 @@ async function endSidebarResize(event){
  if(sidebarGrip.hasPointerCapture(event.pointerId))sidebarGrip.releasePointerCapture(event.pointerId);
  // Run save after the final outstanding resize update completes.
  const latest=sidebarRequested;
- if(latest!==null)await action('sidebar-resize',{width:latest});
  sidebarRequested=null;
+ // Wait until the queued resize has completed to avoid an older IPC call
+ // overwriting the final width before it is persisted.
+ while(sidebarResizeBusy)await new Promise(resolve=>setTimeout(resolve,12));
+ if(latest!==null)await action('sidebar-resize',{width:latest});
  await action('sidebar-resize-save');
 }
 sidebarGrip.addEventListener('pointerup',endSidebarResize);
