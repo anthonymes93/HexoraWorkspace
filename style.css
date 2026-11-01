@@ -515,3 +515,28 @@ body.sidebar-icons-only .quick-jump{
  border-radius:clamp(2px,calc(var(--hx-icon-button) * .25),10px)!important;
  overflow:hidden;
 }
+
+/* Mid-width icon shelf: balanced 2-column grid; preserve existing button sizes. */
+body.sidebar-icons-grid .sidebar{padding-left:5px!important;padding-right:5px!important}
+body.sidebar-icons-grid .workspaces,
+body.sidebar-icons-grid .quick-jumps{
+ display:grid!important;
+ grid-template-columns:repeat(2,minmax(0,38px))!important;
+ justify-content:center!important;
+ align-content:start!important;
+ justify-items:center!important;
+ column-gap:6px!important;
+ row-gap:7px!important;
+ width:100%!important;
+ max-width:100%!important;
+ min-width:0!important;
+}
+body.sidebar-icons-grid .workspace,
+body.sidebar-icons-grid .quick-jump{
+ width:34px!important;height:34px!important;
+ min-width:0!important;max-width:34px!important;
+ flex:none!important;
+ font-size:17px!important;
+}
+body.sidebar-icons-grid .workspace .emoji{font-size:18px!important}
+body.sidebar-icons-grid .quick-jumps{padding-top:11px!important}
