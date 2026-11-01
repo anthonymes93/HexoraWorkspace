@@ -62,7 +62,14 @@ class TabStore {
   }
  }
  total(){return this.q.count.get().count;}
- nextId(){return this.q.max.get().max+1;}
+ nextId(){
+  // Never reuse a closed tab's ID: old deep links must not point to a new tab.
+  const last=Number(this.getMeta('lastAllocatedTabId'))||0;
+  const id=Math.max(last,this.q.max.get().max)+1;
+  if(!Number.isSafeInteger(id))throw Error('Tab ID limit reached.');
+  this.setMeta('lastAllocatedTabId',id);
+  return id;
+ }
  get(id){return this.q.get.get(id)||null;}
  save(t){this.q.put.run({id:t.id,url:t.url,title:t.title,workspace:t.workspace,pinned:+!!t.pinned,muted:+!!t.muted,last_active:t.lastActive||Date.now(),ordinal:t.ordinal||t.id});}
  insertAfter(tab,anchorId){

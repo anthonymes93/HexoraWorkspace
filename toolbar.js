@@ -293,7 +293,30 @@ function hideSearch(){$('search-overlay').classList.add('hidden');action('modal'
 $('search').onclick=showSearch;$('search-rail').onclick=showSearch;$('search-close').onclick=hideSearch;$('search-input').oninput=filterTabs;
 $('search-overlay').onclick=e=>{if(e.target===$('search-overlay'))hideSearch();};
 document.addEventListener('keydown',e=>{if(e.key==='Escape')hideSearch();if(e.ctrlKey&&e.key.toLowerCase()==='k'){e.preventDefault();showSearch();}if(e.ctrlKey&&e.key.toLowerCase()==='t'){e.preventDefault();action('new',activeWorkspace);}});
-window.hexora.onState(()=>{refresh();});updateSidebar();action('switch-workspace',activeWorkspace).then(refresh);
+function linkToast(message){
+ let toast=$('hexora-link-toast');
+ if(!toast){toast=document.createElement('div');toast.id='hexora-link-toast';toast.className='hexora-link-toast';toast.setAttribute('role','status');document.body.append(toast);}
+ toast.textContent='✓  '+message;toast.classList.add('is-visible');
+ clearTimeout(linkToast.timer);
+ linkToast.timer=setTimeout(()=>toast.classList.remove('is-visible'),2400);
+}
+window.hexora.onDeepLink(async target=>{
+ try{
+  if(!target||typeof target.workspace!=='string')return;
+  const tab=target.tabId===null?null:await window.hexora.lookupTab(target.tabId);
+  if(target.tabId!==null&&!tab){linkToast('That tab was closed or is not on this device');return;}
+  // Moving a tab should not invalidate its old deep link.
+  const destination=tab?.workspace||target.workspace;
+  if(!workspaces.some(w=>w.id===destination)){linkToast('Workspace not found on this device');return;}
+  activeWorkspace=destination;offset=0;save();
+  if(tab)await action('activate',tab.id);
+  else await action('switch-workspace',destination);
+  await refresh();
+ }catch(error){console.error('Could not open Hexora link',error);linkToast('Could not open the link');}
+});
+window.hexora.onDeepLinkCopied(linkToast);
+window.hexora.onState(()=>{refresh();});updateSidebar();
+action('switch-workspace',activeWorkspace).then(async()=>{await refresh();await window.hexora.readyForDeepLinks();}).catch(error=>console.error('Hexora initialization failed:',error));
 
 function recoveryMessage(text){$('recovery-message').textContent=text;}
 async function recoveryStatus(){try{const st=await window.hexora.recovery.status();$('recovery-status').textContent='Destination: '+(st.directory||'Not selected')+' | '+(st.enabled?'Unlocked':'Locked')+(st.lastBackup?' | Last backup: '+st.lastBackup.time:'');}catch(e){recoveryMessage(e.message);}}
@@ -846,6 +869,11 @@ function showTabMenu(x,y,item){
  menu.style.left=Math.max(8,Math.min(x,innerWidth-menu.offsetWidth-8))+'px';
  menu.style.top=Math.max(8,Math.min(y,innerHeight-menu.offsetHeight-8))+'px';
 }
+$('tab-menu-copy-link').onclick=async()=>{
+ const tab=contextTab;if(!tab)return;
+ hideTabMenu();
+ try{await action('copy-tab-link',tab.id);}catch(error){linkToast('Could not copy the tab link');console.error(error);}
+};
 $('tab-menu-close-selected').onclick=async()=>{
  const ids=[...selectedTabIds];if(ids.length<2)return;
  hideTabMenu();
