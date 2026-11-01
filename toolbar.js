@@ -988,7 +988,7 @@ function vaultRenderList(){
   const detail=document.createElement('span');detail.className='vault-item-detail';
   const name=document.createElement('strong');name.textContent=entry.name;
   const site=document.createElement('small');site.textContent=entry.username||entry.site;
-  detail.append(name,site);button.append(icon,detail);button.onclick=()=>vaultEdit(entry.id);list.append(button);
+  detail.append(name,site);button.append(icon,detail);button.onclick=()=>vaultEdit(entry.id);const wrapper=document.createElement('div');wrapper.className='vault-login-row';wrapper.append(button);list.append(wrapper);
   const fill=document.createElement('button');fill.type='button';fill.className='vault-fill-button';fill.textContent='Autofill';fill.title='Fill this login in the active website';
   fill.onclick=async event=>{
    event.stopPropagation();
@@ -998,7 +998,7 @@ function vaultRenderList(){
     vaultClose();
    }catch(err){v('vault-editor-error').textContent=err.message;v('vault-entry-form').classList.remove('hidden');}
   };
-  button.append(fill);
+  wrapper.append(fill);
  }
 }
 function vaultClearEditor(){
