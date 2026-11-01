@@ -170,29 +170,35 @@
   home=data.home;recent=data.recent;favorites=data.favorites;shortcuts=data.shortcuts;drives=data.drives||[];
   renderCards();renderSidebar();
  }
- async function navigate(path,record=true){
-  if(!path||!opened)return;
+ async function navigate(location,record=true,filter=null){
+  if(!location||!opened)return;
+  // Search refreshes preserve the search box, ordinary folder navigation
+  // clears it so users don't see an unexpectedly filtered directory.
+  if(filter===null){q('hpp-search-input').value='';filter='';}
   const ticket=++sequence;loading=true;error('');
   q('hpp-folders').replaceChildren();
-  const message=document.createElement('p');message.className='hpp-empty';message.textContent='Loading folders…';
+  const message=document.createElement('p');message.className='hpp-empty';message.textContent='Loading files and folders…';
   q('hpp-folders').append(message);q('hpp-open').disabled=true;
   try{
-   const data=await window.hexora.codePicker.list(path);
+   const data=await window.hexora.codePicker.list(location,filter);
    if(ticket!==sequence||!opened)return;
    mode='browse';where=data.path;rows=data.rows;
-   selected=where; // Current path is selectable without having to open a child.
+   currentCounts={folderCount:data.folderCount||0,fileCount:data.fileCount||0,total:data.total||0,truncated:!!data.truncated};
+   selected=where;
+   q('hpp-path').value=where;
    if(record){history=history.slice(0,historyIndex+1);history.push(where);historyIndex=history.length-1;}
-   q('hpp-path-form').classList.add('hidden');
    updateNavigation();renderRows();renderCards();
    q('hpp-hint').textContent='Selected: '+shortPath(where);
-   if(data.truncated)error('Showing the first '+data.rows.length+' folders. Enter a narrower path to continue.');
-  }catch(e){if(ticket===sequence&&opened)error('Cannot open folder: '+e.message);}
-  finally{if(ticket===sequence){loading=false;q('hpp-open').disabled=!selected;}}
+   if(data.truncated)error('Showing '+data.rows.length+' of '+data.total+' matching items. Search this folder for more.');
+  }catch(e){if(ticket===sequence&&opened)error('Cannot open location: '+e.message);}
+  finally{if(ticket===sequence){loading=false;q('hpp-open').disabled=!q('hpp-path').value.trim();}}
  }
  function showCollection(name){
-  sequence++;mode=name;where=null;rows=name==='favorites'?favorites:recent;selected=null;loading=false;
+  sequence++;mode=name;where=null;
+  rows=name==='favorites'?favorites:name==='computer'?drives.map(d=>({name:d.name,path:d.path,type:'folder',modified:0,favorite:false})):recent;
+  selected=null;loading=false;
   q('hpp-search-input').value='';
-  q('hpp-path-form').classList.add('hidden');
+  q('hpp-path').value=home;
   q('hpp-hint').textContent='Ctrl-click VS Code to open a blank tab';
   updateNavigation();renderRows();renderCards();q('hpp-open').disabled=true;error('');
  }
