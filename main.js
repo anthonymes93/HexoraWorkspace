@@ -7,7 +7,7 @@ const {PasswordVault}=require('./password-vault');
 const fs=require('node:fs');
 const os=require('node:os');
 const {spawn}=require('node:child_process');
-const {workspaceForTab,clearSession,codeSessionDirectory}=require('./code-session-workspace');
+const {managedWorkspaceOrBlank,clearSession,codeSessionDirectory}=require('./code-session-workspace');
 const {syncCodeProjects}=require('./code-project-sync');
 const {buildCompanionVsix,BRIDGE_VERSION}=require('./code-session-vsix');
 // Each native VS Code tab owns its own PowerShell host and reparented window.
@@ -441,7 +441,7 @@ function startNativeCodeHost(tabId,entry){
    if(fs.statSync(configured).isDirectory()){
     // Only saved projects need the companion-managed workspace and active-file
     // restore. A new empty tab must open Code normally and promptly.
-    projectPath=workspaceForTab(app.getPath('userData'),tabId,configured);
+    projectPath=managedWorkspaceOrBlank(app.getPath('userData'),tabId,configured);
    }
   }catch(error){console.warn('[Native VS Code tab '+tabId+'] Saved project unavailable:',error.message);}
  }
