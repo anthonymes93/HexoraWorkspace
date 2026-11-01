@@ -778,3 +778,51 @@ body.sidebar-trim-workspace-details:not(.sidebar-icons-only) .workspace{gap:6px}
 :root[data-hexora-theme="white"] .new-tab-dialog .new-tab-card:hover,:root[data-hexora-theme="white"] .new-tab-dialog .new-tab-recent-item:hover{background:#eeeafb}
 :root[data-hexora-theme="white"] #new-tab-overlay .new-tab-google-search{background:#f0ecfa;color:#463574;border-color:#d9d1eb}
 :root[data-hexora-theme="white"] #new-tab-overlay .new-tab-google-search.is-active{background:#e8dffb;color:#39276b}
+
+/* Compact header favorites */
+.header-favorites{display:flex;align-items:center;gap:5px;position:relative;min-width:0}
+.header-favorites-icons{display:flex;align-items:center;gap:3px;min-width:0}
+.header-favorite-icon,.header-favorites-add{display:grid;place-items:center;width:23px;height:25px;flex:0 0 23px;border:1px solid transparent;border-radius:6px;background:transparent;color:#bba8e3;cursor:pointer;padding:3px}
+.header-favorite-icon:hover,.header-favorites-add:hover{background:#383048;border-color:#695681}
+.header-favorite-icon img{width:15px;height:15px;object-fit:contain}
+.header-favorite-fallback{font-size:11px;font-weight:700}
+.header-favorites-add{font-size:16px;color:#c5b5ec;border:1px dashed #5d4c76}
+.header-favorites-add:disabled{opacity:.3;cursor:not-allowed}
+.header-favorites-popover{position:absolute;top:calc(100% + 12px);right:0;z-index:10000;width:285px;padding:14px;background:#211d2b;border:1px solid #5b4b72;border-radius:12px;box-shadow:0 16px 40px #0009;color:#f1eafc}
+.header-favorites-popover[hidden]{display:none!important}
+.header-favorites-title{display:flex;justify-content:space-between;font-size:12px;font-weight:700;margin-bottom:10px}
+#header-favorites-count{font-size:11px;color:#ab9dbd;font-weight:500}
+#header-favorites-form{display:grid;gap:7px}
+#header-favorites-form input{width:100%;box-sizing:border-box;border:1px solid #51445f;background:#16131d;color:#fff;border-radius:7px;padding:9px;font-size:12px}
+.header-favorites-form-actions{display:flex;justify-content:flex-end;gap:7px}
+.header-favorites-form-actions button{border:1px solid #65537b;border-radius:7px;padding:7px 10px;background:#342a45;color:#f1eafc;cursor:pointer}
+.header-favorites-form-actions button[type=submit]{background:#9f80f4;color:#171020;font-weight:700}
+#header-favorites-error{margin:0;color:#f0a5b0;font-size:11px}
+#header-favorites-manage{max-height:180px;overflow:auto;margin-top:8px}
+.header-favorites-manage-row{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:11px;padding:5px 0;border-top:1px solid #3b3249}
+.header-favorites-manage-row span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.header-favorites-manage-row button{background:transparent;border:0;color:#baa3db;cursor:pointer;font-size:17px}
+
+#header-favorites-form[hidden]{display:none!important}
+
+/* Electron WebContentsView is a native layer: CSS z-index alone cannot cover it.
+   The favorites popover temporarily invokes the same modal view-hiding mechanism
+   used by other Hexora overlays, so its full form stays accessible. */
+.top-main:has(.header-favorites-popover:not([hidden])){z-index:30}
+.top-main:has(.header-favorites-popover:not([hidden])) .top{position:relative;z-index:31}
+.top-main:has(.header-favorites-popover:not([hidden])) .tabsbar{position:relative;z-index:1}
+.header-favorites-popover:not([hidden]){z-index:40}
+
+/* Theme-aware micro-favicons: preserve colorful logos, correct low-contrast monochrome ones. */
+.header-favorite-icon{background:rgba(175,150,225,.11);border-color:rgba(175,150,225,.18)}
+.header-favorite-icon img.header-favicon-invert{filter:invert(1)}
+.header-favorite-icon img.header-favicon-contrast-tile{border-radius:3px}
+.header-favorite-icon:focus-visible{outline:2px solid #ad95ff;outline-offset:2px}
+
+/* White theme: header favorites */
+:root[data-hexora-theme="white"] .header-favorites-popover{background:#fff;color:#263045;border-color:#d9deeb;box-shadow:0 16px 40px #27314a26}
+:root[data-hexora-theme="white"] #header-favorites-form input{background:#f8f9fc;color:#263045;border-color:#d9deeb}
+:root[data-hexora-theme="white"] .header-favorites-form-actions button{background:#f3f1fb;color:#382b59;border-color:#d6cee8}
+:root[data-hexora-theme="white"] .header-favorites-form-actions button[type=submit]{background:#8060d8;color:#fff}
+:root[data-hexora-theme="white"] .header-favorite-icon:hover,:root[data-hexora-theme="white"] .header-favorites-add:hover{background:#ece7f7;border-color:#b5a6d7}
+:root[data-hexora-theme="white"] .header-favorites-manage-row{border-color:#e4e6ed}
