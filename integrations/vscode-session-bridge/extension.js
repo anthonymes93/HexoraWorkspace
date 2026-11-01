@@ -43,10 +43,9 @@ function currentProject(){
  const project=folders[0].uri.fsPath;
  return typeof project==='string'&&path.isAbsolute(project)?project:null;
 }
-function saveProject(){
+function publishProject(project){
  if(!projectUpdatePath||!ownsSession())return;
- const project=currentProject();
- if(!project||project===lastPublishedProject)return;
+ if(typeof project!=='string'||!path.isAbsolute(project)||project===lastPublishedProject)return;
  const data={version:1,projectPath:project,ownerToken,updatedAt:Date.now()};
  const tmp=projectUpdatePath+'.tmp-'+process.pid;
  try{
@@ -58,6 +57,7 @@ function saveProject(){
   console.warn('[Hexora Session Bridge] Could not save project:',error.message);
  }
 }
+function saveProject(){publishProject(currentProject());}
 function refreshProjectButton(){
  if(!projectStatusItem)return;
  const project=currentProject();
@@ -77,6 +77,10 @@ async function chooseProject(){
   vscode.window.showErrorMessage('Hexora could not open that folder in this tab.');
   return;
  }
+ // VS Code may terminate/restart extensions when the FIRST workspace folder
+ // changes, without firing onDidChangeWorkspaceFolders. Publish the folder
+ // selected in our own picker synchronously rather than depending on that event.
+ publishProject(uri.fsPath);
  // Workspace folder changes normally generate an event; also sync once more
  // after the update to handle host versions that delay the notification.
  setTimeout(()=>{refreshProjectButton();saveProject();},300);
