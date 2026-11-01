@@ -902,3 +902,67 @@ $('extension-diagnostics-clear').onclick=async()=>{if(diagnosticFolder){await wi
 $('extension-diagnostics-probe').onclick=async()=>{if(diagnosticFolder)try{await window.hexora.extensions.probeWorker(diagnosticFolder);renderExtensionDiagnostics();}catch(e){$('extension-diagnostic-events').textContent=e.message;}};
 $('extension-diagnostics-popup').onclick=async()=>{if(diagnosticFolder)try{await window.hexora.extensions.open(diagnosticFolder);renderExtensionDiagnostics();}catch(e){$('extension-diagnostic-events').textContent=e.message;}};
 $('extension-diagnostics-overlay').onclick=e=>{if(e.target===$('extension-diagnostics-overlay'))closeExtensionDiagnostics();};
+
+/* History command center */
+let historyOpened=false,historyEntries=[];
+const historyUI=id=>document.getElementById(id);
+async function loadHistory(){
+ try{
+  historyEntries=await action('history-list',{limit:500});
+  renderHistory();
+ }catch(err){historyUI('history-message').textContent=err.message;}
+}
+function renderHistory(){
+ const query=historyUI('history-search').value.toLowerCase().trim();
+ const filter=historyUI('history-range').value;
+ const now=Date.now(),startToday=new Date().setHours(0,0,0,0);
+ const visible=historyEntries.filter(entry=>{
+  if(query&&!([entry.title,entry.url,entry.domain].join(' ').toLowerCase().includes(query)))return false;
+  const t=entry.visited_at;
+  return filter==='all'||(filter==='today'&&t>=startToday)||(filter==='week'&&t>=now-7*86400000)||(filter==='month'&&t>=now-30*86400000);
+ });
+ historyUI('history-count').textContent=visible.length.toLocaleString();
+ historyUI('history-sites').textContent=new Set(visible.map(x=>x.domain)).size.toLocaleString();
+ const host=historyUI('history-list');host.replaceChildren();
+ if(!visible.length){const empty=document.createElement('div');empty.className='history-empty';empty.innerHTML='<strong>No history found</strong><span>Your visited websites will appear here. Try changing the search or date filter.</span>';host.append(empty);return;}
+ let currentDay='';
+ for(const entry of visible){
+  const day=new Date(entry.visited_at).toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric',year:'numeric'});
+  if(day!==currentDay){currentDay=day;const heading=document.createElement('div');heading.className='history-day';heading.textContent=day;host.append(heading);}
+  const row=document.createElement('div');row.className='history-entry';
+  const favicon=document.createElement('img');favicon.className='history-favicon';favicon.alt='';
+  favicon.src='https://'+entry.domain+'/favicon.ico';favicon.onerror=()=>{favicon.style.display='none';};
+  const details=document.createElement('div');details.className='history-entry-text';
+  const title=document.createElement('strong');title.textContent=entry.title||entry.domain;
+  const address=document.createElement('small');address.textContent=entry.url;
+  details.append(title,address);
+  const stamp=document.createElement('time');stamp.textContent=new Date(entry.visited_at).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});
+  const launch=document.createElement('button');launch.className='history-entry-open';launch.title='Open in a new tab';launch.textContent='↗';
+  const open=async()=>{try{await action('history-open',{url:entry.url,workspace:activeWorkspace});closeHistory();}catch(err){historyUI('history-message').textContent=err.message;}};
+  launch.onclick=open;details.onclick=open;favicon.onclick=open;
+  const remove=document.createElement('button');remove.className='history-entry-remove';remove.title='Delete visit';remove.setAttribute('aria-label','Delete history entry');remove.textContent='×';
+  remove.onclick=async()=>{await action('history-delete',entry.id);historyEntries=historyEntries.filter(item=>item.id!==entry.id);renderHistory();};
+  row.append(favicon,details,stamp,launch,remove);host.append(row);
+ }
+}
+async function openHistory(){
+ historyOpened=true;historyUI('history-overlay').classList.remove('hidden');action('modal',true);
+ historyUI('history-search').value='';historyUI('history-message').textContent='';
+ await loadHistory();historyUI('history-search').focus();
+}
+function closeHistory(){
+ if(!historyOpened)return;historyOpened=false;
+ historyUI('history-overlay').classList.add('hidden');action('modal',false);
+}
+historyUI('history-rail').onclick=openHistory;
+historyUI('history-close').onclick=closeHistory;
+historyUI('history-overlay').onclick=e=>{if(e.target===historyUI('history-overlay'))closeHistory();};
+historyUI('history-search').addEventListener('input',renderHistory);
+historyUI('history-range').addEventListener('change',renderHistory);
+historyUI('history-clear').onclick=async()=>{
+ if(!historyEntries.length)return;
+ if(!confirm('Permanently clear all Hexora browsing history?'))return;
+ await action('history-clear');historyEntries=[];renderHistory();
+ historyUI('history-message').textContent='History cleared';
+};
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&historyOpened)closeHistory();});
