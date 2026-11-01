@@ -229,7 +229,7 @@ function renderSecondTabRow(page){
   close.onclick=()=>{selectedStackId=null;stackRowsDismissed=true;openStackPath=[];renderSecondTabRow({...page,activeId:null});};
   row.append(label,tabs,close);host.append(row);
  }
- const height=120+44*openStackPath.length;
+ const height=120+34*openStackPath.length;
  document.body.classList.toggle('stack-row-open',openStackPath.length>0);
  document.documentElement.style.setProperty('--hexora-rows-height',height+'px');
  if(height!==lastRowHeight){lastRowHeight=height;action('stack-row-height',height);}
