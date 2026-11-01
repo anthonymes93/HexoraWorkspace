@@ -890,9 +890,20 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
   if(event.sender!==win.webContents)throw Error('Invalid caller');
   return projectPicker.locations(store);
  });
- ipcMain.handle('code-picker:list',(event,folder)=>{
+ ipcMain.handle('code-picker:list',(event,folder,filter='')=>{
   if(event.sender!==win.webContents)throw Error('Invalid caller');
-  return projectPicker.listFolders(folder,projectPicker.readPaths(store,projectPicker.FAVORITES_KEY,100));
+  return projectPicker.listFolders(folder,projectPicker.readPaths(store,projectPicker.FAVORITES_KEY,100),1200,typeof filter==='string'?filter:'');
+ });
+ ipcMain.handle('code-picker:validate',(event,folder)=>{
+  if(event.sender!==win.webContents)throw Error('Invalid caller');
+  return projectPicker.validateFolder(folder);
+ });
+ ipcMain.handle('code-picker:focus',event=>{
+  if(event.sender!==win.webContents||!modalVisible)throw Error('Project picker must be active.');
+  // Native VS Code is a child HWND. Reclaim keyboard focus for the Electron
+  // text input when the user clicks the project-picker path/address field.
+  if(!win.isDestroyed()){win.focus();win.webContents.focus();}
+  return true;
  });
  ipcMain.handle('code-picker:favorite',(event,folder)=>{
   if(event.sender!==win.webContents)throw Error('Invalid caller');
