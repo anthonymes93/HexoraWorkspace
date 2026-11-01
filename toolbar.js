@@ -168,7 +168,7 @@ let tabPointer=null,dropSaving=false,suppressTabClickUntil=0;
 function beginTabPointerDrag(e){
  if(e.button!==0||!e.isPrimary||e.target.closest('.close'))return;
  const tab=e.currentTarget;
- tabPointer={tab,id:Number(tab.dataset.tabId),workspace:activeWorkspace,startX:e.clientX,startY:e.clientY,moving:false,originLeft:tab.getBoundingClientRect().left,visualLeft:tab.getBoundingClientRect().left,grabOffset:e.clientX-tab.getBoundingClientRect().left};
+ tabPointer={tab,id:Number(tab.dataset.tabId),workspace:activeWorkspace,startX:e.clientX,startY:e.clientY,moving:false,originLeft:tab.getBoundingClientRect().left,visualLeft:tab.getBoundingClientRect().left,grabOffset:e.clientX-tab.getBoundingClientRect().left,lastX:e.clientX};
  // Do not capture until the movement threshold is met; a normal click still activates.
 }
 function animateReflow(before,dragged){
@@ -194,16 +194,25 @@ window.addEventListener('pointermove',e=>{
  const slotLeft=d.tab.getBoundingClientRect().left-parseFloat(d.tab.style.getPropertyValue('--drag-x')||'0');
  d.tab.style.setProperty('--drag-x',(desiredLeft-slotLeft)+'px');
  d.visualLeft=desiredLeft;
- const center=desiredLeft+d.tab.offsetWidth/2;
- const others=[...tabStrip.children].filter(el=>el!==d.tab);
- const next=others.find(el=>center<el.getBoundingClientRect().left+el.offsetWidth/2)||null;
- if(next!==d.tab.nextElementSibling){
-  const before=new Map([...tabStrip.children].map(el=>[el,el.getBoundingClientRect().left]));
-  tabStrip.insertBefore(d.tab,next);
-  const newSlot=d.tab.getBoundingClientRect().left-parseFloat(d.tab.style.getPropertyValue('--drag-x')||'0');
-  d.tab.style.setProperty('--drag-x',(desiredLeft-newSlot)+'px');
-  animateReflow(before,d.tab);
+ // Exchange places after just 10% overlap with the adjacent tab.
+ // Direction gating prevents oscillation after an insertion shifts the layout.
+ const direction=Math.sign(e.clientX-d.lastX);
+ d.lastX=e.clientX;
+ const sibling=direction>0?d.tab.nextElementSibling:direction<0?d.tab.previousElementSibling:null;
+ if(sibling&&sibling.classList.contains('tab')){
+  const edge=sibling.getBoundingClientRect();
+  const crosses=direction>0
+   ? desiredLeft+d.tab.offsetWidth>=edge.left+edge.width*0.10
+   : desiredLeft<=edge.right-edge.width*0.10;
+  if(crosses){
+   const before=new Map([...tabStrip.children].map(el=>[el,el.getBoundingClientRect().left]));
+   tabStrip.insertBefore(d.tab,direction>0?sibling.nextSibling:sibling);
+   const newSlot=d.tab.getBoundingClientRect().left-parseFloat(d.tab.style.getPropertyValue('--drag-x')||'0');
+   d.tab.style.setProperty('--drag-x',(desiredLeft-newSlot)+'px');
+   animateReflow(before,d.tab);
+  }
  }
+
 });
 function cancelTabPointer(){
  if(!tabPointer)return;
