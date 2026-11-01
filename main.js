@@ -422,7 +422,7 @@ async function toggleEditor(address){
  const url=address?localEditorAddress(address):null;
  if(!editorSession){
   editorSession=new EditorSession({id:'local-code-editor',capabilities:[CAPABILITIES.FOCUS,CAPABILITIES.EMBEDDED],
-   async start(){editorView=new WebContentsView({webPreferences:{sandbox:false,contextIsolation:false,nodeIntegration:true}});editorView.webContents.setWindowOpenHandler(()=>({action:'deny'}));if(url)await editorView.webContents.loadURL(url);else await editorView.webContents.loadFile(path.join(__dirname,'integrations/code/editor.html'));},
+   async start(){editorView=new WebContentsView({webPreferences:{sandbox:true,contextIsolation:true,nodeIntegration:false,preload:path.join(__dirname,'integrations/code/editor-preload.js')}});editorView.webContents.setWindowOpenHandler(()=>({action:'deny'}));if(url)await editorView.webContents.loadURL(url);else await editorView.webContents.loadFile(path.join(__dirname,'integrations/code/editor.html'));},
    async stop(){if(editorView){mainViewport.removeChildView(editorView);editorView.webContents.close();editorView=null;}},
    async focus(){editorView.webContents.focus();}
   });
