@@ -218,7 +218,22 @@ function wire(t){const view=new WebContentsView({webPreferences:{partition:'pers
  wc.on('did-navigate-in-page',()=>update());
  wc.on('did-start-loading',()=>{loading.set(t.id,true);emit();});
  wc.on('did-stop-loading',()=>{loading.delete(t.id);emit();});
- wc.on('dom-ready',()=>{if(/^https:\/\/chatgpt\.com(?:\/|$)/.test(wc.getURL()))wc.executeJavaScript(CHATGPT_DRAFT_GUARD).catch(error=>console.warn('ChatGPT draft isolation unavailable:',error.message));});
+ const draftKey='chatgptDraft:'+t.id;
+ let draftBusy=false;
+ const draftTimer=setInterval(async()=>{
+  if(draftBusy||wc.isDestroyed()||!wc.getURL().startsWith('https://chatgpt.com/'))return;
+  draftBusy=true;
+  try{
+   const value=await wc.executeJavaScript('window.__hexoraReadDraft?.()');
+   if(typeof value==='string'&&value!==(store.getMeta(draftKey)||''))store.setMeta(draftKey,value);
+  }catch{}finally{draftBusy=false;}
+ },250);
+ wc.once('destroyed',()=>clearInterval(draftTimer));
+ wc.on('dom-ready',()=>{
+  if(!wc.getURL().startsWith('https://chatgpt.com/'))return;
+  const initial=JSON.stringify(store.getMeta(draftKey)||'');
+  wc.executeJavaScript(CHATGPT_DRAFT_GUARD.replace('__HEXORA_SAVED_DRAFT__',initial)).catch(err=>console.warn('Draft restore unavailable:',err.message));
+ });
  wc.on('render-process-gone',()=>{loading.delete(t.id);emit();});
  wc.setWindowOpenHandler(({url})=>/^https:\/\//.test(url)?{action:'allow',overrideBrowserWindowOptions:{width:540,height:750,autoHideMenuBar:true,webPreferences:{partition:'persist:hexora-chatgpt',sandbox:true,contextIsolation:true,nodeIntegration:false,webSecurity:true}}}:{action:'deny'});
  wc.loadURL(safeUrl(t.url)).catch(err=>console.error('Tab load error',err));
