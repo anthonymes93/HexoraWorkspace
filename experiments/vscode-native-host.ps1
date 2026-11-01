@@ -6,8 +6,29 @@ Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 Add-Type @'
 using System;
+using System.Text;
+using System.Collections.Generic;
 using System.Runtime.InteropServices;
 public static class NativeHost {
+  public delegate bool EnumWindowsProc(IntPtr hwnd, IntPtr lparam);
+  [DllImport("user32.dll")] public static extern bool EnumWindows(EnumWindowsProc callback, IntPtr lparam);
+  [DllImport("user32.dll")] public static extern int GetWindowText(IntPtr hwnd, StringBuilder text, int maxCount);
+  [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr hwnd);
+  [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr hwnd, out uint processId);
+  public static IntPtr[] CodeWindows() {
+    var windows = new List<IntPtr>();
+    EnumWindows((hwnd, lparam) => {
+      if (!IsWindowVisible(hwnd)) return true;
+      var title = new StringBuilder(512);
+      GetWindowText(hwnd, title, title.Capacity);
+      uint pid; GetWindowThreadProcessId(hwnd, out pid);
+      try { var p = System.Diagnostics.Process.GetProcessById((int)pid);
+        if (string.Equals(p.ProcessName, "Code", StringComparison.OrdinalIgnoreCase) && title.Length > 0) windows.Add(hwnd);
+      } catch {}
+      return true;
+    }, IntPtr.Zero);
+    return windows.ToArray();
+  }
   [DllImport("user32.dll", SetLastError=true)] public static extern IntPtr SetParent(IntPtr child, IntPtr parent);
   [DllImport("user32.dll", SetLastError=true)] public static extern int GetWindowLong(IntPtr hwnd, int index);
   [DllImport("user32.dll", SetLastError=true)] public static extern int SetWindowLong(IntPtr hwnd, int index, int value);
@@ -40,19 +61,19 @@ $resize = {
 }
 $panel.Add_Resize($resize)
 $hostForm.Add_Shown({
-  $existing = @(Get-Process Code -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne [IntPtr]::Zero } | Select-Object -ExpandProperty Id)
+  $existing = @([NativeHost]::CodeWindows() | ForEach-Object { $_.ToInt64() })
   Start-Process -FilePath $codeCommand.Source -ArgumentList '--new-window' | Out-Null
   $deadline = [DateTime]::UtcNow.AddSeconds(20)
   do {
     Start-Sleep -Milliseconds 250
     [System.Windows.Forms.Application]::DoEvents()
-    $candidate = Get-Process Code -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne [IntPtr]::Zero -and $_.Id -notin $existing } | Select-Object -First 1
+    $candidate = [NativeHost]::CodeWindows() | Where-Object { $_.ToInt64() -notin $existing } | Select-Object -First 1
   } until ($candidate -or [DateTime]::UtcNow -gt $deadline)
   if (-not $candidate) {
-    [System.Windows.Forms.MessageBox]::Show('No new VS Code window was detected. VS Code may have reused an existing process/window.','Experiment')
+    [System.Windows.Forms.MessageBox]::Show('No new VS Code window was detected. Try closing extra VS Code windows and retry.','Experiment')
     return
   }
-  $script:child = $candidate.MainWindowHandle
+  $script:child = [IntPtr]$candidate
   $script:oldStyle = [NativeHost]::GetWindowLong($script:child, $GWL_STYLE)
   $newStyle = ($script:oldStyle -band (-bnot ($WS_POPUP -bor $WS_CAPTION -bor $WS_THICKFRAME))) -bor $WS_CHILD
   [void][NativeHost]::SetWindowLong($script:child, $GWL_STYLE, $newStyle)
