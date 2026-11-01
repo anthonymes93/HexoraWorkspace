@@ -232,13 +232,13 @@ async function renameStack(stack){
 function attachFaviconMarquee(img,tab){
  if(img.dataset.marqueeBound)return;
  img.dataset.marqueeBound='1';
- let raf=0,last=0,hold=0,expanded=false,hoverTimer=null;
+ let raf=0,last=0,hold=0,hoverTimer=null,reveal=null;
  const stop=()=>{
   clearTimeout(hoverTimer);hoverTimer=null;
   cancelAnimationFrame(raf);raf=0;last=0;hold=0;
   const title=tab.querySelector('.tab-title-lines > .name');
   if(title)title.scrollLeft=0;
-  if(expanded){tab.style.width='';tab.style.minWidth='';tab.style.maxWidth='';expanded=false;}
+  reveal?.remove();reveal=null;
  };
  const tick=now=>{
   const title=tab.querySelector('.tab-title-lines > .name');
@@ -255,25 +255,30 @@ function attachFaviconMarquee(img,tab){
   raf=requestAnimationFrame(tick);
  };
  img.addEventListener('mouseenter',()=>{
-  if(raf||expanded||hoverTimer)return;
+  if(raf||reveal||hoverTimer)return;
   hoverTimer=setTimeout(()=>{
    hoverTimer=null;
    if(!img.matches(':hover')||!img.isConnected)return;
-  const title=tab.querySelector('.tab-title-lines > .name');
-  if(!title)return;
-  const overflow=title.scrollWidth-title.clientWidth;
-  if(overflow<=1)return;
-  // Barely clipped names look silly scrolling a few pixels. Expand only
-  // those tabs; long names continue using the regular marquee.
-  if(overflow<=42){
-   const width=Math.ceil(tab.getBoundingClientRect().width+overflow+12);
-   tab.style.width=width+'px';
-   tab.style.minWidth=width+'px';
-   tab.style.maxWidth=width+'px';
-   expanded=true;
-   return;
-  }
-  title.scrollLeft=0;raf=requestAnimationFrame(tick);
+   const title=tab.querySelector('.tab-title-lines > .name');
+   if(!title)return;
+   const overflow=title.scrollWidth-title.clientWidth;
+   if(overflow<=1)return;
+   if(overflow<=42){
+    // A lightweight title extension floats over the row; no tabs resize or move.
+    const rect=title.getBoundingClientRect();
+    const style=getComputedStyle(title);
+    reveal=document.createElement('span');
+    reveal.className='hexora-tab-title-reveal';
+    reveal.textContent=title.textContent;
+    Object.assign(reveal.style,{
+     left:rect.left+'px',top:rect.top+'px',
+     width:Math.ceil(title.scrollWidth+8)+'px',height:rect.height+'px',
+     font:style.font,lineHeight:style.lineHeight,color:style.color
+    });
+    document.body.append(reveal);
+    return;
+   }
+   title.scrollLeft=0;raf=requestAnimationFrame(tick);
   },120);
  });
  img.addEventListener('mouseleave',stop);
