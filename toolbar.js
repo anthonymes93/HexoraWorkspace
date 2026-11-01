@@ -666,7 +666,7 @@ $('tab-menu-url-form').onsubmit=async e=>{
  const input=$('tab-menu-url'),error=$('tab-menu-url-error');
  let url=input.value.trim();
  if(!url){error.textContent='Enter a website address.';input.focus();return;}
- if(!/^[a-zA-Z][\\w+.-]*:\/\//.test(url))url='https://'+url;
+ if(!url.includes('://'))url='https://'+url;
  try{
   const parsed=new URL(url);
   if(!['http:','https:'].includes(parsed.protocol)||!parsed.hostname||parsed.username||parsed.password)throw new Error('Enter a valid HTTP or HTTPS address.');
