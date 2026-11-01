@@ -662,13 +662,13 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
  ipcMain.handle('native-code:toggle',async event=>{
   if(event.sender!==win.webContents)throw Error('Invalid caller');
   if(process.platform!=='win32')throw Error('Native VS Code hosting requires Windows.');
-  if(nativeCodeHost){if(nativeCodeDetached){nativeCodeDetached=false;nativeCodeCommand('ATTACH');nativeCodeActive=true;const view=live.get(activeId);if(view)mainViewport.removeChildView(view);nativeCodeBounds();return {active:true};}nativeCodeActive=!nativeCodeActive;if(nativeCodeActive){const view=live.get(activeId);if(view)mainViewport.removeChildView(view);nativeCodeCommand('SHOW');nativeCodeBounds();}else{nativeCodeCommand('HIDE');restoreNativeWebView();}return {active:nativeCodeActive};}
+  if(nativeCodeHost){if(nativeCodeDetached){nativeCodeDetached=false;nativeCodeCommand('ATTACH');setTimeout(()=>{if(nativeCodeHost)nativeCodeCommand('FOCUS');},180);nativeCodeActive=true;const view=live.get(activeId);if(view)mainViewport.removeChildView(view);nativeCodeBounds();return {active:true};}nativeCodeActive=!nativeCodeActive;if(nativeCodeActive){const view=live.get(activeId);if(view)mainViewport.removeChildView(view);nativeCodeCommand('SHOW');nativeCodeBounds();setTimeout(()=>{if(nativeCodeActive)nativeCodeCommand('FOCUS');},180);}else{nativeCodeCommand('HIDE');restoreNativeWebView();}return {active:nativeCodeActive};}
   const script=path.join(__dirname,'experiments','vscode-hexora-host.ps1');
   const hwnd=win.getNativeWindowHandle().readBigUInt64LE(0).toString();
   const proc=spawn('powershell.exe',['-NoProfile','-STA','-ExecutionPolicy','Bypass','-File',script,'-ParentHwnd',hwnd],{stdio:['pipe','pipe','pipe'],windowsHide:true});
   nativeCodeHost=proc;nativeCodeActive=true;nativeCodeDetached=false;
   const webView=live.get(activeId);if(webView)mainViewport.removeChildView(webView);
-  proc.stdout.on('data',data=>console.log('[Native VS Code]',String(data).trim()));
+  proc.stdout.on('data',data=>{const output=String(data).trim();console.log('[Native VS Code]',output);if(output.includes('READY')&&nativeCodeHost===proc){setTimeout(()=>{if(nativeCodeHost===proc&&nativeCodeActive)nativeCodeCommand('FOCUS');},250);}});
   proc.stderr.on('data',data=>console.error('[Native VS Code]',String(data).trim()));
   proc.on('error',error=>{console.error('Native VS Code host failed',error);if(nativeCodeHost===proc){nativeCodeHost=null;nativeCodeActive=false;nativeCodeDetached=false;restoreNativeWebView();}win?.webContents?.send('native-code:stopped');});
   proc.on('exit',()=>{if(nativeCodeHost===proc){nativeCodeHost=null;nativeCodeActive=false;restoreNativeWebView();}if(win&&!win.isDestroyed())win.webContents.send('native-code:stopped');});

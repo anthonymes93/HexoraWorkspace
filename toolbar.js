@@ -1348,6 +1348,6 @@ v('vault-delete').onclick=async()=>{if(!vaultSelected||!confirm('Delete this sav
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&vaultOpen)vaultClose();});
 
 // Experimental native Windows application overlay (not yet a persistent tab).
-$('native-code-rail').addEventListener('click',async()=>{try{const state=await window.hexora.nativeCode.toggle();$('native-code-rail').classList.toggle('selected',state.active);}catch(error){alert('Native VS Code: '+error.message);}});
+$('native-code-rail').addEventListener('click',async()=>{try{const state=await window.hexora.nativeCode.toggle();$('native-code-rail').classList.toggle('selected',state.active);if(state.active&&document.activeElement instanceof HTMLElement)document.activeElement.blur();}catch(error){alert('Native VS Code: '+error.message);}});
 $('native-code-rail').addEventListener('contextmenu',async e=>{e.preventDefault();try{const state=await window.hexora.nativeCode.detach();if(state.detached){$('native-code-rail').classList.remove('selected');$('native-code-rail').title='VS Code detached — click to reattach';}}catch(error){alert('Detach VS Code: '+error.message);}});
 window.hexora.nativeCode.onStopped(()=>$('native-code-rail').classList.remove('selected'));
