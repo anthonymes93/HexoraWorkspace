@@ -12,6 +12,8 @@ on:
       - 'main.js'
       - 'code-session-vsix.js'
       - 'code-session-workspace.js'
+      - 'code-project-sync.js'
+      - 'scripts/test-code-project-sync.cjs'
       - 'integrations/vscode-session-bridge/**'
       - 'scripts/test-code-session.cjs'
       - 'scripts/test-code-bridge.cjs'
@@ -47,3 +49,5 @@ jobs:
           if ($errors.Count -gt 0) { $errors | Format-List; exit 1 }
       - name: Verify automatic VS Code project discovery
         run: npm run test:code-auto-project
+      - name: Verify fenced auto-detected project records
+        run: npm run test:code-project-sync
