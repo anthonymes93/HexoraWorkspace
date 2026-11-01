@@ -732,6 +732,11 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
    const view=live.get(id);if(view){view.webContents.setUserAgent(enabled?chromeUserAgent(view.webContents):app.userAgentFallback);view.webContents.reload();}
    emit();return enabled;
   }
+  else if(action==='close-many'){
+   const ids=[...new Set(Array.isArray(arg)?arg:[])].filter(id=>Number.isSafeInteger(id)&&id>0).slice(0,100);
+   for(const id of ids)if(store.get(id))closeTab(id);
+   return ids.length;
+  }
   else if(action==='close')closeTab(arg);
   else if(action==='reload'){
    if(wc){const view=live.get(activeId);mainViewport.removeChildView(view);mainViewport.addChildView(view);bounds();wc.reloadIgnoringCache();}
