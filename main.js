@@ -9,6 +9,8 @@ const os=require('node:os');
 const {spawn}=require('node:child_process');
 let nativeCodeHost=null,nativeCodeActive=false,nativeCodeDetached=false;
 let tabStoreClosing=false;
+const VSCODE_URL='hexora-native://vscode';
+const isCodeTab=t=>t?.url===VSCODE_URL;
 function nativeCodeCommand(message){const proc=nativeCodeHost;if(!proc||proc.exitCode!==null||proc.killed||proc.stdin?.destroyed||!proc.stdin?.writable)return false;try{proc.stdin.write(message+'\n',error=>{if(error&&error.code!=='EPIPE')console.error('[Native VS Code] stdin:',error.message);});return true;}catch(error){console.error('[Native VS Code] command failed:',error.message);return false;}}
 function nativeCodeBounds(){if(!win||win.isDestroyed()||!nativeCodeHost)return;const [w,h]=win.getContentSize();nativeCodeCommand('RECT '+sidebarWidth+' '+TOP_HEIGHT+' '+Math.max(0,w-sidebarWidth)+' '+Math.max(0,h-TOP_HEIGHT));}
 let nativeCodeLifecycleTimer=null;
@@ -27,7 +29,7 @@ function scheduleNativeCodeLifecycle(reason){
 }
 
 // Focus recovery is event-driven; avoid repeatedly stealing keyboard focus from VS Code.
-function restoreNativeWebView(){if(win&&!win.isDestroyed()&&mainViewport){const view=live.get(activeId);if(view&&!modalVisible){mainViewport.addChildView(view);bounds();}}}
+function restoreNativeWebView(){if(win&&!win.isDestroyed()&&mainViewport&&!isCodeTab(store?.get(activeId))){const view=live.get(activeId);if(view&&!modalVisible){mainViewport.addChildView(view);bounds();}}}
 function stopNativeCode(){nativeCodeActive=false;nativeCodeCommand('QUIT');if(nativeCodeHost){const proc=nativeCodeHost;nativeCodeHost=null;setTimeout(()=>{if(proc.exitCode===null)proc.kill();},2500).unref();}}
 
 const {snapshot,stageRestore,applyPending,verifyBackup}=require('./recovery');
@@ -265,7 +267,7 @@ function wire(t){const view=new WebContentsView({webPreferences:{partition:'pers
  wc.loadURL(safeUrl(t.url)).catch(err=>console.error('Tab load error',err));
  return view;
 }
-function toModel(r){return{id:r.id,url:safeUrl(r.url),title:r.title||'ChatGPT',workspace:r.workspace||'web',pinned:!!r.pinned,muted:!!r.muted,lastActive:r.last_active??r.lastActive??Date.now(),ordinal:r.ordinal||r.id};}
+function toModel(r){return{id:r.id,url:isCodeTab(r)?VSCODE_URL:safeUrl(r.url),title:r.title||'ChatGPT',workspace:r.workspace||'web',pinned:!!r.pinned,muted:!!r.muted,lastActive:r.last_active??r.lastActive??Date.now(),ordinal:r.ordinal||r.id};}
 function discard(id){const view=live.get(id);if(!view)return;live.delete(id);const pop=detached.get(id);if(pop&&!pop.isDestroyed())pop.contentView.removeChildView(view);else if(mainViewport)mainViewport.removeChildView(view);loading.delete(id);view.webContents.close();}
 // Clip the native web view to the available viewport while keeping its internal layout stable.
 // The right edge stays anchored to the window; the left portion is revealed/hidden by the panel.
@@ -307,27 +309,76 @@ function setSidebarWidth(collapsed){
  frame();
 }
 
-function pageRow(r){return{id:r.id,url:r.url,title:store.getMeta('tabCustomTitle:'+r.id)||r.title,workspace:r.workspace,pinned:!!r.pinned,muted:!!r.muted,lastActive:r.last_active,ordinal:r.ordinal,favicon:(favicons.get(r.id)?.origin===originOf(r.url)?favicons.get(r.id)?.url:null)||store.getMeta('favicon:'+originOf(r.url))||null,faviconFallback:(()=>{try{const u=new URL(r.url);return ['http:','https:'].includes(u.protocol)?u.origin+'/favicon.ico':null;}catch{return null;}})(),active:r.id===activeId,detached:detached.has(r.id),loading:!!loading.get(r.id),suspended:!live.has(r.id),chromeMode:chromeMode(r.id),panelMode:panelMode(r.id),panelPreference:panelPreference(r.id)};}
+function pageRow(r){return{id:r.id,url:r.url,nativeCode:isCodeTab(r),title:store.getMeta('tabCustomTitle:'+r.id)||r.title,workspace:r.workspace,pinned:!!r.pinned,muted:!!r.muted,lastActive:r.last_active,ordinal:r.ordinal,favicon:(favicons.get(r.id)?.origin===originOf(r.url)?favicons.get(r.id)?.url:null)||store.getMeta('favicon:'+originOf(r.url))||null,faviconFallback:(()=>{try{const u=new URL(r.url);return ['http:','https:'].includes(u.protocol)?u.origin+'/favicon.ico':null;}catch{return null;}})(),active:r.id===activeId,detached:detached.has(r.id),loading:!!loading.get(r.id),suspended:isCodeTab(r)?false:!live.has(r.id),chromeMode:chromeMode(r.id),panelMode:panelMode(r.id),panelPreference:panelPreference(r.id)};}
 function state(workspace='web',offset=0){const active=activeId?store.get(activeId):null;return{activeId,total:store.total(),counts:store.counts(),tabs:store.page(workspace,offset,50).map(pageRow),active:active?.workspace===workspace?active:null,activePanelMode:activeId?panelMode(activeId):'wide',stackData:store.stacks(workspace),offset};}
 function emit(){if(!win||win.isDestroyed())return;clearTimeout(stateTimer);stateTimer=setTimeout(()=>{if(!win||win.isDestroyed())return;win.webContents.send('tabs:changed');},70);}
-function activate(id){const raw=store.get(Number(id));if(!raw)return false;
- if(detached.has(raw.id)){const popup=detached.get(raw.id);if(!popup.isDestroyed()){if(popup.isMinimized())popup.restore();popup.focus();return true;}}
- for(const [otherId,view] of live)if(otherId!==id&&!detached.has(otherId))mainViewport.removeChildView(view);
- activeId=raw.id;store.setMeta('workspaceActive:'+raw.workspace,String(activeId));const t=toModel(raw);t.lastActive=Date.now();store.save(t);store.setMeta('activeId',String(activeId));
- let view=live.get(id);if(!view){view=wire(t);live.set(id,view);}
- if(!modalVisible&&!nativeCodeActive){mainViewport.addChildView(view);bounds();view.webContents.focus();}evict();emit();return true;
+function activate(id){
+ const row=store.get(Number(id));if(!row)return false;
+ if(detached.has(row.id)){const popup=detached.get(row.id);if(!popup.isDestroyed()){if(popup.isMinimized())popup.restore();popup.focus();return true;}}
+ if(isCodeTab(store.get(activeId))&&!isCodeTab(row))hideNativeCode();
+ if(!isCodeTab(row))store.setMeta('nativeCodeLastWebId',String(row.id));
+ for(const [otherId,view] of live)if(otherId!==row.id&&!detached.has(otherId))mainViewport.removeChildView(view);
+ activeId=row.id;store.setMeta('workspaceActive:'+row.workspace,String(row.id));const t=toModel(row);t.lastActive=Date.now();store.save(t);store.setMeta('activeId',String(row.id));
+ if(isCodeTab(row)){if(!modalVisible)showNativeCode();else hideNativeCode();evict();emit();return true;}
+ let view=live.get(row.id);if(!view){view=wire(t);live.set(row.id,view);}
+ if(!modalVisible){mainViewport.addChildView(view);bounds();view.webContents.focus();}
+ evict();emit();return true;
 }
-function evict(){if(live.size<=MAX_LIVE)return;const candidates=Array.from(live.keys()).filter(id=>id!==activeId&&!detached.has(id)&&!store.get(id)?.pinned);
- candidates.sort((a,b)=>(store.get(a)?.last_active||0)-(store.get(b)?.last_active||0));
- while(live.size>MAX_LIVE&&candidates.length)discard(candidates.shift());}
+function findCodeTab(){
+ const saved=store.get(Number(store.getMeta('nativeCodeTabId')));
+ return isCodeTab(saved)?saved:(store.search(VSCODE_URL,100).find(isCodeTab)||null);
+}
+function openCodeTab(workspace='web'){
+ if(process.platform!=='win32')throw Error('Native VS Code requires Windows.');
+ let row=findCodeTab();
+ if(!row){const id=store.nextId();store.save({id,url:VSCODE_URL,title:'Visual Studio Code',workspace:typeof workspace==='string'&&workspace.length<=80?workspace:'web',pinned:false,muted:false,lastActive:Date.now(),ordinal:id});row=store.get(id);}
+ store.setMeta('nativeCodeTabId',String(row.id));activate(row.id);return {id:row.id,workspace:row.workspace,active:true};
+}
+function activateWebFallback(excludedId){
+ const previous=store.get(Number(store.getMeta('nativeCodeLastWebId'))),workspace=store.get(excludedId)?.workspace||'web';
+ const candidate=(previous&&!isCodeTab(previous)?previous:null)||store.page(workspace,0,50).find(t=>!isCodeTab(t))||store.page('web',0,50).find(t=>!isCodeTab(t));
+ if(candidate)activate(candidate.id);else newTab(workspace);
+}
+function hideNativeCode(){nativeCodeActive=false;if(nativeCodeHost&&!nativeCodeDetached)nativeCodeCommand('HIDE');}
+function showNativeCode(){
+ if(!isCodeTab(store?.get(activeId))||modalVisible)return;
+ if(!nativeCodeHost){startNativeCodeHost();return;}
+ if(nativeCodeDetached){nativeCodeDetached=false;nativeCodeCommand('ATTACH');}
+ nativeCodeActive=true;nativeCodeCommand('SHOW');nativeCodeBounds();nativeCodeCommand('RECOVER_Z');
+ const host=nativeCodeHost;
+ setTimeout(()=>{if(nativeCodeHost===host&&nativeCodeActive&&!nativeCodeDetached&&isCodeTab(store?.get(activeId)))nativeCodeCommand('FOCUS');},180);
+}
+function startNativeCodeHost(){
+ if(nativeCodeHost||process.platform!=='win32'||!win||win.isDestroyed())return;
+ const script=path.join(__dirname,'experiments','vscode-hexora-host.ps1');
+ const hwnd=win.getNativeWindowHandle().readBigUInt64LE(0).toString();
+ const proc=spawn('powershell.exe',['-NoProfile','-STA','-ExecutionPolicy','Bypass','-File',script,'-ParentHwnd',hwnd],{stdio:['pipe','pipe','pipe'],windowsHide:true});
+ nativeCodeHost=proc;nativeCodeActive=false;nativeCodeDetached=false;
+ proc.stdin.on('error',error=>console.error('[Native VS Code] stdin pipe:',error.message));
+ proc.stdout.on('data',data=>{
+  const output=String(data).trim();console.log('[Native VS Code]',output);
+  if(output.split(/\r?\n/).some(line=>line.trim()==='READY')&&nativeCodeHost===proc){
+   if(isCodeTab(store?.get(activeId))&&!modalVisible){
+    nativeCodeActive=true;nativeCodeCommand('SHOW');nativeCodeBounds();nativeCodeCommand('GEOMETRY launch');nativeCodeCommand('RECOVER_Z');
+    setTimeout(()=>{if(nativeCodeHost===proc&&nativeCodeActive)nativeCodeCommand('FOCUS');},250);
+   }else{nativeCodeActive=false;nativeCodeCommand('HIDE');}
+   emit();
+  }
+ });
+ proc.stderr.on('data',data=>console.error('[Native VS Code]',String(data).trim()));
+ proc.on('error',err=>{console.error('[Native VS Code] host failed:',err);if(nativeCodeHost===proc){nativeCodeHost=null;nativeCodeActive=false;nativeCodeDetached=false;restoreNativeWebView();}if(win&&!win.isDestroyed())win.webContents.send('native-code:stopped');});
+ proc.on('exit',(exitCode,signal)=>{console.error('[Native VS Code] host exited:',{code:exitCode,signal});if(nativeCodeHost===proc){nativeCodeHost=null;nativeCodeActive=false;nativeCodeDetached=false;restoreNativeWebView();}if(win&&!win.isDestroyed())win.webContents.send('native-code:stopped');});
+}
 function newTab(workspace='web',url=HOME,afterId=null){const id=store.nextId(),t={id,title:'New tab',url:safeUrl(url),workspace:typeof workspace==='string'?workspace:'web',pinned:false,muted:false,lastActive:Date.now(),ordinal:id};if(afterId&&store.get(afterId)?.workspace===t.workspace)store.insertAfter(t,afterId);else store.save(t);activate(id);return id;}
 function closeTab(id){id=Number(id);favicons.delete(id);const closing=store.get(id);if(!closing)return;
+ if(isCodeTab(closing)){store.setMeta('nativeCodeTabId','');stopNativeCode();}
  if(detached.has(id)){const popup=detached.get(id);setDetachedSaved(id,false);detached.delete(id);if(!popup.isDestroyed())popup.close();}
  discard(id);store.delete(id);if(activeId===id){activeId=null;const sameWorkspace=store.page(closing.workspace,0,50).find(t=>!detached.has(t.id));const target=sameWorkspace?.id||store.lastActiveId();if(target)activate(target);else newTab(closing.workspace);}emit();}
 function sweep(){const now=Date.now();for(const id of Array.from(live.keys())){if(id===activeId)continue;const t=store.get(id),v=live.get(id);if(!t){discard(id);continue;}if(detached.has(id)||t.pinned||now-t.last_active<IDLE_MS||v.webContents.isLoading()||v.webContents.isCurrentlyAudible?.())continue;discard(id);}emit();}
 function detachTab(id){
  id=Number(id);const row=store.get(id);
  if(!row||!win||win.isDestroyed())return false;
+ if(isCodeTab(row)){if(!nativeCodeHost)return false;if(!nativeCodeDetached){nativeCodeDetached=true;nativeCodeActive=false;nativeCodeCommand('DETACH');}if(activeId===id)activateWebFallback(id);return true;}
  const existing=detached.get(id);
  if(existing&&!existing.isDestroyed()){existing.focus();return true;}
  let view=live.get(id);
@@ -681,22 +732,8 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
   return true;
  });
  ipcMain.handle('native-code:repair',async event=>{if(event.sender!==win.webContents)throw Error('Invalid caller');if(!nativeCodeHost||nativeCodeDetached||!nativeCodeActive)return {repaired:false};nativeCodeCommand('TRACE BEFORE_REPAIR');nativeCodeCommand('DIAG BEFORE_REPAIR');nativeCodeCommand('DETACH');await new Promise(resolve=>setTimeout(resolve,300));if(!nativeCodeHost||!nativeCodeActive)return {repaired:false};nativeCodeCommand('ATTACH');nativeCodeBounds();return {repaired:true};});
- ipcMain.handle('native-code:detach',async event=>{if(event.sender!==win.webContents)throw Error('Invalid caller');if(!nativeCodeHost)return {detached:false};nativeCodeDetached=true;nativeCodeActive=false;nativeCodeCommand('TRACE BEFORE_DETACH');nativeCodeCommand('DIAG BEFORE_DETACH');nativeCodeCommand('DETACH');restoreNativeWebView();return {detached:true};});
- ipcMain.handle('native-code:toggle',async event=>{
-  if(event.sender!==win.webContents)throw Error('Invalid caller');
-  if(process.platform!=='win32')throw Error('Native VS Code hosting requires Windows.');
-  if(nativeCodeHost){if(nativeCodeDetached){nativeCodeDetached=false;nativeCodeCommand('TRACE BEFORE_ATTACH');nativeCodeCommand('DIAG BEFORE_ATTACH');nativeCodeCommand('ATTACH');setTimeout(()=>{if(nativeCodeHost)nativeCodeCommand('FOCUS');nativeCodeCommand('TRACE AFTER_FOCUS');},180);nativeCodeActive=true;const view=live.get(activeId);if(view)mainViewport.removeChildView(view);nativeCodeBounds();return {active:true};}nativeCodeActive=!nativeCodeActive;if(nativeCodeActive){const view=live.get(activeId);if(view)mainViewport.removeChildView(view);nativeCodeCommand('SHOW');nativeCodeBounds();setTimeout(()=>{if(nativeCodeActive)nativeCodeCommand('FOCUS');nativeCodeCommand('TRACE AFTER_FOCUS');},180);}else{nativeCodeCommand('HIDE');restoreNativeWebView();}return {active:nativeCodeActive};}
-  const script=path.join(__dirname,'experiments','vscode-hexora-host.ps1');
-  const hwnd=win.getNativeWindowHandle().readBigUInt64LE(0).toString();
-  const proc=spawn('powershell.exe',['-NoProfile','-STA','-ExecutionPolicy','Bypass','-File',script,'-ParentHwnd',hwnd],{stdio:['pipe','pipe','pipe'],windowsHide:true});
-  nativeCodeHost=proc;nativeCodeActive=false;nativeCodeDetached=false;
-  proc.stdin.on('error',error=>console.error('[Native VS Code] stdin pipe:',error.message));
-  proc.stdout.on('data',data=>{const output=String(data).trim();console.log('[Native VS Code]',output);if(output.split(/\r?\n/).some(line=>line.trim()==='READY')&&nativeCodeHost===proc){nativeCodeActive=true;const webView=live.get(activeId);if(webView)mainViewport.removeChildView(webView);nativeCodeBounds();nativeCodeCommand('GEOMETRY launch');setTimeout(()=>{if(nativeCodeHost===proc&&nativeCodeActive)nativeCodeCommand('FOCUS');},250);}});
-  proc.stderr.on('data',data=>console.error('[Native VS Code]',String(data).trim()));
-  proc.on('error',error=>{console.error('Native VS Code host failed',error);if(nativeCodeHost===proc){nativeCodeHost=null;nativeCodeActive=false;nativeCodeDetached=false;restoreNativeWebView();}win?.webContents?.send('native-code:stopped');});
-  proc.on('exit',(code,signal)=>{console.error('[Native VS Code] host exited:',{code,signal});if(nativeCodeHost===proc){nativeCodeHost=null;nativeCodeActive=false;restoreNativeWebView();}if(win&&!win.isDestroyed())win.webContents.send('native-code:stopped');});
-  return {active:false,starting:true};
- });
+ ipcMain.handle('native-code:detach',async event=>{if(event.sender!==win.webContents)throw Error('Invalid caller');const row=findCodeTab();if(!row||!nativeCodeHost)return {detached:false};nativeCodeCommand('TRACE BEFORE_DETACH');nativeCodeCommand('DIAG BEFORE_DETACH');return {detached:detachTab(row.id)};});
+ ipcMain.handle('native-code:toggle',async event=>{if(event.sender!==win.webContents)throw Error('Invalid caller');return openCodeTab(store.get(activeId)?.workspace||'web');});
  ipcMain.handle('tabs:page',(_e,arg)=>sendPage(arg));
  ipcMain.handle('tabs:search',(_e,term)=>store.search(term,50).map(pageRow));
  ipcMain.handle('tabs:lookup',(_e,id)=>{const row=store.get(Number(id));return row?pageRow(row):null;});
@@ -710,6 +747,7 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
    newTab(typeof arg?.workspace==='string'?arg.workspace:'web',url);
    return true;
   }
+  if(action==='open-native-code')return openCodeTab(typeof arg==='string'?arg:'web');
   if(action==='new'){const workspace=typeof arg==='string'?arg:'web';const anchor=store.get(activeId);newTab(workspace,HOME,anchor?.workspace===workspace?activeId:null);}
   else if(action==='activate')activate(Number(arg));
   else if(action==='switch-workspace'){
@@ -749,6 +787,7 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
    const title=typeof arg?.title==='string'&&arg.title.trim()?arg.title.trim().slice(0,100):new URL(url).hostname;
    const id=arg?.newTab?newTab(typeof arg.workspace==='string'?arg.workspace:'web',url):Number(arg?.id);
    const row=store.get(id);if(!row)throw new Error('Tab no longer exists.');
+   if(isCodeTab(row)){store.setMeta('nativeCodeTabId','');stopNativeCode();}
    const t=toModel(row);t.url=url;t.title=title;store.save(t);
    const view=live.get(id);
    if(view){view.webContents.loadURL(url).catch(err=>console.error('Could not open website',err));}
@@ -786,11 +825,12 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
   }
   else if(action==='close')closeTab(arg);
   else if(action==='reload'){
-   if(wc){const view=live.get(activeId);mainViewport.removeChildView(view);mainViewport.addChildView(view);bounds();wc.reloadIgnoringCache();}
+   if(isCodeTab(current)){if(!nativeCodeHost)startNativeCodeHost();else{nativeCodeCommand('RECOVER_Z');nativeCodeCommand('FOCUS');}}
+   else if(wc){const view=live.get(activeId);mainViewport.removeChildView(view);mainViewport.addChildView(view);bounds();wc.reloadIgnoringCache();}
   }
   else if(action==='back'&&wc?.navigationHistory.canGoBack())wc.navigationHistory.goBack();
   else if(action==='forward'&&wc?.navigationHistory.canGoForward())wc.navigationHistory.goForward();
-  else if(action==='open-external')shell.openExternal(current?.url||HOME);
+  else if(action==='open-external'){if(!isCodeTab(current))shell.openExternal(current?.url||HOME);}
   else if(action==='sidebar-resize'){
    if(sidebarAnimation){clearInterval(sidebarAnimation);sidebarAnimation=null;}
    sidebarTransitioning=false;sidebarTransitionTarget=null;
@@ -811,6 +851,7 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
   else if(action==='detached-info'){return {title:store.get(Number(arg))?.title||'ChatGPT'};}
   else if(action==='modal'){
    modalVisible=!!arg;
+   if(isCodeTab(store.get(activeId))){if(modalVisible){hideNativeCode();win.webContents.focus();}else showNativeCode();return true;}
    const view=live.get(activeId);
    if(view){
     if(modalVisible){mainViewport.removeChildView(view);win.webContents.focus();}
