@@ -361,6 +361,20 @@ function setSidebarWidth(collapsed){
  frame();
 }
 
+function awaitNotionSidebarDemo(wc){
+ // Demo only: use Notion's own accessible sidebar toggle, never hide arbitrary page elements.
+ return wc.executeJavaScript(`(() => {
+  const visible=el=>{const r=el.getBoundingClientRect();const s=getComputedStyle(el);return r.width>0&&r.height>0&&s.visibility!=='hidden'&&s.display!=='none';};
+  const controls=[...document.querySelectorAll('button,[role="button"]')].filter(visible);
+  const label=el=>[el.getAttribute('aria-label'),el.getAttribute('title'),el.getAttribute('data-tooltip'),el.textContent?.trim()].filter(Boolean).join(' ').toLowerCase();
+  const close=controls.find(el=>/^(close|hide|collapse) (the )?(left )?sidebar$/.test(label(el)));
+  const open=controls.find(el=>/^(open|show|expand) (the )?(left )?sidebar$/.test(label(el)));
+  const target=close||open;
+  if(!target)return {ok:false,reason:'Notion sidebar control not found. Notion may have changed its UI.'};
+  target.click();
+  return {ok:true,action:close?'hidden':'shown'};
+ })()`,true).catch(error=>({ok:false,reason:error.message}));
+}
 function pageRow(r){const codeProject=isCodeTab(r)?store.getCodeProject(r.id)?.project_path||null:null;
  return{id:r.id,url:r.url,nativeCode:isCodeTab(r),nativeCodeProject:codeProject,nativeCodeProjectMissing:!!codeProject&&!fs.existsSync(codeProject),title:store.getMeta('tabCustomTitle:'+r.id)||r.title,workspace:r.workspace,pinned:!!r.pinned,muted:!!r.muted,lastActive:r.last_active,ordinal:r.ordinal,favicon:(favicons.get(r.id)?.origin===originOf(r.url)?favicons.get(r.id)?.url:null)||store.getMeta('favicon:'+originOf(r.url))||null,faviconFallback:(()=>{try{const u=new URL(r.url);return ['http:','https:'].includes(u.protocol)?u.origin+'/favicon.ico':null;}catch{return null;}})(),active:r.id===activeId,detached:detached.has(r.id),loading:!!loading.get(r.id),suspended:isCodeTab(r)?false:!live.has(r.id),chromeMode:chromeMode(r.id),panelMode:panelMode(r.id),panelPreference:panelPreference(r.id)};}
 function state(workspace='web',offset=0){const active=activeId?store.get(activeId):null;return{activeId,total:store.total(),counts:store.counts(),tabs:store.page(workspace,offset,50).map(pageRow),active:active?.workspace===workspace?active:null,activePanelMode:activeId?panelMode(activeId):'wide',stackData:store.stacks(workspace),offset};}
@@ -995,6 +1009,12 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
  ipcMain.handle('tabs:action',(_e,action,arg)=>{
    if(action==='copy-tab-link'){const tab=store.get(Number(arg));if(!tab)throw Error('This tab no longer exists.');const link=tabLink(tab.workspace,tab.id);clipboard.writeText(link);win.webContents.send('deep-link:copied','Tab link copied');return link;}
   const current=store.get(activeId);const wc=live.get(activeId)?.webContents;
+  if(action==='notion-sidebar-demo'){
+   if(!current||!/^https:\/\/(?:www\.)?notion\.(?:so|com)\//i.test(current.url))return {ok:false,reason:'Select a Notion tab first.'};
+   if(!wc||wc.isDestroyed())return {ok:false,reason:'Notion tab is not loaded.'};
+   const result=awaitNotionSidebarDemo(wc);
+   return result;
+  }
   if(action==='history-list')return store.historySearch(arg?.query||'',arg?.limit||250);
   if(action==='history-delete'){store.removeHistory(Number(arg));return true;}
   if(action==='history-clear'){store.clearHistory();return true;}
