@@ -503,7 +503,7 @@ async function filterTabs(){const seq=++searchSeq;const items=await window.hexor
 function hideSearch(){$('search-overlay').classList.add('hidden');action('modal',false);}
 $('search').onclick=showSearch;$('search-rail').onclick=showSearch;$('search-close').onclick=hideSearch;$('search-input').oninput=filterTabs;
 $('search-overlay').onclick=e=>{if(e.target===$('search-overlay'))hideSearch();};
-document.addEventListener('keydown',e=>{if(e.key==='Escape')hideSearch();if(e.ctrlKey&&e.key.toLowerCase()==='k'){e.preventDefault();showSearch();}if(e.ctrlKey&&e.key.toLowerCase()==='t'){e.preventDefault();openNewTabLauncher();}if(e.ctrlKey&&e.key.toLowerCase()==='t'){e.preventDefault();action('new',activeWorkspace);}});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')hideSearch();if(e.ctrlKey&&e.key.toLowerCase()==='k'){e.preventDefault();showSearch();}if(e.ctrlKey&&e.key.toLowerCase()==='t'){e.preventDefault();openNewTabLauncher();}});
 function linkToast(message){
  let toast=$('hexora-link-toast');
  if(!toast){toast=document.createElement('div');toast.id='hexora-link-toast';toast.className='hexora-link-toast';toast.setAttribute('role','status');document.body.append(toast);}
