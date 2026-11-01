@@ -15,6 +15,7 @@ const nativeCodeHosts=new Map();
 const nativeCodeLaunchQueue=[];
 let nativeCodeLaunchingId=null;
 let tabStoreClosing=false;
+let nativeCodeBridgeInstallAttempted=false;
 const VSCODE_URL='hexora-native://vscode';
 const isCodeTab=t=>typeof t?.url==='string'&&/^hexora-native:\/\/vscode(?:\/[1-9]\d*)?$/.test(t.url);
 const codeTabUrl=id=>VSCODE_URL+'/'+id;
@@ -351,12 +352,29 @@ function activate(id){
  evict();emit();return true;
 }
 
-function openCodeTab(workspace='web'){
+async function openCodeTab(workspace='web',chooseProject=true){
  if(process.platform!=='win32')throw Error('Native VS Code requires Windows.');
+ // The folder picker runs *before* opening the native window. Switching
+ // projects via VS Code's File menu can replace a reparented HWND, so provide
+ // a safe first-class path that doesn't detach or strand a Code window.
+ let selectedPath=null;
+ if(chooseProject){
+  const selection=await dialog.showOpenDialog(win,{
+   title:'Open project in a new VS Code tab (Cancel opens a blank tab)',
+   properties:['openDirectory'],defaultPath:app.getPath('home')
+  });
+  if(!selection.canceled&&selection.filePaths[0]){
+   const candidate=path.resolve(selection.filePaths[0]);
+   if(!fs.statSync(candidate).isDirectory())throw Error('Selected VS Code project is not a folder.');
+   selectedPath=candidate;
+  }
+ }
  const id=store.nextId();
  const count=store.search(VSCODE_URL,100).filter(isCodeTab).length+1;
- const row={id,url:codeTabUrl(id),title:count===1?'Visual Studio Code':'Visual Studio Code '+count,workspace:typeof workspace==='string'&&workspace.length<=80?workspace:'web',pinned:false,muted:false,lastActive:Date.now(),ordinal:id};
- store.save(row);activate(id);
+ const row={id,url:codeTabUrl(id),title:selectedPath?('VS Code · '+path.basename(selectedPath)).slice(0,100):count===1?'Visual Studio Code':'Visual Studio Code '+count,workspace:typeof workspace==='string'&&workspace.length<=80?workspace:'web',pinned:false,muted:false,lastActive:Date.now(),ordinal:id};
+ store.save(row);
+ if(selectedPath)store.setCodeProject(id,selectedPath);
+ activate(id);
  return {id,workspace:row.workspace,active:true};
 }
 function activateWebFallback(excludedId){
@@ -418,14 +436,20 @@ function startNativeCodeHost(tabId,entry){
  // PowerShell (rather than interpolating into a command) avoids shell injection.
  const configured=store.getCodeProject(tabId)?.project_path;
  let projectPath=null;
- try{
-  const projectFolder=configured&&fs.existsSync(configured)&&fs.statSync(configured).isDirectory()?configured:null;
-  // Always launch a stable .code-workspace, even when a user hasn't chosen
-  // any folder yet. The companion can then capture a later folder selection.
-  projectPath=workspaceForTab(app.getPath('userData'),tabId,projectFolder);
- }catch(error){console.warn('[Native VS Code tab '+tabId+'] Could not prepare session workspace:',error.message);}
+ if(configured){
+  try{
+   if(fs.statSync(configured).isDirectory()){
+    // Only saved projects need the companion-managed workspace and active-file
+    // restore. A new empty tab must open Code normally and promptly.
+    projectPath=workspaceForTab(app.getPath('userData'),tabId,configured);
+   }
+  }catch(error){console.warn('[Native VS Code tab '+tabId+'] Saved project unavailable:',error.message);}
+ }
  let companionVsix=null;
- if(projectPath&&store.getMeta('nativeCodeBridgeInstalledVersion')!==BRIDGE_VERSION){
+ if(projectPath&&store.getMeta('nativeCodeBridgeInstalledVersion')!==BRIDGE_VERSION&&!nativeCodeBridgeInstallAttempted){
+  // Avoid repeated expensive CLI installation attempts on every native tab
+  // when the local Code build cannot load the companion.
+  nativeCodeBridgeInstallAttempted=true;
   try{companionVsix=buildCompanionVsix(codeSessionDirectory(app.getPath('userData')));}
   catch(error){console.warn('[Native VS Code] Session companion packaging failed:',error.message);}
  }
@@ -901,7 +925,10 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
    newTab(typeof arg?.workspace==='string'?arg.workspace:'web',url);
    return true;
   }
-  if(action==='open-native-code')return openCodeTab(typeof arg==='string'?arg:'web');
+  if(action==='open-native-code'){
+   const workspace=typeof arg==='string'?arg:typeof arg?.workspace==='string'?arg.workspace:'web';
+   return openCodeTab(workspace,arg?.skipPicker!==true);
+  }
   if(action==='new'){const workspace=typeof arg==='string'?arg:'web';const anchor=store.get(activeId);newTab(workspace,HOME,anchor?.workspace===workspace?activeId:null);}
   else if(action==='activate')activate(Number(arg));
   else if(action==='switch-workspace'){
