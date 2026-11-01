@@ -375,3 +375,8 @@ body.reordering-tabs,body.reordering-tabs *{cursor:grabbing!important;user-selec
 .vault-login-row>.vault-item{flex:1;min-width:0}
 .vault-fill-button{flex-shrink:0;background:var(--hx-accent-soft,#ad95ff24);color:var(--hx-accent,#ad95ff);border:1px solid var(--hx-accent-border,#ad95ff75);padding:7px 9px;border-radius:8px;font-size:11px;cursor:pointer}
 .vault-fill-button:hover{filter:brightness(1.22)}
+
+/* Explicit device-unlock choice in the password vault. */
+#vault-unlock-form .vault-remember-choice{display:flex;align-items:center;gap:9px;margin:3px 0;color:#c7c0d2;font-size:11px;cursor:pointer}
+#vault-remember{width:15px;height:15px;accent-color:var(--hx-accent,#ad95ff);flex:none}
+#vault-remember:disabled{opacity:.4}
