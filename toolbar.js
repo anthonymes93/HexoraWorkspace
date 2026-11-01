@@ -236,7 +236,7 @@ tabStrip.addEventListener('click',e=>{
 tabStrip.addEventListener('dragover',e=>{e.preventDefault();e.dataTransfer.dropEffect='move';});
 tabStrip.addEventListener('drop',e=>{
  e.preventDefault();
- const match=/^hexora-tab:(\\d+)$/.exec(e.dataTransfer.getData('text/plain')||'');
+ const match=/^hexora-tab:(\d+)$/.exec(e.dataTransfer.getData('text/plain')||'');
  if(match)action('dock',Number(match[1]));
 });
 
