@@ -925,6 +925,15 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
   if(event.sender!==win.webContents)throw Error('Invalid caller');
   return projectPicker.listFolders(folder,projectPicker.readPaths(store,projectPicker.FAVORITES_KEY,100),1200,typeof filter==='string'?filter:'');
  });
+ ipcMain.handle('code-picker:validate',(event,folder)=>{
+  if(event.sender!==win.webContents)throw Error('Invalid caller');
+  return projectPicker.validateFolder(folder);
+ });
+ ipcMain.handle('code-picker:focus',event=>{
+  if(event.sender!==win.webContents||!modalVisible)throw Error('Project picker must be active.');
+  if(!win.isDestroyed()){win.focus();win.webContents.focus();}
+  return true;
+ });
  ipcMain.handle('code-picker:favorite',(event,folder)=>{
   if(event.sender!==win.webContents)throw Error('Invalid caller');
   return projectPicker.toggleFavorite(store,folder);
