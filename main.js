@@ -16,6 +16,7 @@ const nativeCodeLaunchQueue=[];
 let nativeCodeLaunchingId=null;
 let tabStoreClosing=false;
 let nativeCodeBridgeInstallAttempted=false;
+let nativeCodeInstaller=null;
 const VSCODE_URL='hexora-native://vscode';
 const isCodeTab=t=>typeof t?.url==='string'&&/^hexora-native:\/\/vscode(?:\/[1-9]\d*)?$/.test(t.url);
 const codeTabUrl=id=>VSCODE_URL+'/'+id;
@@ -429,6 +430,35 @@ function syncNativeCodeProjects(){
   }
  });
 }
+// Install or upgrade the optional VS Code companion without delaying the
+// launch/capture of a native VS Code window. Failed installs can be retried on
+// the next Hexora run, not on every new editor tab.
+function installCodeBridgeInBackground(){
+ if(process.platform!=='win32'||quitting||tabStoreClosing||!store||
+  nativeCodeBridgeInstallAttempted||store.getMeta('nativeCodeBridgeInstalledVersion')===BRIDGE_VERSION)return;
+ nativeCodeBridgeInstallAttempted=true;
+ let vsix;
+ try{vsix=buildCompanionVsix(codeSessionDirectory(app.getPath('userData')));}
+ catch(error){console.warn('[Native VS Code] Could not package session companion:',error.message);return;}
+ const script=path.join(__dirname,'experiments','vscode-companion-install.ps1');
+ let proc;
+ try{proc=spawn('powershell.exe',['-NoProfile','-ExecutionPolicy','Bypass','-File',script,'-CompanionVsix',vsix],{
+  windowsHide:true,stdio:['ignore','pipe','pipe']
+ });}
+ catch(error){console.warn('[Native VS Code] Could not start companion installer:',error.message);return;}
+ nativeCodeInstaller=proc;
+ let log='',failed=false;
+ proc.stdout.on('data',data=>{log+=String(data);if(log.length>8000)log=log.slice(-8000);});
+ proc.stderr.on('data',data=>{failed=true;console.warn('[Native VS Code] Companion installation:',String(data).trim());});
+ proc.on('error',error=>{failed=true;console.warn('[Native VS Code] Companion installer error:',error.message);});
+ proc.on('exit',code=>{
+  nativeCodeInstaller=null;
+  if(!failed&&code===0&&log.includes('COMPANION_INSTALLED')&&!tabStoreClosing&&!quitting&&store){
+   store.setMeta('nativeCodeBridgeInstalledVersion',BRIDGE_VERSION);
+   console.log('[Native VS Code] Companion installed in background');
+  }else console.warn('[Native VS Code] Companion upgrade unavailable; Code launch was not blocked.');
+ });
+}
 function startNativeCodeHost(tabId,entry){
  const script=path.join(__dirname,'experiments','vscode-hexora-host.ps1');
  const hwnd=win.getNativeWindowHandle().readBigUInt64LE(0).toString();
@@ -445,16 +475,9 @@ function startNativeCodeHost(tabId,entry){
    }
   }catch(error){console.warn('[Native VS Code tab '+tabId+'] Saved project unavailable:',error.message);}
  }
- let companionVsix=null;
- if(projectPath&&store.getMeta('nativeCodeBridgeInstalledVersion')!==BRIDGE_VERSION&&!nativeCodeBridgeInstallAttempted){
-  // Avoid repeated expensive CLI installation attempts on every native tab
-  // when the local Code build cannot load the companion.
-  nativeCodeBridgeInstallAttempted=true;
-  try{companionVsix=buildCompanionVsix(codeSessionDirectory(app.getPath('userData')));}
-  catch(error){console.warn('[Native VS Code] Session companion packaging failed:',error.message);}
- }
+ if(projectPath)installCodeBridgeInBackground();
  let proc;
- try{proc=spawn('powershell.exe',['-NoProfile','-STA','-ExecutionPolicy','Bypass','-File',script,'-ParentHwnd',hwnd,...(projectPath?['-ProjectPath',projectPath]:[]),...(companionVsix?['-CompanionVsix',companionVsix]:[])],{stdio:['pipe','pipe','pipe'],windowsHide:true});}
+ try{proc=spawn('powershell.exe',['-NoProfile','-STA','-ExecutionPolicy','Bypass','-File',script,'-ParentHwnd',hwnd,...(projectPath?['-ProjectPath',projectPath]:[])],{stdio:['pipe','pipe','pipe'],windowsHide:true});}
  catch(error){console.error('[Native VS Code tab '+tabId+'] spawn:',error.message);nativeCodeHosts.delete(tabId);nativeCodeLaunchingId=null;setImmediate(pumpNativeCodeLaunchQueue);return;}
  entry.proc=proc;
  let stdoutBuffer='',finished=false;
@@ -473,7 +496,6 @@ function startNativeCodeHost(tabId,entry){
    const line=stdoutBuffer.slice(0,idx).trim();stdoutBuffer=stdoutBuffer.slice(idx+1);
    if(!line)continue;
    console.log('[Native VS Code tab '+tabId+']',line);
-   if(line==='COMPANION_INSTALLED'&&!tabStoreClosing)store.setMeta('nativeCodeBridgeInstalledVersion',BRIDGE_VERSION);
    if(line==='READY'&&!entry.ready&&nativeCodeHosts.get(tabId)===entry){
     entry.ready=true;release();
     if(activeId===tabId&&!modalVisible&&!entry.detached)showNativeCode(tabId);
@@ -1052,7 +1074,7 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
  setInterval(sweep,60*1000).unref();
  syncNativeCodeProjects();
  setInterval(syncNativeCodeProjects,1000).unref();
- win.on('closed',()=>{if(nativeCodeLifecycleTimer){clearTimeout(nativeCodeLifecycleTimer);nativeCodeLifecycleTimer=null;}quitting=true;stopAllNativeCode();for(const folder of [...extensionPopups.keys()])closeExtensionPopup(folder);if(sidebarAnimation)clearInterval(sidebarAnimation);for(const popup of detached.values())if(!popup.isDestroyed())popup.close();detached.clear();clearInterval(recoveryTimer);recoveryPassword=null;clearTimeout(stateTimer);win=null;for(const id of Array.from(live.keys()))discard(id);vault?.lock();tabStoreClosing=true;store.close();});
+ win.on('closed',()=>{if(nativeCodeLifecycleTimer){clearTimeout(nativeCodeLifecycleTimer);nativeCodeLifecycleTimer=null;}quitting=true;if(nativeCodeInstaller&&nativeCodeInstaller.exitCode===null)nativeCodeInstaller.kill();stopAllNativeCode();for(const folder of [...extensionPopups.keys()])closeExtensionPopup(folder);if(sidebarAnimation)clearInterval(sidebarAnimation);for(const popup of detached.values())if(!popup.isDestroyed())popup.close();detached.clear();clearInterval(recoveryTimer);recoveryPassword=null;clearTimeout(stateTimer);win=null;for(const id of Array.from(live.keys()))discard(id);vault?.lock();tabStoreClosing=true;store.close();});
  // Register every IPC handler before the renderer can issue actions.
  win.loadFile('toolbar.html').catch(err=>console.error('[Hexora] Toolbar load failed:',err));
 });
