@@ -8,7 +8,8 @@
     "start": "electron .",
     "benchmark:tabs": "node --experimental-sqlite scripts/benchmark-tabs.cjs",
     "build:win": "npx --yes electron-builder@26.18.0 --win nsis --x64 --publish never",
-    "build:store": "npx --yes electron-builder@26.18.0 --win appx --x64 --publish never"
+    "build:store": "npx --yes electron-builder@26.18.0 --win appx --x64 --publish never",
+    "demo:taskbar": "electron demo/taskbar"
   },
   "build": {
     "appId": "app.hexora.workspace",
