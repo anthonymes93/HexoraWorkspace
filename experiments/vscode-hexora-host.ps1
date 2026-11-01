@@ -1,6 +1,7 @@
 param(
  [Parameter(Mandatory=$true)][string]$ParentHwnd,
- [string]$ProjectPath=''
+ [string]$ProjectPath='',
+ [string]$CompanionVsix=''
 )
 # Experimental VS Code window hosted inside the Hexora Electron BrowserWindow.
 # Control protocol on stdin: RECT x y width height, SHOW, HIDE, QUIT.
@@ -111,12 +112,36 @@ $parent=[IntPtr]([long]::Parse($ParentHwnd))
 # the same CLI setup (notably on versioned Windows installs).
 # CreateNoWindow hides only the cmd.exe interpreter; the VS Code GUI remains normal.
 $cmd=Get-Command code.cmd -ErrorAction Stop
+# First use only: install our small, local VS Code companion. This runs
+# without a visible command prompt and never modifies project source files.
+if($CompanionVsix -and (Test-Path -LiteralPath $CompanionVsix -PathType Leaf)){
+ try {
+  $install=New-Object System.Diagnostics.ProcessStartInfo
+  $install.FileName=$env:ComSpec
+  $install.Arguments=('/d /v:off /s /c ""{0}" --install-extension "%HEXORA_VSCODE_BRIDGE%" --force"' -f $cmd.Source)
+  $install.EnvironmentVariables['HEXORA_VSCODE_BRIDGE']=$CompanionVsix
+  $install.UseShellExecute=$false
+  $install.CreateNoWindow=$true
+  $install.RedirectStandardOutput=$true
+  $install.RedirectStandardError=$true
+  $installer=[System.Diagnostics.Process]::Start($install)
+  if($null -ne $installer){
+   $installLog=$installer.StandardOutput.ReadToEnd()
+   $installError=$installer.StandardError.ReadToEnd()
+   $installer.WaitForExit()
+   if($installer.ExitCode -eq 0){Write-Output 'COMPANION_INSTALLED'}
+   else{Write-Output ('COMPANION_INSTALL_FAILED code='+$installer.ExitCode+' details='+($installError.Trim() -replace '\\r?\\n',' '))}
+  }else{Write-Output 'COMPANION_INSTALL_FAILED could-not-start'}
+ }catch {
+  Write-Output ('COMPANION_INSTALL_FAILED '+$_.Exception.Message)
+ }
+}
 $existing=@([HexoraNative]::Windows())
 $launchBegan=[DateTime]::UtcNow
 $launch=New-Object System.Diagnostics.ProcessStartInfo
 $launch.FileName=$env:ComSpec
 if($ProjectPath){
- if(-not (Test-Path -LiteralPath $ProjectPath -PathType Container)){throw 'Saved VS Code project directory does not exist'}
+ if(-not (Test-Path -LiteralPath $ProjectPath)){throw 'Saved VS Code project workspace does not exist'}
  # Pass the chosen directory through a child-only environment variable rather
  # than concatenating an arbitrary folder name into a cmd.exe command line.
  # /v:off prevents delayed ! expansion, including paths with ! characters.

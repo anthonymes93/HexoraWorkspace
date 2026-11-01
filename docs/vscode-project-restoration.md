@@ -9,17 +9,24 @@ project folder per tab**, saved in the same database.
 1. Create a VS Code tab with **⌘** in the Hexora rail.
 2. Right-click that **VS Code tab** (top tab strip or left sidebar).
 3. Select **Choose VS Code project folder…** and choose the local project folder.
-4. Restart Hexora. When that tab becomes active, its native VS Code host is
-   launched with `code.cmd --new-window "<saved folder>"`. Other Code tabs stay
-   dormant until activated. Each tab uses its own saved folder.
-5. Change the association with **Change VS Code project…**, or remove it with
+4. Restart Hexora. When that tab becomes active, its native VS Code host opens
+   a stable tab-specific `.code-workspace` file stored in **Hexora's user data
+   directory**, pointing at your chosen folder. No metadata enters your project.
+   Other Code tabs remain dormant until activated.
+5. On first launch, Hexora builds and installs a small local **Hexora Session
+   Bridge** VS Code extension from its own bundled source (no network or
+   marketplace downloads). The extension records the selected editor file and
+   cursor location to the tab's session record. After opening a file and
+   restarting Hexora, the same editor file and cursor should return.
+6. Change the association with **Change VS Code project…**, or remove it with
    **Clear saved project folder**. Changes to a *running* Code window deliberately
    take effect on its **next launch**; Hexora never forcibly closes an editor
    containing unsaved work.
 
-The saved paths are in `native_code_projects` inside the existing
+The saved project paths are in `native_code_projects` inside the existing
 `hexora-tabs.sqlite` database, included in the existing encrypted recovery
-snapshot. Closing a tab removes its project association. Moving/renaming a tab
+snapshot. The active file and cursor live in a separate local JSON record under
+`<Hexora userData>/hexora-native-code`. Closing a tab removes its project association and this editor record. Moving/renaming a tab
 does not lose its association. If a directory is missing, the tab displays a
 warning in the sidebar and VS Code opens without a folder rather than crashing
 Hexora; choose the new folder in the tab menu.
@@ -32,9 +39,15 @@ Hexora; choose the new folder in the tab menu.
   saved Hexora association.** Use the tab's Hexora context menu to update it.
   Accurate automatic in-editor project tracking would require a VS Code
   companion extension or another trustworthy per-window bridge.
-- VS Code owns open-file lists, unsaved drafts, split editors, and Hot Exit
-  behavior. Hexora stores and restores the project folder **only**; other
-  editor restoration is controlled by installed VS Code and user settings.
+- Hexora restores the project, **last active local file, and cursor** via the
+  companion extension. It does **not** yet capture every editor group, split,
+  tab ordering, unsaved buffer contents, or terminal state. VS Code itself owns
+  unsaved drafts and Hot Exit; Hexora does not claim to back them up.
+- First-run installation may require VS Code to finish updating its extensions
+  or a manual VS Code reload. If the local bridge installation fails, folder
+  restoration still works and the PowerShell host reports the error in its log.
+- Files opened in VS Code **before the bridge was installed** cannot be inferred
+  retroactively. Visit the file after updating Hexora to allow it to be saved.
 - Hexora does not close native Code windows when the host stops, to avoid
   destructively discarding unsaved work. Those standalone windows can remain
   open on the desktop after Hexora exits. Avoid confusing them with restored
@@ -62,8 +75,17 @@ On Windows, also test manually:
    must not be killed; after restart the new folder must be used.
 5. Rename or remove folder B on disk: Hexora should stay operational, show
    a warning, and offer a replacement project folder.
-6. Close Code tab 1, restart, and ensure it does not return. Other tabs and
+6. Open `src/index.js` in tab 2, move the cursor to a recognizable line,
+   restart Hexora, and confirm the same editor opens with the cursor restored.
+   Repeat with two Hexora tabs pointing to the **same** project folder.
+7. Close Code tab 1, restart, and ensure it does not return. Other tabs and
    their projects must still load.
-7. Test a Windows crash/restart and multi-monitor focus/resize/detach behavior
+8. Test a Windows crash/restart and multi-monitor focus/resize/detach behavior
    separately. Confirm no loss of unsaved editor state before treating this
    native integration as production-ready.
+
+Run the companion package and workspace isolation tests:
+
+```sh
+npm run test:code-session
+```

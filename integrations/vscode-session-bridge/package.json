@@ -1,0 +1,26 @@
+{
+  "name": "hexora-session-bridge",
+  "displayName": "Hexora Session Bridge",
+  "description": "Restores the last active editor and cursor for Hexora-managed VS Code workspaces.",
+  "publisher": "hexora",
+  "version": "0.1.0",
+  "private": true,
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "extensionKind": [
+    "workspace"
+  ],
+  "main": "./extension.js",
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": true
+    }
+  }
+}
