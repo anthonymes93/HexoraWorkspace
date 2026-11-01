@@ -94,6 +94,7 @@ function render(p){
   el.append(symbol,label,count,edit);el.onclick=async()=>{activeWorkspace=w.id;offset=0;save();await action('switch-workspace',w.id);refresh();};container.append(el);
  }
  const conversations=$('conversations');conversations.replaceChildren();
+ renderStackTree(conversations,p);
  for(const item of p.tabs){
   const el=document.createElement('button');el.className='chat-row'+(item.active?' active':'');
   const symbol=document.createElement('span');symbol.className='symbol';symbol.textContent=item.suspended?'☾':'▤';
@@ -162,6 +163,60 @@ async function recoveryAction(name){
 }
 for(const name of ['backup','configure','unlock','restore'])$('recovery-'+name).onclick=()=>recoveryAction(name);
 
+// Unlimited-depth tab stacks; only expanded branches are rendered.
+function renderStackTree(host,page){
+ const data=page.stackData;if(!data?.stacks?.length)return;
+ const heading=document.createElement('div');heading.className='eyebrow stack-heading';heading.textContent='Tab Stacks';host.append(heading);
+ const stacks=new Map(data.stacks.map(x=>[x.id,x])),members=new Map();
+ for(const m of data.members){if(!members.has(m.stack_id))members.set(m.stack_id,[]);members.get(m.stack_id).push(m.tab_id);}
+ const tabs=new Map(page.tabs.map(t=>[t.id,t]));
+ const children=new Map();
+ for(const stack of data.stacks){const parent=stacks.has(stack.parent_id)?stack.parent_id:null;if(!children.has(parent))children.set(parent,[]);children.get(parent).push(stack);}
+ const renderNode=(stack,depth)=>{
+  const row=document.createElement('div');row.className='stack-node';row.style.paddingLeft=(8+Math.min(depth,24)*14)+'px';
+  const fold=document.createElement('button');fold.className='stack-fold';fold.textContent=stack.collapsed?'▸':'▾';fold.title='Expand or collapse';
+  fold.onclick=()=>action('stack-edit',{id:stack.id,operation:'toggle'});
+  const label=document.createElement('button');label.className='stack-label';label.textContent='▤ '+stack.name;label.title='Right-click for stack actions';
+  label.onclick=()=>action('stack-edit',{id:stack.id,operation:'toggle'});
+  label.oncontextmenu=async e=>{
+   e.preventDefault();
+   const choice=prompt('Stack: '+stack.name+'\\n1 Rename\\n2 Move inside another stack\\n3 Move to top level\\n4 Delete stack (tabs remain)');
+   try{
+    if(choice==='1'){const name=prompt('Stack name:',stack.name);if(name)await action('stack-edit',{id:stack.id,operation:'rename',value:name});}
+    if(choice==='2'){const options=data.stacks.filter(x=>x.id!==stack.id);const raw=prompt('Move inside which stack?\\n'+options.map(x=>x.id+': '+x.name).join('\\n'));if(raw!==null)await action('stack-nest',{id:stack.id,parentId:Number(raw)});}
+    if(choice==='3')await action('stack-nest',{id:stack.id,parentId:null});
+    if(choice==='4'&&confirm('Delete stack '+stack.name+'? Tabs and nested stacks will be kept.'))await action('stack-edit',{id:stack.id,operation:'delete'});
+   }catch(err){alert(err.message);}
+  };
+  row.append(fold,label);host.append(row);
+  if(stack.collapsed)return;
+  for(const child of children.get(stack.id)||[])renderNode(child,depth+1);
+  for(const id of members.get(stack.id)||[]){
+   const tab=tabs.get(id);const tabRow=document.createElement('button');
+   tabRow.className='stack-tab'+(page.activeId===id?' active':'');
+   tabRow.style.paddingLeft=(23+Math.min(depth,24)*14)+'px';
+   tabRow.textContent='↳ '+(tab?.title||'Tab #'+id);tabRow.title='Open tab';
+   tabRow.onclick=()=>action('activate',id);
+   tabRow.oncontextmenu=e=>{e.preventDefault();const selected=tab||{id,workspace:activeWorkspace};showTabMenu(e.clientX,e.clientY,selected);};
+   host.append(tabRow);
+  }
+ };
+ for(const root of children.get(null)||[])renderNode(root,0);
+}
+async function chooseTabStack(){
+ if(!contextTab)return;
+ const tab=contextTab,stacks=currentPage?.stackData?.stacks||[];
+ const menu=['0: Create a new stack','-1: Remove from stack',...stacks.map(x=>x.id+': '+x.name)].join('\\n');
+ const choice=prompt('Add tab to a stack:\\n'+menu);
+ if(choice===null)return;
+ try{
+  if(choice==='0'){const name=prompt('New stack name:','New Stack');if(!name)return;await action('stack-create',{workspace:tab.workspace||activeWorkspace,name,tabId:tab.id});}
+  else if(choice==='-1')await action('stack-assign',{tabId:tab.id,stackId:null});
+  else{const id=Number(choice);if(!stacks.some(x=>x.id===id))throw Error('Choose a listed stack');await action('stack-assign',{tabId:tab.id,stackId:id});}
+  hideTabMenu();refresh();
+ }catch(e){alert(e.message);}
+}
+$('tab-menu-stack').onclick=chooseTabStack;
 // Pointer-based reorder: no native Chromium drag image or dotted cursor rectangle.
 const tabStrip=$('tabs');
 let tabPointer=null,dropSaving=false,suppressTabClickUntil=0;
