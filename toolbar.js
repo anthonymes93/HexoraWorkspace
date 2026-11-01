@@ -341,17 +341,36 @@ async function chooseTabStack(){
 $('tab-menu-stack').onclick=chooseTabStack;
 // Pointer-based reorder: no native Chromium drag image or dotted cursor rectangle.
 const tabStrip=$('tabs');
-// Mouse-wheel movement over a horizontal tab row scrolls the row sideways.
-// Do not intercept wheel events when there is no horizontal overflow.
+// Frame-driven horizontal wheel scrolling with accumulated momentum.
+// New wheel input updates the destination rather than restarting an animation.
+const tabScrollAnimations=new WeakMap();
+function glideTabRow(row,amount){
+ const maximum=Math.max(0,row.scrollWidth-row.clientWidth);
+ if(!maximum)return;
+ let state=tabScrollAnimations.get(row);
+ if(!state){state={target:row.scrollLeft,frame:0,last:0};tabScrollAnimations.set(row,state);}
+ state.target=Math.max(0,Math.min(maximum,state.target+amount));
+ if(state.frame)return;
+ const tick=now=>{
+  state.last=now;
+  if(!row.isConnected){state.frame=0;return;}
+  const remaining=state.target-row.scrollLeft;
+  if(Math.abs(remaining)<.45){row.scrollLeft=state.target;state.frame=0;return;}
+  row.scrollLeft+=remaining*.22;
+  state.frame=requestAnimationFrame(tick);
+ };
+ state.frame=requestAnimationFrame(tick);
+}
 for(const strip of [tabStrip,$('stack-rows')]){
  strip.addEventListener('wheel',e=>{
   const row=e.target.closest('.tabs,.stack-tabs');
   if(!row||!strip.contains(row)||row.scrollWidth<=row.clientWidth+1)return;
   if(e.ctrlKey||e.metaKey)return;
-  const movement=Math.abs(e.deltaY)>Math.abs(e.deltaX)?e.deltaY:e.deltaX;
-  if(!movement)return;
+  const raw=Math.abs(e.deltaY)>Math.abs(e.deltaX)?e.deltaY:e.deltaX;
+  if(!raw)return;
   e.preventDefault();
-  row.scrollLeft+=movement;
+  const multiplier=e.deltaMode===1?16:e.deltaMode===2?row.clientWidth:1;
+  glideTabRow(row,raw*multiplier);
  },{passive:false});
 }
 let tabPointer=null,dropSaving=false,suppressTabClickUntil=0;
