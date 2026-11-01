@@ -357,15 +357,29 @@ function findTabDrop(e,d){
  if(!row)return null;
  const parent=row.dataset.stackId?Number(row.dataset.stackId):null;
  const targets=[...row.querySelectorAll('.tab')].filter(el=>el!==d.el);
- let target=targets.find(el=>{const r=el.getBoundingClientRect();return e.clientX>=r.left&&e.clientX<=r.right;});
+ const pointerX=e.clientX;
+ // Snapshot untransformed coordinates: the dragged tab's transform must not
+ // change the destination or cause the tab bar to reorder under the cursor.
+ let target=null,rect=null;
+ for(const el of targets){const r=el.getBoundingClientRect();if(pointerX>=r.left&&pointerX<=r.right){target=el;rect=r;break;}}
  if(target){
-  const r=target.getBoundingClientRect();
-  const within=(e.clientX-r.left)/r.width;
-  // Dropping on the central 70% creates/joins a stack; edges reorder.
-  const kind=within>=.15&&within<=.85?'on':'between';
-  return {parent,target,kind,id:Number(target.dataset.stackContainerId||target.dataset.tabId),
-   targetType:target.dataset.stackContainerId?'stack':'tab',after:within>.5};
+  const within=(pointerX-rect.left)/Math.max(1,rect.width);
+  const key=target.dataset.stackContainerId?'stack':'tab';
+  const id=Number(target.dataset.stackContainerId||target.dataset.tabId);
+  // Intent: a deliberate short hover in the middle stacks; a quick drag
+  // reorders. Edges always reorder immediately.
+  const inside=within>=.24&&within<=.76;
+  const same=d.candidateId===id&&d.candidateParent===parent;
+  if(!same){d.candidateId=id;d.candidateParent=parent;d.candidateSince=performance.now();}
+  const held=same&&performance.now()-d.candidateSince>=280;
+  const kind=inside&&held?'on':'between';
+  return {parent,target,kind,id,targetType:key,after:within>.5};
  }
+ d.candidateId=null;d.candidateSince=0;
+ const first=targets[0]?.getBoundingClientRect();
+ const last=targets.at(-1)?.getBoundingClientRect();
+ if(first&&pointerX<first.left)return {parent,target:targets[0],kind:'between',after:false};
+ if(last&&pointerX>last.right)return {parent,target:targets.at(-1),kind:'between',after:true};
  return {parent,target:null,kind:'end'};
 }
 window.addEventListener('pointermove',e=>{
@@ -404,19 +418,22 @@ window.addEventListener('pointerup',async e=>{
   }else if(drop.kind==='on'&&drop.targetType==='stack'&&d.type==='stack'){
    if(d.id!==drop.id)await action('stack-nest',{id:d.id,parentId:drop.id});
    selectedStackId=drop.id;selectedRootTabId=null;stackRowsDismissed=false;
-  }else if(d.type==='tab'&&drop.parent!==((d.row.dataset.stackId&&Number(d.row.dataset.stackId))||null)){
-   await action('stack-assign',{tabId:d.id,stackId:drop.parent});
-   selectedStackId=drop.parent;stackRowsDismissed=drop.parent===null;
   }else if(drop.kind==='between'||drop.kind==='end'){
-   const nodes=[...drop.parent===null?$('tabs').children:document.querySelector('.stack-tabs[data-stack-id="'+drop.parent+'"]').children];
-   const key=el=>el.dataset.stackContainerId?'s:'+el.dataset.stackContainerId:'t:'+el.dataset.tabId;
-   const id=d.type==='stack'?'s:'+d.id:'t:'+d.id;
-   const order=nodes.map(key).filter(x=>x!==id);
-   let index=drop.target?order.indexOf(key(drop.target)):-1;
-   if(index<0)index=order.length;
-   else if(drop.after)index++;
-   order.splice(index,0,id);
-   await action('reorder-row',{workspace:d.workspace,parentId:drop.parent,items:order});
+   const originalParent=d.row.dataset.stackId?Number(d.row.dataset.stackId):null;
+   if(originalParent!==drop.parent&&d.type==='tab'){
+    await action('stack-assign',{tabId:d.id,stackId:drop.parent});
+    selectedStackId=drop.parent;stackRowsDismissed=drop.parent===null;
+   }else if(originalParent===drop.parent){
+    const row=drop.parent===null?$('tabs'):document.querySelector('.stack-tabs[data-stack-id="'+drop.parent+'"]');
+    const key=el=>el.dataset.stackContainerId?'s:'+el.dataset.stackContainerId:'t:'+el.dataset.tabId;
+    const id=d.type==='stack'?'s:'+d.id:'t:'+d.id;
+    const order=[...row.children].map(key).filter(x=>x!==id);
+    let index=drop.target?order.indexOf(key(drop.target)):-1;
+    if(index<0)index=order.length;else if(drop.after)index++;
+    order.splice(index,0,id);
+    if(order.join('|')!==[...row.children].map(key).join('|'))
+     await action('reorder-row',{workspace:d.workspace,parentId:drop.parent,items:order});
+   }
   }
   await refresh();
  }catch(err){console.error('Tab drop failed',err);alert('Could not move tab: '+err.message);await refresh();}
