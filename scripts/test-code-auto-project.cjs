@@ -38,7 +38,7 @@ test('blank Hexora VS Code tab discovers project chosen inside editor, without c
     showOpenDialog:async()=>[{scheme:'file',fsPath:projectA}],
     showErrorMessage:message=>{throw Error(message);}
    },
-   commands:{registerCommand:(name,cb)=>{events[name]=cb;return{dispose(){}};}},
+   commands:{executeCommand:async(name,key,value)=>{events.context={name,key,value};},registerCommand:(name,cb)=>{events[name]=cb;return{dispose(){}};}},
    StatusBarAlignment:{Left:1},
    Uri:{file:p=>({scheme:'file',fsPath:p})},
    Selection:class {},
@@ -48,6 +48,7 @@ test('blank Hexora VS Code tab discovers project chosen inside editor, without c
   delete require.cache[modulePath];
   const bridge=require(modulePath);
   await bridge.activate({subscriptions:disposables});
+  assert.deepEqual(events.context,{name:'setContext',key:'hexoraSession.active',value:true});
   assert.ok(events['hexoraSession.openProject'],'Open Project command should be available inside VS Code');
   assert.equal(fs.existsSync(projectUpdateFile(dir,42)),false,'blank workspace is not assigned an invented folder');
   await events['hexoraSession.openProject']();
