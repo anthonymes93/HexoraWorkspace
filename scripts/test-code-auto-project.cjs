@@ -24,7 +24,8 @@ test('blank Hexora VS Code tab discovers project chosen inside editor, without c
     onDidChangeWorkspaceFolders:cb=>{events.onFolders=cb;return{dispose(){}};},
     updateWorkspaceFolders(_start,_deleteCount,folder){
      this.workspaceFolders=[{uri:folder.uri}];
-     events.onFolders({added:this.workspaceFolders,removed:[]});
+     // VS Code documents that the first folder change can restart the
+     // extension without a folder-change event. Simulate that case.
      return true;
     },
     fs:{stat:uri=>fs.promises.stat(uri.fsPath)},
