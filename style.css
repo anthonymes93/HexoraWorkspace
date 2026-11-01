@@ -161,17 +161,22 @@ body.reordering-tabs,body.reordering-tabs *{cursor:grabbing!important;user-selec
 
 .stack-heading{padding-top:12px;margin-bottom:6px}.stack-node{display:flex;align-items:center;gap:3px;min-height:30px}.stack-fold,.stack-label{border:0;background:transparent;color:#b3a4e4;cursor:pointer}.stack-fold{width:20px;flex:none}.stack-label{flex:1;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:7px 2px}.stack-node:hover,.stack-tab:hover{background:#292633}.stack-tab{display:block;width:100%;border:0;background:transparent;color:#aaa9b8;text-align:left;padding-top:7px;padding-bottom:7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.stack-tab.active{color:#e9ddff;background:#2d273d}
 
-/* Vivaldi-style second row: top row retains existing tab bar. */
-.top-main{height:120px}body.stack-row-open .top-main{height:164px}.stack-tabs-row{display:flex;align-items:center;gap:9px;height:44px;border-bottom:1px solid #38323f;background:#1a1920;padding:4px 16px;overflow:hidden}
-.stack-tabs-label{color:#b7a6ef;white-space:nowrap;font-size:12px;max-width:140px;overflow:hidden;text-overflow:ellipsis}
-.stack-tabs{display:flex;gap:5px;overflow-x:auto;flex:1;min-width:0;scrollbar-width:thin}
-.stack-tabs .tab{height:35px;min-width:105px;max-width:210px;border-radius:8px;background:#26232e;padding:7px 10px;border:1px solid #363142}
-.stack-tabs .tab.active{background:#3a304f;color:white;border-color:#7f6aa8}
-.stack-row-close{border:0;background:transparent;color:#a8a1b6;font-size:20px}
-.tab.stack-drop-target{box-shadow:inset 0 0 0 2px #b7a0ff!important;background:#3a304b!important}
-
-/* Dynamic horizontally scrolling nested rows. */
-.top-main{height:var(--hexora-rows-height,120px)!important}.stack-rows{display:flex;flex-direction:column}.stack-tabs-row{flex:0 0 44px}.stack-tabs .tab{flex:0 0 auto;cursor:grab}.stack-tabs .tab.dragging{transform:translate3d(var(--drag-x,0px),0,0);will-change:transform;pointer-events:none;z-index:4;position:relative}
-
-/* Clear target indication and horizontal row hit areas. */
-.stack-tabs{min-height:38px;align-items:center}.stack-tabs-row{position:relative}.tab.stack-drop-target{outline:2px solid #b7a0ff;outline-offset:-2px;box-shadow:0 0 0 3px #a18aff40!important}
+/* Compact nested stack rows; main tab bar remains unchanged. */
+.top-main{height:var(--hexora-rows-height,120px)!important}
+.stack-rows{display:flex;flex-direction:column;background:#15141b;border-top:1px solid #262330}
+.stack-tabs-row{position:relative;display:flex;align-items:center;gap:8px;flex:0 0 34px;height:34px;min-height:34px;padding:2px 12px;border-bottom:1px solid #24212c;background:#181720;overflow:hidden}
+.stack-tabs-row:nth-child(2){background:#17161e}
+.stack-tabs-row:nth-child(3){background:#16151d}
+.stack-tabs-row:nth-child(n+4){background:#15141b}
+.stack-tabs-label{flex:0 0 auto;min-width:72px;max-width:116px;height:25px;padding:0 8px;border:1px solid #393447;border-radius:7px;background:#211f2a;color:#b9a9ef;font-size:11px;line-height:23px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer}
+.stack-tabs-label:hover{background:#292436;border-color:#504762}
+.stack-tabs{display:flex;align-items:center;gap:5px;flex:1;min-width:0;min-height:30px;overflow-x:auto;overflow-y:hidden;scrollbar-width:thin}
+.stack-tabs::-webkit-scrollbar{height:4px}.stack-tabs::-webkit-scrollbar-thumb{background:#3a3546;border-radius:99px}
+.stack-tabs .tab{flex:0 0 auto;display:inline-flex;align-items:center;gap:6px;height:28px;min-width:88px;max-width:165px;padding:0 9px;border:1px solid #373244;border-radius:7px;background:#24212c;color:#cfc8dd;font-size:12px;line-height:26px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:grab}
+.stack-tabs .tab .name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.stack-tabs .tab:hover{background:#2c2836;border-color:#4a4459}
+.stack-tabs .tab.active{background:#3a3050;border-color:#8d79d4;color:#fff;box-shadow:inset 0 0 0 1px #ad94ff29}
+.stack-tabs .tab.dragging{transform:translate3d(var(--drag-x,0px),0,0);will-change:transform;pointer-events:none;z-index:4;position:relative;opacity:.96;box-shadow:0 10px 24px #0005}
+.stack-row-close{flex:0 0 auto;width:24px;height:24px;border:0;border-radius:6px;background:transparent;color:#8e879d;font-size:16px;line-height:24px;cursor:pointer}
+.stack-row-close:hover{background:#282431;color:#d2cbe0}
+.tab.stack-drop-target{outline:2px solid #a88cff;outline-offset:-2px;background:#372d49!important;border-color:#9b84ea!important;box-shadow:0 0 0 3px #a18aff40!important}
