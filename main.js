@@ -259,7 +259,8 @@ function bounds(){
 }
 let sidebarAnimation=null;
 function setSidebarWidth(collapsed){
- const start=sidebarWidth,target=collapsed?64:330;
+ const saved=Math.max(240,Math.min(560,Number(store?.getMeta('sidebarCustomWidth'))||330));
+ const start=sidebarWidth,target=collapsed?64:saved;
  if(sidebarAnimation){clearInterval(sidebarAnimation);sidebarAnimation=null;}
  if(start===target){bounds();return;}
  // Resize the embedded browser together with the panel on every frame.
@@ -434,6 +435,7 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
  restoreExtensions().catch(err=>console.error('Extension initialization failed:',err));
  store=new TabStore(dataDir);
  store.importLegacy(path.join(app.getPath('userData'),'hexora-tabs.json'));
+ sidebarWidth=Math.max(240,Math.min(560,Number(store.getMeta('sidebarCustomWidth'))||330));
  win=new BrowserWindow({width:1360,height:900,minWidth:700,minHeight:400,title:'Hexora Workspace',autoHideMenuBar:true,backgroundColor:'#111215',webPreferences:{preload:path.join(__dirname,'preload.js'),contextIsolation:true,sandbox:true,nodeIntegration:false}});
  mainViewport=new View();win.contentView.addChildView(mainViewport);
  win.loadFile('toolbar.html');win.on('resize',bounds);win.webContents.on('did-finish-load',emit);
@@ -683,6 +685,16 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
   else if(action==='back'&&wc?.navigationHistory.canGoBack())wc.navigationHistory.goBack();
   else if(action==='forward'&&wc?.navigationHistory.canGoForward())wc.navigationHistory.goForward();
   else if(action==='open-external')shell.openExternal(current?.url||HOME);
+  else if(action==='sidebar-resize'){
+   if(sidebarAnimation){clearInterval(sidebarAnimation);sidebarAnimation=null;}
+   const max=Math.min(560,Math.max(240,win.getContentSize()[0]-420));
+   sidebarWidth=Math.round(Math.max(240,Math.min(max,Number(arg?.width)||330)));
+   bounds();return sidebarWidth;
+  }
+  else if(action==='sidebar-resize-save'){
+   if(sidebarWidth>64)store.setMeta('sidebarCustomWidth',String(sidebarWidth));
+   return sidebarWidth;
+  }
   else if(action==='sidebar'){setSidebarWidth(!!arg);}
   else if(action==='recovery-window'){openRecoveryWindow();}
   else if(action==='detach'){detachTab(arg||activeId);}
