@@ -6,6 +6,7 @@ on:
       - 'feature/vscode-active-file-session'
       - 'feature/vscode-auto-project-detection'
       - 'experiment/vscode-no-flash'
+      - 'feature/hexora-project-picker'
   pull_request:
     paths:
       - 'tab-store.js'
