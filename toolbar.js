@@ -184,7 +184,7 @@ function renderTabRow(host,page,parentId){
  }
  items.sort((a,b)=>b.ordinal-a.ordinal||a.id-b.id);
  for(const item of items){
-  const el=document.createElement('button');el.className='tab'+(item.type==='tab'&&item.id===page.activeId?' active':'');
+  const el=document.createElement('button');el.className='tab'+(item.type==='tab'&&item.id===page.activeId?' active':'')+(item.type==='stack'&&openStackPath.includes(item.id)?' stack-path-active':'');
   el.draggable=false;
   if(item.type==='stack'){
    el.dataset.stackContainerId=String(item.id);el.textContent='▤ '+item.stack.name;
