@@ -114,8 +114,8 @@ function iconFile(userData, kind, id) {
   if (!fs.existsSync(target)) fs.writeFileSync(target, icoBytes(pngBytes(kind, id)));
   return target;
 }
-function taskbarIdentity(userData, tabId = null) {
-  if (process.platform !== 'win32') return null;
+function taskbarIdentity(userData, tabId = null, platform = process.platform) {
+  if (platform !== 'win32') return null;
   const kind = tabId === null ? 'main' : 'tab';
   const id = kind === 'main' ? 0 : Number(tabId);
   if (kind === 'tab' && (!Number.isSafeInteger(id) || id < 1)) throw Error('Invalid taskbar window tab');
@@ -124,8 +124,8 @@ function taskbarIdentity(userData, tabId = null) {
     iconPath: iconFile(userData, kind, id)
   };
 }
-function applyTaskbarIdentity(window, identity) {
-  if (!identity || process.platform !== 'win32' || window.isDestroyed()) return;
+function applyTaskbarIdentity(window, identity, platform = process.platform) {
+  if (!identity || platform !== 'win32' || window.isDestroyed()) return;
   // Windows recognizes different taskbar groups via per-window AppUserModelIDs.
   window.setAppDetails({ appId: identity.appId, appIconPath: identity.iconPath, appIconIndex: 0 });
   // Explicitly update the live HWND's small/large icon too.
