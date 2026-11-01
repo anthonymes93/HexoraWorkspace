@@ -35,3 +35,11 @@ jobs:
         run: npm run test:code-session
       - name: Verify VS Code active-editor capture and restoration
         run: npm run test:code-bridge
+      - name: Validate native Windows PowerShell host syntax
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $PWD 'experiments/vscode-hexora-host.ps1'), [ref]$tokens, [ref]$errors) | Out-Null
+          if ($errors.Count -gt 0) { $errors | Format-List; exit 1 }
