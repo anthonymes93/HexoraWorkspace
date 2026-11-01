@@ -63,9 +63,19 @@ class TabStore {
  page(workspace,offset=0,limit=50){return this.q.page.all(workspace,Math.min(100,Math.max(1,limit)),Math.max(0,offset));}
  counts(){return this.q.counts.all();}
  search(term,limit=40){const value='%'+String(term).replace(/[\\%_]/g,m=>'\\'+m)+'%';return this.q.search.all(value,value,Math.min(100,Math.max(1,limit)));}
+ reorderStack(stackId,ids){
+  if(!Number.isSafeInteger(stackId)||!Array.isArray(ids)||!ids.length||new Set(ids).size!==ids.length||!ids.every(Number.isSafeInteger))throw Error('Invalid reorder');
+  const existing=this.db.prepare('SELECT m.tab_id FROM tab_stack_members m JOIN tabs t ON t.id=m.tab_id WHERE m.stack_id=? ORDER BY t.ordinal DESC,t.id DESC').all(stackId).map(x=>x.tab_id);
+  if(existing.length!==ids.length||!ids.every(id=>existing.includes(id)))throw Error('Stack changed while dragging');
+  const max=this.db.prepare('SELECT COALESCE(MAX(ordinal),0) n FROM tabs').get().n;
+  const update=this.db.prepare('UPDATE tabs SET ordinal=? WHERE id=?');
+  this.db.exec('BEGIN');
+  try{ids.forEach((id,i)=>update.run(max+ids.length-i,id));this.db.exec('COMMIT');}
+  catch(error){this.db.exec('ROLLBACK');throw error;}
+ }
  stacks(workspace){
   return {stacks:this.db.prepare('SELECT * FROM tab_stacks WHERE workspace=? ORDER BY id').all(workspace),
-   members:this.db.prepare('SELECT m.tab_id,m.stack_id FROM tab_stack_members m JOIN tabs t ON t.id=m.tab_id WHERE t.workspace=?').all(workspace)};
+   members:this.db.prepare('SELECT m.tab_id,m.stack_id FROM tab_stack_members m JOIN tabs t ON t.id=m.tab_id WHERE t.workspace=? ORDER BY t.ordinal DESC,t.id DESC').all(workspace)};
  }
  createStack(workspace,name,tabId=null,parentId=null){
   if(typeof workspace!=='string'||!workspace||typeof name!=='string'||!name.trim()||name.length>80)throw Error('Invalid stack name');
