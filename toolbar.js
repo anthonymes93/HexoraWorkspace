@@ -168,20 +168,18 @@ let tabPointer=null,dropSaving=false,suppressTabClickUntil=0;
 function beginTabPointerDrag(e){
  if(e.button!==0||!e.isPrimary||e.target.closest('.close'))return;
  const tab=e.currentTarget;
- tabPointer={tab,id:Number(tab.dataset.tabId),workspace:activeWorkspace,startX:e.clientX,startY:e.clientY,moving:false};
+ tabPointer={tab,id:Number(tab.dataset.tabId),workspace:activeWorkspace,startX:e.clientX,startY:e.clientY,moving:false,originLeft:tab.getBoundingClientRect().left,visualLeft:tab.getBoundingClientRect().left,grabOffset:e.clientX-tab.getBoundingClientRect().left};
  // Do not capture until the movement threshold is met; a normal click still activates.
 }
-function shiftTabWithAnimation(tab,other,after){
- const before=new Map([...tabStrip.children].map(el=>[el,el.getBoundingClientRect().left]));
- tabStrip.insertBefore(tab,after?other.nextSibling:other);
+function animateReflow(before,dragged){
  for(const el of tabStrip.children){
-  if(el===tab)continue;
-  const delta=before.get(el)-el.getBoundingClientRect().left;
-  if(Math.abs(delta)>1)el.animate([{transform:'translateX('+delta+'px)'},{transform:'translateX(0)'}],{duration:130,easing:'ease-out'});
+  if(el===dragged)continue;
+  const dx=(before.get(el)||0)-el.getBoundingClientRect().left;
+  if(Math.abs(dx)>0.5)el.animate([{transform:'translate3d('+dx+'px,0,0)'},{transform:'translate3d(0,0,0)'}],{duration:190,easing:'cubic-bezier(.2,.8,.2,1)'});
  }
 }
 window.addEventListener('pointermove',e=>{
- const d=tabPointer;if(!d||e.pointerId!==undefined&&e.isPrimary===false)return;
+ const d=tabPointer;if(!d||!e.isPrimary)return;
  if(!d.tab.isConnected||activeWorkspace!==d.workspace){cancelTabPointer();return;}
  if(!d.moving){
   if(Math.hypot(e.clientX-d.startX,e.clientY-d.startY)<5)return;
@@ -190,36 +188,34 @@ window.addEventListener('pointermove',e=>{
  }
  e.preventDefault();
  const rect=tabStrip.getBoundingClientRect();
- if(e.clientX>rect.right-24)tabStrip.scrollLeft+=15;
- else if(e.clientX<rect.left+24)tabStrip.scrollLeft-=15;
- const others=[...tabStrip.querySelectorAll('.tab')].filter(el=>el!==d.tab);
- const target=others.find(el=>e.clientX<el.getBoundingClientRect().left+el.getBoundingClientRect().width/2);
- const ordered=[...tabStrip.querySelectorAll('.tab')].filter(el=>el!==d.tab);
- const next=target||null;
+ if(e.clientX>rect.right-24)tabStrip.scrollLeft+=12;
+ else if(e.clientX<rect.left+24)tabStrip.scrollLeft-=12;
+ const desiredLeft=e.clientX-d.grabOffset;
+ const slotLeft=d.tab.getBoundingClientRect().left-parseFloat(d.tab.style.getPropertyValue('--drag-x')||'0');
+ d.tab.style.setProperty('--drag-x',(desiredLeft-slotLeft)+'px');
+ d.visualLeft=desiredLeft;
+ const center=desiredLeft+d.tab.offsetWidth/2;
+ const others=[...tabStrip.children].filter(el=>el!==d.tab);
+ const next=others.find(el=>center<el.getBoundingClientRect().left+el.offsetWidth/2)||null;
  if(next!==d.tab.nextElementSibling){
-  const oldIndex=[...tabStrip.children].indexOf(d.tab);
-  const targetIndex=next?[...tabStrip.children].indexOf(next):tabStrip.children.length;
-  if(oldIndex!==targetIndex&&oldIndex+1!==targetIndex) {
-   const before=new Map([...tabStrip.children].map(el=>[el,el.getBoundingClientRect().left]));
-   tabStrip.insertBefore(d.tab,next);
-   for(const el of tabStrip.children){
-    if(el===d.tab)continue;
-    const dx=before.get(el)-el.getBoundingClientRect().left;
-    if(Math.abs(dx)>1)el.animate([{transform:'translateX('+dx+'px)'},{transform:'translateX(0)'}],{duration:140,easing:'ease-out'});
-   }
-  }
+  const before=new Map([...tabStrip.children].map(el=>[el,el.getBoundingClientRect().left]));
+  tabStrip.insertBefore(d.tab,next);
+  const newSlot=d.tab.getBoundingClientRect().left-parseFloat(d.tab.style.getPropertyValue('--drag-x')||'0');
+  d.tab.style.setProperty('--drag-x',(desiredLeft-newSlot)+'px');
+  animateReflow(before,d.tab);
  }
 });
 function cancelTabPointer(){
  if(!tabPointer)return;
  tabPointer.tab.classList.remove('dragging');
+ tabPointer.tab.style.removeProperty('--drag-x');
  document.body.classList.remove('reordering-tabs');
  tabPointer=null;
 }
-window.addEventListener('pointerup',async e=>{
+window.addEventListener('pointerup',async()=>{
  const d=tabPointer;if(!d)return;
+ if(d.moving)suppressTabClickUntil=Date.now()+300;
  const moving=d.moving;
- if(moving)suppressTabClickUntil=Date.now()+300;
  cancelTabPointer();
  if(!moving||dropSaving)return;
  dropSaving=true;
