@@ -30,13 +30,13 @@ test('auto project sync updates the correct tab and ignores untrusted/stale reco
   assert.equal(run(),0,'unchanged projects should not continuously update SQLite');
 
   // A detached, superseded editor must never replace its tab's project.
-  fs.writeFileSync(ownerFile(userData,7),'new-owner');
+  fs.writeFileSync(ownerFile(userData,7),'new-owner-4560-4ee3-aa13-191234567890');
   fs.writeFileSync(projectUpdateFile(userData,7),JSON.stringify({version:1,ownerToken:ownerA,projectPath:b}));
   assert.equal(run(),0);
   assert.equal(projects.get(7),a);
 
   // A valid newly published record must update only its own tab.
-  fs.writeFileSync(projectUpdateFile(userData,7),JSON.stringify({version:1,ownerToken:'new-owner',projectPath:b}));
+  fs.writeFileSync(projectUpdateFile(userData,7),JSON.stringify({version:1,ownerToken:'new-owner-4560-4ee3-aa13-191234567890',projectPath:b}));
   assert.equal(run(),1);
   assert.equal(projects.get(7),b);
   assert.equal(projects.get(8),b);
@@ -56,7 +56,7 @@ test('auto project sync updates the correct tab and ignores untrusted/stale reco
   assert.equal(projects.has(9),false);
 
   // Simulate manual project picker while a VS Code host remains open.
-  fs.writeFileSync(projectUpdateFile(userData,7),JSON.stringify({version:1,ownerToken:'new-owner',projectPath:a}));
+  fs.writeFileSync(projectUpdateFile(userData,7),JSON.stringify({version:1,ownerToken:'new-owner-4560-4ee3-aa13-191234567890',projectPath:a}));
   assert.equal(syncCodeProjects({userData,store,eligible:id=>id===8}),0);
   assert.equal(projects.get(7),b);
  }finally{fs.rmSync(userData,{recursive:true,force:true});}
