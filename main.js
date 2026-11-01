@@ -13,6 +13,15 @@ const projectPicker=require('./code-project-picker');
 const {buildCompanionVsix,BRIDGE_VERSION}=require('./code-session-vsix');
 const {APP_ID,taskbarIdentity,applyTaskbarIdentity}=require('./taskbar-identity');
 if(process.platform==='win32')app.setAppUserModelId(APP_ID);
+// Cosmetic taskbar setup must never prevent Hexora, its tabs, or native VS Code from opening.
+function safeTaskbarIdentity(tabId=null){
+ try{return taskbarIdentity(app.getPath('userData'),tabId);}
+ catch(error){console.warn('[Hexora] Taskbar icon unavailable:',error.message);return null;}
+}
+function safeApplyTaskbar(window,identity){
+ try{if(identity)applyTaskbarIdentity(window,identity);}
+ catch(error){console.warn('[Hexora] Taskbar identity unavailable:',error.message);}
+}
 // Each native VS Code tab owns its own PowerShell host and reparented window.
 const nativeCodeHosts=new Map();
 const nativeCodeLaunchQueue=[];
@@ -546,10 +555,10 @@ function detachTab(id){
  const h=Math.max(400,Math.min(1100,valid?rectangle.height:800));
  const x=valid?Math.max(area.x,Math.min(rectangle.x,area.x+area.width-200)):area.x+60;
  const y=valid?Math.max(area.y,Math.min(rectangle.y,area.y+area.height-100)):area.y+60;
- const taskbar=taskbarIdentity(app.getPath('userData'),id);
+ const taskbar=safeTaskbarIdentity(id);
  const popup=new BrowserWindow({x,y,width:w,height:h,minWidth:400,minHeight:300,title:'Hexora · '+(row.title||'ChatGPT'),icon:taskbar?.iconPath,backgroundColor:'#111215',autoHideMenuBar:true,webPreferences:{preload:path.join(__dirname,'preload.js'),contextIsolation:true,sandbox:true,nodeIntegration:false}});
  popup.hexoraTabId=id;
- if(taskbar)applyTaskbarIdentity(popup,taskbar);
+ safeApplyTaskbar(popup,taskbar);
  popup.loadFile('detached.html',{query:{tab:String(id)}});
  popup.webContents.on('did-finish-load',()=>popup.webContents.send('detached:owner',{id:popup.hexoraTabId,title:store.get(popup.hexoraTabId)?.title||'ChatGPT'}));
  detached.set(id,popup);
@@ -605,7 +614,7 @@ function swapDetached(source,target){
   detached.set(target,other);
   other.webContents.send('detached:owner',{id:target,title:store.get(target).title});
   other.setTitle('Hexora · '+store.get(target).title);
-  if(process.platform==='win32')applyTaskbarIdentity(other,taskbarIdentity(app.getPath('userData'),target));
+  safeApplyTaskbar(other,safeTaskbarIdentity(target));
   const [ow,oh]=other.getContentSize();destView.setBounds({x:0,y:DETACHED_HEADER,width:ow,height:Math.max(0,oh-DETACHED_HEADER)});
  }else{
   detached.delete(target);setDetachedSaved(target,false);
@@ -615,7 +624,7 @@ function swapDetached(source,target){
  detached.set(source,dest);setDetachedSaved(source,true);
  dest.webContents.send('detached:owner',{id:source,title:store.get(source).title});
  dest.setTitle('Hexora · '+store.get(source).title);
- if(process.platform==='win32')applyTaskbarIdentity(dest,taskbarIdentity(app.getPath('userData'),source));
+ safeApplyTaskbar(dest,safeTaskbarIdentity(source));
  const [dw,dh]=dest.getContentSize();sourceView.setBounds({x:0,y:DETACHED_HEADER,width:dw,height:Math.max(0,dh-DETACHED_HEADER)});
  if(!other||other.isDestroyed()){
   // The replaced tab returns to the main workspace; avoid destroying its live browser view.
@@ -674,9 +683,9 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
  // before activating its native tab and regenerating its workspace file.
  syncNativeCodeProjects();
  sidebarWidth=Math.max(64,Math.min(560,Number(store.getMeta('sidebarCustomWidth'))||330));
- const mainTaskbar=taskbarIdentity(dataDir);
+ const mainTaskbar=safeTaskbarIdentity();
  win=new BrowserWindow({width:1360,height:900,minWidth:700,minHeight:400,title:'Hexora Workspace',icon:mainTaskbar?.iconPath,autoHideMenuBar:true,backgroundColor:'#111215',webPreferences:{preload:path.join(__dirname,'preload.js'),contextIsolation:true,sandbox:true,nodeIntegration:false}});
- if(mainTaskbar)applyTaskbarIdentity(win,mainTaskbar);
+ safeApplyTaskbar(win,mainTaskbar);
  mainViewport=new View();win.contentView.addChildView(mainViewport);
  win.on('focus',()=>{const entry=activeCodeEntry();if(entry?.ready&&entry.visible&&!entry.detached){nativeCodeCommand('TRACE HEXORA_FOCUS_BEFORE');nativeCodeCommand('RESTORE');nativeCodeCommand('RECOVER_Z');nativeCodeCommand('WATCH_MOUSE');}});win.on('blur',()=>{const entry=activeCodeEntry();if(entry?.ready&&entry.visible&&!entry.detached)nativeCodeCommand('DIAG HEXORA_BLUR');});win.on('resize',bounds);
  for(const lifecycleEvent of ['restore','maximize','unmaximize','moved','resized']){
