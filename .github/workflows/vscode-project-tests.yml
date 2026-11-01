@@ -13,6 +13,7 @@ on:
       - 'code-session-workspace.js'
       - 'integrations/vscode-session-bridge/**'
       - 'scripts/test-code-session.cjs'
+      - 'scripts/test-code-bridge.cjs'
       - 'experiments/vscode-hexora-host.ps1'
       - 'scripts/test-code-projects.cjs'
       - 'package.json'
@@ -32,3 +33,5 @@ jobs:
         run: npm run test:code-projects
       - name: Verify VS Code active-file session bundle and isolation
         run: npm run test:code-session
+      - name: Verify VS Code active-editor capture and restoration
+        run: npm run test:code-bridge
