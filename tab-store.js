@@ -140,6 +140,19 @@ class TabStore {
    this.db.exec('COMMIT');return id;
   }catch(error){this.db.exec('ROLLBACK');throw error;}
  }
+ reorderSidebarTabs(workspace,ids){
+  if(typeof workspace!=='string'||!Array.isArray(ids)||ids.length<2||ids.length>100||!ids.every(Number.isSafeInteger)||new Set(ids).size!==ids.length)throw Error('Invalid sidebar order');
+  const all=this.db.prepare('SELECT id FROM tabs WHERE workspace=? ORDER BY ordinal DESC').all(workspace).map(row=>row.id);
+  if(!ids.every(id=>all.includes(id)))throw Error('Tabs changed during drag');
+  const ordered=[...ids,...all.filter(id=>!ids.includes(id))];
+  const high=this.db.prepare('SELECT COALESCE(MAX(ordinal),0) n FROM tabs').get().n+ordered.length;
+  const update=this.db.prepare('UPDATE tabs SET ordinal=? WHERE id=? AND workspace=?');
+  this.db.exec('BEGIN');
+  try{
+   ordered.forEach((id,index)=>update.run(high-index,id,workspace));
+   this.db.exec('COMMIT');
+  }catch(error){this.db.exec('ROLLBACK');throw error;}
+ }
  reorderRow(workspace,parentId,items){
   if(!Array.isArray(items)||!items.length||items.length>1000)throw Error('Invalid row order');
   const tabs=parentId===null
