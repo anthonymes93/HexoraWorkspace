@@ -635,6 +635,9 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
  restoreExtensions().catch(err=>console.error('Extension initialization failed:',err));
  store=new TabStore(dataDir);
  store.importLegacy(path.join(app.getPath('userData'),'hexora-tabs.json'));
+ // Apply any project saved by VS Code immediately before the prior shutdown,
+ // before activating its native tab and regenerating its workspace file.
+ syncNativeCodeProjects();
  sidebarWidth=Math.max(64,Math.min(560,Number(store.getMeta('sidebarCustomWidth'))||330));
  win=new BrowserWindow({width:1360,height:900,minWidth:700,minHeight:400,title:'Hexora Workspace',autoHideMenuBar:true,backgroundColor:'#111215',webPreferences:{preload:path.join(__dirname,'preload.js'),contextIsolation:true,sandbox:true,nodeIntegration:false}});
  mainViewport=new View();win.contentView.addChildView(mainViewport);
