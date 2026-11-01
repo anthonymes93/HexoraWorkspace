@@ -1,6 +1,7 @@
 'use strict';
 const {app,BrowserWindow,WebContentsView,View,session,ipcMain,shell,dialog,clipboard,safeStorage,Menu}=require('electron');
 const path=require('node:path');
+const {EditorSession,CAPABILITIES}=require('./integrations/code/editor-provider');
 const {screen}=require('electron');
 const {TabStore}=require('./tab-store');
 const {PasswordVault}=require('./password-vault');
@@ -26,6 +27,7 @@ let quitting=false;
 const LAYOUT_KEY='detachedWindowIds';
 function savedDetachedIds(){try{const values=JSON.parse(store.getMeta(LAYOUT_KEY)||'[]');return Array.isArray(values)?values.filter(x=>Number.isSafeInteger(x)&&x>0).slice(0,32):[];}catch{return [];}}
 function setDetachedSaved(id,present){const ids=new Set(savedDetachedIds());if(present)ids.add(id);else ids.delete(id);store.setMeta(LAYOUT_KEY,JSON.stringify([...ids]));}
+let editorView=null,editorSession=null,editorVisible=false;
 let mainViewport=null,win,store,activeId=null,sidebarWidth=330,live=new Map(),favicons=new Map(),loading=new Map(),stateTimer=null,modalVisible=false,recoveryPassword=null,recoveryDir=null,recoveryTimer=null,recoveryBusy=false,lastBackup=null;
 const extensionPartition='persist:hexora-chatgpt';
 let extensionRecords=[],extensionLoaded=new Map(),extensionSession=null,extensionConfigFile=null;
@@ -249,6 +251,7 @@ function bounds(){
  const [w,h]=win.getContentSize();
  const visibleWidth=Math.max(0,w-sidebarWidth),visibleHeight=Math.max(0,h-TOP_HEIGHT);
  mainViewport.setBounds({x:sidebarWidth,y:TOP_HEIGHT,width:visibleWidth,height:visibleHeight});
+ if(editorView)editorView.setBounds({x:0,y:0,width:visibleWidth,height:visibleHeight});
  const view=live.get(activeId);
  if(view){
   // Fill the visible viewport exactly: no negative offsets, clipped gray gaps,
@@ -289,7 +292,7 @@ function activate(id){const raw=store.get(Number(id));if(!raw)return false;
  for(const [otherId,view] of live)if(otherId!==id&&!detached.has(otherId))mainViewport.removeChildView(view);
  activeId=raw.id;store.setMeta('workspaceActive:'+raw.workspace,String(activeId));const t=toModel(raw);t.lastActive=Date.now();store.save(t);store.setMeta('activeId',String(activeId));
  let view=live.get(id);if(!view){view=wire(t);live.set(id,view);}
- if(!modalVisible){mainViewport.addChildView(view);bounds();view.webContents.focus();}evict();emit();return true;
+ if(!modalVisible&&!editorVisible){mainViewport.addChildView(view);bounds();view.webContents.focus();}evict();emit();return true;
 }
 function evict(){if(live.size<=MAX_LIVE)return;const candidates=Array.from(live.keys()).filter(id=>id!==activeId&&!detached.has(id)&&!store.get(id)?.pinned);
  candidates.sort((a,b)=>(store.get(a)?.last_active||0)-(store.get(b)?.last_active||0));
@@ -403,7 +406,33 @@ function openRecoveryWindow(){
  recoveryWindow.on('closed',()=>{recoveryWindow=null;});
 }
 function sendPage(payload){const w=typeof payload?.workspace==='string'?payload.workspace:'web';const offset=Number.isSafeInteger(payload?.offset)?payload.offset:0;return state(w,offset);}
-if(hasSingleInstanceLock)app.whenReady().then(()=>{
+if(hasSingleInstanceLock)
+function localEditorAddress(value){
+ const u=new URL(String(value||'http://127.0.0.1:8080'));
+ if(!['http:','https:'].includes(u.protocol)||!['localhost','127.0.0.1','[::1]'].includes(u.hostname)||u.username||u.password)throw Error('Use a local editor URL on localhost.');
+ return u.toString();
+}
+async function toggleEditor(address){
+ if(editorVisible){
+  mainViewport.removeChildView(editorView);editorVisible=false;
+  const current=live.get(activeId);if(current&&!modalVisible){mainViewport.addChildView(current);bounds();current.webContents.focus();}
+  return {visible:false};
+ }
+ const url=localEditorAddress(address);
+ if(!editorSession){
+  editorSession=new EditorSession({id:'local-code-editor',capabilities:[CAPABILITIES.FOCUS,CAPABILITIES.EMBEDDED],
+   async start(){editorView=new WebContentsView({webPreferences:{sandbox:true,contextIsolation:true,nodeIntegration:false}});editorView.webContents.setWindowOpenHandler(()=>({action:'deny'}));await editorView.webContents.loadURL(url);},
+   async stop(){if(editorView){mainViewport.removeChildView(editorView);editorView.webContents.close();editorView=null;}},
+   async focus(){editorView.webContents.focus();}
+  });
+  try{await editorSession.start();}catch(e){await editorSession.stop();editorSession=null;throw Error('Local editor unavailable: '+e.message);}
+ }else if(editorView.webContents.getURL()!==url)await editorView.webContents.loadURL(url);
+ for(const view of live.values())mainViewport.removeChildView(view);
+ mainViewport.addChildView(editorView);editorVisible=true;bounds();editorView.webContents.focus();
+ return {visible:true};
+}
+
+app.whenReady().then(()=>{
  const dataDir=app.getPath('userData');
  vault=new PasswordVault(dataDir);
  vault.restoreDeviceUnlock(safeStorage);
@@ -448,6 +477,7 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
   if(!store.get(id)){setDetachedSaved(id,false);continue;}
   try{detachTab(id);}catch(err){console.error('Could not restore detached window',id,err);}
  }
+ ipcMain.handle('editor:toggle',async(event,address)=>{if(event.sender!==win.webContents)throw Error('Invalid caller');return toggleEditor(address);});
  ipcMain.handle('recovery:status',()=>({directory:recoveryDir,enabled:!!(recoveryDir&&recoveryPassword),lastBackup}));
  ipcMain.handle('recovery:configure',async(_e,password)=>{
   if(typeof password!=='string'||password.length<12)throw new Error('Enter a recovery password of at least 12 characters.');
@@ -778,6 +808,6 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
   emit();return true;
  });
  setInterval(sweep,60*1000).unref();
- win.on('closed',()=>{quitting=true;for(const folder of [...extensionPopups.keys()])closeExtensionPopup(folder);if(sidebarAnimation)clearInterval(sidebarAnimation);for(const popup of detached.values())if(!popup.isDestroyed())popup.close();detached.clear();clearInterval(recoveryTimer);recoveryPassword=null;clearTimeout(stateTimer);win=null;for(const id of Array.from(live.keys()))discard(id);vault?.lock();store.close();});
+ win.on('closed',()=>{if(editorView){editorView.webContents.close();editorView=null;}editorSession=null;editorVisible=false;quitting=true;for(const folder of [...extensionPopups.keys()])closeExtensionPopup(folder);if(sidebarAnimation)clearInterval(sidebarAnimation);for(const popup of detached.values())if(!popup.isDestroyed())popup.close();detached.clear();clearInterval(recoveryTimer);recoveryPassword=null;clearTimeout(stateTimer);win=null;for(const id of Array.from(live.keys()))discard(id);vault?.lock();store.close();});
 });
 app.on('window-all-closed',()=>{if(process.platform!=='darwin')app.quit();});

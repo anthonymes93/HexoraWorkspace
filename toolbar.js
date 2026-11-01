@@ -1346,3 +1346,12 @@ v('vault-entry-form').onsubmit=async e=>{
 };
 v('vault-delete').onclick=async()=>{if(!vaultSelected||!confirm('Delete this saved login permanently?'))return;await window.hexora.vault.delete(vaultSelected);vaultClearEditor();v('vault-entry-form').classList.add('hidden');await vaultLoad();};
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&vaultOpen)vaultClose();});
+
+document.getElementById('editor-rail').addEventListener('click',async()=>{
+ try{const state=await window.hexora.editor.toggle(localStorage.getItem('hexora-editor-url')||'http://127.0.0.1:8080');document.getElementById('editor-rail').classList.toggle('selected',state.visible);}
+ catch(e){alert('Code editor: '+e.message+'\nStart your local code-server or OpenVSCode Server first.');}
+});
+document.getElementById('editor-rail').addEventListener('contextmenu',e=>{
+ e.preventDefault();const url=prompt('Local code editor URL',localStorage.getItem('hexora-editor-url')||'http://127.0.0.1:8080');
+ if(url!==null)localStorage.setItem('hexora-editor-url',url);
+});
