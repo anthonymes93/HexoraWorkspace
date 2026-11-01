@@ -259,7 +259,7 @@ function bounds(){
 }
 let sidebarAnimation=null;
 function setSidebarWidth(collapsed){
- const saved=Math.max(64,Math.min(560,Number(store?.getMeta('sidebarCustomWidth'))||330));
+ const saved=Math.max(220,Math.min(560,Number(store?.getMeta('sidebarLastExpandedWidth'))||Number(store?.getMeta('sidebarCustomWidth'))||330));
  const start=sidebarWidth,target=collapsed?64:saved;
  if(sidebarAnimation){clearInterval(sidebarAnimation);sidebarAnimation=null;}
  if(start===target){bounds();return;}
@@ -693,6 +693,7 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
   }
   else if(action==='sidebar-resize-save'){
    store.setMeta('sidebarCustomWidth',String(sidebarWidth));
+   if(sidebarWidth>=220)store.setMeta('sidebarLastExpandedWidth',String(sidebarWidth));
    return sidebarWidth;
   }
   else if(action==='sidebar'){setSidebarWidth(!!arg);}
