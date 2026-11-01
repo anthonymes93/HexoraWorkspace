@@ -168,38 +168,29 @@ for(const name of ['backup','configure','unlock','restore'])$('recovery-'+name).
 
 // Render one horizontal row per level along the current nested-stack path.
 let openStackPath=[];
-let stackRowsDismissed=false;
+let stackRowsDismissed=true;
+const expandedStackNodes=new Set();
 let lastRowHeight=120;
 function renderSecondTabRow(page){
  const host=$('stack-rows');host.replaceChildren();
  const data=page.stackData||{stacks:[],members:[]};
  const stacks=new Map(data.stacks.map(s=>[s.id,s]));
  const members=new Map(data.members.map(m=>[m.tab_id,m.stack_id]));
- const activeStack=members.get(page.activeId);
- // A top-row click selects only stacks anchored to that specific tab.
- // Do not infer the same second row for every member of a group.
- let focusStack=null;
- if(selectedRootTabId!==null){
-  const root=page.tabs.find(t=>t.id===selectedRootTabId);
-  if(root){
-   focusStack=data.stacks.find(st=>st.anchor_tab_id===selectedRootTabId&&st.parent_id===null)||null;
-   if(!focusStack){
-    // Legacy stacks created before anchors existed: choose one representative.
-    focusStack=data.stacks.find(st=>st.parent_id===null&&!st.anchor_tab_id&&
-     data.members.filter(m=>m.stack_id===st.id)[0]?.tab_id===selectedRootTabId)||null;
-   }
-  }
- }else if(selectedStackId&&stacks.has(selectedStackId))focusStack=stacks.get(selectedStackId);
- else if(activeStack&&stacks.has(activeStack))focusStack=stacks.get(activeStack);
+ // Rows are an explicit navigation choice, never restored from the last
+ // active tab. This prevents old nested stacks filling the screen on launch.
  openStackPath=[];
- if(!stackRowsDismissed&&focusStack){
-  let node=focusStack,seen=new Set();
-  while(node&&!seen.has(node.id)){seen.add(node.id);openStackPath.unshift(node.id);node=stacks.get(node.parent_id);}
-  // Extend through the explicitly selected nested stack, if one was chosen.
-  if(selectedStackId&&stacks.has(selectedStackId)){
-   const path=[],visited=new Set();let child=stacks.get(selectedStackId);
-   while(child&&!visited.has(child.id)){visited.add(child.id);path.unshift(child.id);child=stacks.get(child.parent_id);}
-   if(path[0]===openStackPath[0])openStackPath=path;
+ if(!stackRowsDismissed){
+  let focus=selectedStackId&&stacks.get(selectedStackId);
+  if(!focus&&selectedRootTabId!==null){
+   focus=data.stacks.find(st=>st.parent_id===null&&st.anchor_tab_id===selectedRootTabId);
+   if(!focus)focus=data.stacks.find(st=>st.parent_id===null&&!st.anchor_tab_id&&data.members.find(m=>m.stack_id===st.id)?.tab_id===selectedRootTabId);
+  }
+  if(focus){
+   const seen=new Set();
+   while(focus&&!seen.has(focus.id)&&openStackPath.length<12){
+    seen.add(focus.id);openStackPath.unshift(focus.id);
+    focus=stacks.get(focus.parent_id);
+   }
   }
  }
  for(let depth=0;depth<openStackPath.length;depth++){
@@ -237,10 +228,11 @@ function renderStackTree(host,page){
  for(const stack of data.stacks){const parent=stacks.has(stack.parent_id)?stack.parent_id:null;if(!children.has(parent))children.set(parent,[]);children.get(parent).push(stack);}
  const renderNode=(stack,depth)=>{
   const row=document.createElement('div');row.className='stack-node';row.style.paddingLeft=(8+Math.min(depth,24)*14)+'px';
-  const fold=document.createElement('button');fold.className='stack-fold';fold.textContent=stack.collapsed?'▸':'▾';fold.title='Expand or collapse';
-  fold.onclick=()=>action('stack-edit',{id:stack.id,operation:'toggle'});
+  const fold=document.createElement('button');fold.className='stack-fold';fold.textContent=expandedStackNodes.has(stack.id)?'▾':'▸';fold.title='Expand or collapse';
+  const toggleNode=()=>{if(expandedStackNodes.has(stack.id))expandedStackNodes.delete(stack.id);else expandedStackNodes.add(stack.id);refresh();};
+  fold.onclick=toggleNode;
   const label=document.createElement('button');label.className='stack-label';label.textContent='▤ '+stack.name;label.title='Right-click for stack actions';
-  label.onclick=()=>action('stack-edit',{id:stack.id,operation:'toggle'});
+  label.onclick=()=>{selectedStackId=stack.id;selectedRootTabId=null;stackRowsDismissed=false;toggleNode();};
   label.oncontextmenu=async e=>{
    e.preventDefault();
    const choice=prompt('Stack: '+stack.name+'\\n1 Rename\\n2 Move inside another stack\\n3 Move to top level\\n4 Delete stack (tabs remain)');
@@ -252,7 +244,7 @@ function renderStackTree(host,page){
    }catch(err){alert(err.message);}
   };
   row.append(fold,label);host.append(row);
-  if(stack.collapsed)return;
+  if(!expandedStackNodes.has(stack.id))return;
   for(const child of children.get(stack.id)||[])renderNode(child,depth+1);
   for(const id of members.get(stack.id)||[]){
    const tab=tabs.get(id);const tabRow=document.createElement('button');
