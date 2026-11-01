@@ -957,14 +957,9 @@ window.hexora.onSidebarFrame((width,transitioning=false,target=null)=>{
 });
 
 let workspaceHoverTimer=null;
-const workspaceHoverTip=document.createElement('div');
-workspaceHoverTip.className='workspace-hover-tip hidden';
-workspaceHoverTip.setAttribute('role','tooltip');
-workspaceHoverTip.innerHTML='<span class="workspace-tip-icon"></span><span class="workspace-tip-details"><strong></strong><small></small></span>';
-document.body.append(workspaceHoverTip);
 function hideWorkspaceHoverTip(){
  clearTimeout(workspaceHoverTimer);workspaceHoverTimer=null;
- workspaceHoverTip.classList.add('hidden');
+ window.hexora.workspaceTooltip.hide().catch(()=>{});
 }
 function attachWorkspaceHoverTip(el,w,count){
  el.removeAttribute('title');
@@ -973,15 +968,14 @@ function attachWorkspaceHoverTip(el,w,count){
   hideWorkspaceHoverTip();
   if(!document.body.classList.contains('sidebar-icons-only'))return;
   workspaceHoverTimer=setTimeout(()=>{
+   workspaceHoverTimer=null;
    if(!el.isConnected||!el.matches(':hover')||!document.body.classList.contains('sidebar-icons-only'))return;
-   workspaceHoverTip.querySelector('.workspace-tip-icon').textContent=w.emoji;
-   workspaceHoverTip.querySelector('strong').textContent=w.name;
-   workspaceHoverTip.querySelector('small').textContent=count+' saved '+(count===1?'tab':'tabs');
-   workspaceHoverTip.classList.remove('hidden');
    const icon=el.getBoundingClientRect();
-   const tip=workspaceHoverTip.getBoundingClientRect();
-   workspaceHoverTip.style.left=Math.min(window.innerWidth-tip.width-12,Math.max(68,icon.right+12))+'px';
-   workspaceHoverTip.style.top=Math.max(12,Math.min(window.innerHeight-tip.height-12,icon.top+(icon.height-tip.height)/2))+'px';
+   window.hexora.workspaceTooltip.show({
+    icon:w.emoji,name:w.name,count,
+    x:Math.max(68,icon.right+12),
+    y:icon.top+(icon.height-66)/2
+   }).catch(()=>{});
   },445);
  });
  el.addEventListener('pointerleave',hideWorkspaceHoverTip);
