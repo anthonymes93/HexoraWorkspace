@@ -166,7 +166,7 @@ function render(p){
   const label=document.createElement('span');label.className='name';label.textContent=w.name;
   const count=document.createElement('span');count.className='count';count.textContent=p.counts.find(x=>x.workspace===w.id)?.count||0;
   const edit=document.createElement('span');edit.className='workspace-edit';edit.title='Edit workspace';edit.textContent='⋯';edit.onclick=e=>{e.stopPropagation();openWorkspaceEditor(w.id);};
-  el.append(symbol,label,count,edit);el.onclick=async()=>{activeWorkspace=w.id;offset=0;save();await action('switch-workspace',w.id);refresh();};enableSidebarDrag(el,w.id,sidebarWorkspaceOrderKey);container.append(el);
+  el.append(symbol,label,count,edit);el.addEventListener('contextmenu',e=>showWorkspaceMenu(e,w));el.onclick=async()=>{activeWorkspace=w.id;offset=0;save();await action('switch-workspace',w.id);refresh();};enableSidebarDrag(el,w.id,sidebarWorkspaceOrderKey);container.append(el);
  }
  const conversations=$('conversations');conversations.replaceChildren();
  renderStackTree(conversations,p);
@@ -954,6 +954,36 @@ window.hexora.onSidebarFrame((width,transitioning=false,target=null)=>{
  }
 });
 
+let workspaceMenuId=null;
+function hideWorkspaceMenu(){
+ $('workspace-context-menu').classList.add('hidden');workspaceMenuId=null;
+ action('modal',false);
+}
+function showWorkspaceMenu(e,w){
+ e.preventDefault();e.stopPropagation();
+ workspaceMenuId=w.id;
+ const menu=$('workspace-context-menu');
+ $('workspace-context-icon').textContent=w.emoji;
+ $('workspace-context-name').textContent=w.name;
+ const count=currentPage?.counts.find(x=>x.workspace===w.id)?.count||0;
+ $('workspace-context-count').textContent=count+' saved '+(count===1?'tab':'tabs');
+ menu.classList.remove('hidden');
+ const rect=menu.getBoundingClientRect();
+ menu.style.left=Math.max(67,Math.min(e.clientX,window.innerWidth-rect.width-12))+'px';
+ menu.style.top=Math.max(15,Math.min(e.clientY,window.innerHeight-rect.height-12))+'px';
+ action('modal',true);
+}
+$('workspace-context-open').onclick=async()=>{
+ const id=workspaceMenuId;if(!id)return;hideWorkspaceMenu();
+ activeWorkspace=id;offset=0;save();await action('switch-workspace',id);refresh();
+};
+$('workspace-context-rename').onclick=()=>{
+ const id=workspaceMenuId;if(!id)return;hideWorkspaceMenu();openWorkspaceEditor(id);
+};
+document.addEventListener('pointerdown',e=>{
+ if(workspaceMenuId&&!$('workspace-context-menu').contains(e.target))hideWorkspaceMenu();
+},true);
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&workspaceMenuId)hideWorkspaceMenu();});
 function openWorkspaceEditor(id){
  const workspace=id?workspaces.find(w=>w.id===id):null;workspaceEditing=id||null;
  $('workspace-editor-title').textContent=workspace?'Edit workspace':'New workspace';
