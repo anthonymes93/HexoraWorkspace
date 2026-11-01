@@ -1394,7 +1394,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&vaultOpen)vaultClos
  $('native-code-rail').addEventListener('click',async event=>{
   try{
    if(event.shiftKey){await window.hexora.nativeCode.repair();return;}
-   const tab=await action('open-native-code',activeWorkspace);
+   const tab=await action('open-native-code',{workspace:activeWorkspace,skipPicker:event.ctrlKey});
    if(tab.workspace!==activeWorkspace){activeWorkspace=tab.workspace;offset=0;save();}
    await refresh();
    if(document.activeElement instanceof HTMLElement)document.activeElement.blur();
