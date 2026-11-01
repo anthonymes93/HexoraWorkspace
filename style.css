@@ -533,10 +533,10 @@ body.sidebar-icons-grid .quick-jumps{
 }
 body.sidebar-icons-grid .workspace,
 body.sidebar-icons-grid .quick-jump{
- width:34px!important;height:34px!important;
- min-width:0!important;max-width:34px!important;
+ width:38px!important;height:38px!important;
+ min-width:0!important;max-width:38px!important;
  flex:none!important;
- font-size:17px!important;
+ font-size:19px!important;
 }
-body.sidebar-icons-grid .workspace .emoji{font-size:18px!important}
+body.sidebar-icons-grid .workspace .emoji{font-size:20px!important}
 body.sidebar-icons-grid .quick-jumps{padding-top:11px!important}
