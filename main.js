@@ -213,9 +213,9 @@ function wire(t){const view=new WebContentsView({webPreferences:{partition:'pers
   const url=icons.find(candidate=>{try{const u=new URL(candidate);return ['https:','http:','data:'].includes(u.protocol);}catch{return false;}});
   if(url)rememberFavicon(t.id,wc.getURL(),url);
  });
- wc.on('page-title-updated',()=>update(true));
- wc.on('did-navigate',()=>{if(favicons.get(t.id)?.origin!==originOf(wc.getURL()))favicons.delete(t.id);update();});
- wc.on('did-navigate-in-page',()=>update());
+ wc.on('page-title-updated',()=>{update(true);});
+ wc.on('did-navigate',()=>{if(favicons.get(t.id)?.origin!==originOf(wc.getURL()))favicons.delete(t.id);update();store.recordVisit(wc.getURL(),wc.getTitle(),t.id);});
+ wc.on('did-navigate-in-page',()=>{update();store.recordVisit(wc.getURL(),wc.getTitle(),t.id);});
  wc.on('did-start-loading',()=>{loading.set(t.id,true);emit();});
  wc.on('did-stop-loading',()=>{loading.delete(t.id);emit();});
  const draftKey='chatgptDraft:'+t.id;
@@ -543,6 +543,14 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
  ipcMain.handle('tabs:lookup',(_e,id)=>{const row=store.get(Number(id));return row?pageRow(row):null;});
  ipcMain.handle('tabs:action',(_e,action,arg)=>{
   const current=store.get(activeId);const wc=live.get(activeId)?.webContents;
+  if(action==='history-list')return store.historySearch(arg?.query||'',arg?.limit||250);
+  if(action==='history-delete'){store.removeHistory(Number(arg));return true;}
+  if(action==='history-clear'){store.clearHistory();return true;}
+  if(action==='history-open'){
+   const url=userWebsiteUrl(arg?.url);
+   newTab(typeof arg?.workspace==='string'?arg.workspace:'web',url);
+   return true;
+  }
   if(action==='new'){const workspace=typeof arg==='string'?arg:'web';const anchor=store.get(activeId);newTab(workspace,HOME,anchor?.workspace===workspace?activeId:null);}
   else if(action==='activate')activate(Number(arg));
   else if(action==='switch-workspace'){
