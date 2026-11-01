@@ -381,7 +381,11 @@ async function updateNewTabSuggestions(){
   const primary=ranked.filter(x=>x.kind==='site');
   const secondary=ranked.filter(x=>x.kind==='history');
   newTabHistoryMatches=[...primary,...secondary].slice(0,8);
-  newTabHistorySelected=newTabHistoryMatches.length?0:-1;paintNewTabSuggestions();
+  // When there are no matching sites, keep Google selected instead of resetting to -1.
+  // Preserve an explicit keyboard choice if it still points at a valid result.
+  const count=smartSuggestionCount();
+  newTabHistorySelected=count?(newTabHistorySelected>=0&&newTabHistorySelected<count?newTabHistorySelected:0):-1;
+  paintNewTabSuggestions();
  }catch{if(request===newTabHistoryRequest){newTabHistoryMatches=[];newTabHistorySelected=smartSuggestionCount()?0:-1;paintNewTabSuggestions();}}
 }
 newTabAddress.addEventListener('input',()=>{
