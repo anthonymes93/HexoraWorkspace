@@ -30,6 +30,7 @@ public static class HexoraNative {
  [DllImport("user32.dll")] public static extern bool GetCursorPos(out POINT point);
  [DllImport("user32.dll")] public static extern IntPtr WindowFromPoint(POINT point);
  [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr h,out RECT rect);
+ [DllImport("user32.dll")] public static extern bool GetClientRect(IntPtr h,out RECT rect);
  [DllImport("user32.dll")] public static extern short GetAsyncKeyState(int vKey);
  [DllImport("user32.dll")] public static extern int GetClassName(IntPtr h,StringBuilder name,int max);
 
@@ -50,6 +51,10 @@ public static class HexoraNative {
  public static string FocusTrace(IntPtr parent,IntPtr child) {uint pid;uint ct=GetWindowThreadProcessId(child,out pid);uint pt=GetWindowThreadProcessId(parent,out pid);uint fg=GetWindowThreadProcessId(GetForegroundWindow(),out pid);return "childEnabled="+IsWindowEnabled(child)+" parentEnabled="+IsWindowEnabled(parent)+" foreground="+GetForegroundWindow().ToInt64()+" foregroundThread="+fg+" child="+child.ToInt64()+" parent="+parent.ToInt64()+" childGUI=["+ThreadInfo(ct)+"] parentGUI=["+ThreadInfo(pt)+"] foregroundGUI=["+ThreadInfo(fg)+"]";}
  // Re-activation can put Electron's render-widget HWND above the reparented Code HWND.
  // Check actual Windows hit-testing during the activation transition instead of guessing.
+ public static string Geometry(IntPtr parent,IntPtr child){
+  RECT pr,cr;bool parentValid=GetClientRect(parent,out pr);bool childValid=GetWindowRect(child,out cr);
+  return "parentClient="+(parentValid?(pr.right-pr.left)+"x"+(pr.bottom-pr.top):"invalid")+" childScreenRect="+(childValid?cr.left+","+cr.top+","+cr.right+","+cr.bottom:"invalid")+" visible="+IsWindowVisible(child)+" parent="+GetParent(child).ToInt64();
+ }
  public static int zOrderRecoverySequence=0;
  public static void RecoverZOrder(IntPtr parent,IntPtr child) {
   int sequence=System.Threading.Interlocked.Increment(ref zOrderRecoverySequence);
@@ -59,7 +64,8 @@ public static class HexoraNative {
     int last=0;
     foreach(int offset in offsets) {
      System.Threading.Thread.Sleep(offset-last);last=offset;
-     if(sequence!=zOrderRecoverySequence||!IsWindow(child)||GetParent(child)!=parent||!IsWindowVisible(child)||GetForegroundWindow()!=parent)break;
+     if(sequence!=zOrderRecoverySequence||!IsWindow(child)||GetParent(child)!=parent)break;
+     if(!IsWindowVisible(child)||GetForegroundWindow()!=parent)continue;
      RECT rect; if(!GetWindowRect(child,out rect)||rect.right<=rect.left||rect.bottom<=rect.top)continue;
      POINT p=new POINT();p.x=rect.left+(rect.right-rect.left)/2;p.y=rect.top+(rect.bottom-rect.top)/2;
      IntPtr hit=WindowFromPoint(p);
@@ -134,6 +140,7 @@ try {
    'TRACE' {Write-Output ('FOCUS_TRACE '+($parts[1..($parts.Length-1)] -join ' ')+' '+[HexoraNative]::FocusTrace($parent,$child))}
    'WATCH_MOUSE' {if(-not $detached){[HexoraNative]::WatchMouse($parent,$child);Write-Output 'MOUSE_PROBE ARMED'}}
    'RECOVER_Z' {if(-not $detached -and [HexoraNative]::GetParent($child) -eq $parent){[HexoraNative]::RecoverZOrder($parent,$child);Write-Output 'Z_ORDER_RECOVERY ARMED'}}
+   'GEOMETRY' {if(-not $detached){Write-Output ('GEOMETRY '+($parts[1..($parts.Length-1)] -join ' ')+' '+[HexoraNative]::Geometry($parent,$child)+' requestedRect='+($lastRect -join ','))}}
    'DIAG' {Write-Output ('DIAG '+($parts[1..($parts.Length-1)] -join ' ')+' '+[HexoraNative]::Diagnostic($child))}
    'HIDE' {[void][HexoraNative]::ShowWindow($child,0)}
    'DETACH' {if(-not $detached){[void][HexoraNative]::SetParent($child,[IntPtr]::Zero);[void][HexoraNative]::SetWindowLong($child,-16,$oldStyle);[void][HexoraNative]::SetWindowPos($child,[IntPtr]::Zero,120,120,1000,700,0x0024 -bor 0x0020);[void][HexoraNative]::ShowWindow($child,5);[HexoraNative]::Focus($child);$detached=$true;Write-Output ('DIAG DETACHED '+[HexoraNative]::Diagnostic($child));Write-Output 'DETACHED'}}
