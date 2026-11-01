@@ -293,12 +293,13 @@ function paintNewTabSuggestions(){
  newTabSuggestions.replaceChildren();
  newTabSuggestions.hidden=!newTabHistoryMatches.length;
  newTabHistoryMatches.forEach((entry,index)=>{
-  const row=document.createElement('div');row.className='new-tab-suggestion-row';
+  const row=document.createElement('div');row.className='new-tab-suggestion-row '+(entry.kind==='site'?'new-tab-primary':'new-tab-secondary');
   const item=document.createElement('button');item.type='button';item.className='new-tab-suggestion';
   item.setAttribute('role','option');item.setAttribute('aria-selected',String(index===newTabHistorySelected));
   if(index===newTabHistorySelected)item.classList.add('selected');
+  if(entry.kind==='site'){const icon=document.createElement('span');icon.className='new-tab-primary-icon';icon.textContent='↗';icon.setAttribute('aria-hidden','true');item.append(icon);}
   const title=document.createElement('strong');title.textContent=entry.title||entry.domain||entry.url;
-  const url=document.createElement('span');url.textContent=entry.kind==='history'?'Previously visited · '+entry.domain:entry.url;
+  const url=document.createElement('span');url.textContent=entry.kind==='history'?'Previously visited · '+entry.domain:entry.url+' · Open main website';
   item.append(title,url);
   item.addEventListener('mousedown',e=>e.preventDefault());
   item.onclick=()=>openSmartSuggestion(entry);
@@ -358,7 +359,10 @@ async function updateNewTabSuggestions(){
    const score=x=>(choices[smartIdentity(x)]||0)*12+(x.kind==='site'?15:0)+(x.domain.startsWith(query)?8:0)+(x.title.toLowerCase().startsWith(query)?5:0);
    return score(b)-score(a)||a.title.localeCompare(b.title);
   });
-  newTabHistoryMatches=ranked.slice(0,8);
+  // Keep the main website as the primary action; learning only reorders secondary history.
+  const primary=ranked.filter(x=>x.kind==='site');
+  const secondary=ranked.filter(x=>x.kind==='history');
+  newTabHistoryMatches=[...primary,...secondary].slice(0,8);
   newTabHistorySelected=newTabHistoryMatches.length?0:-1;paintNewTabSuggestions();
  }catch{if(request===newTabHistoryRequest){newTabHistoryMatches=[];hideNewTabSuggestions();}}
 }
