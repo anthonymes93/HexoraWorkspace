@@ -442,3 +442,19 @@ body.resizing-sidebar .sidebar,body.resizing-sidebar .sidebar.hidden{transition:
 .sidebar .profile{gap:7px;min-width:0}
 .sidebar .profile>div{min-width:0}
 .sidebar .profile strong,.sidebar .profile small{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+
+/* Progressive sidebar contraction: full content -> icon shelf -> rail only. */
+body.sidebar-icons-only .sidebar{padding:17px 7px;gap:10px;align-items:stretch}
+body.sidebar-icons-only .sidebar-title{justify-content:center;padding:0;margin-bottom:4px}
+body.sidebar-icons-only .sidebar-title>strong,body.sidebar-icons-only .sidebar-title-actions,body.sidebar-icons-only .sidebar>.eyebrow,body.sidebar-icons-only .conversation-head,body.sidebar-icons-only .conversation-list,body.sidebar-icons-only .profile{display:none!important}
+body.sidebar-icons-only .workspaces{display:flex;flex-direction:column;align-items:center;gap:7px;overflow:visible}
+body.sidebar-icons-only .workspace{width:min(45px,calc(100% - 3px));height:43px;min-width:0;padding:0;display:flex;align-items:center;justify-content:center;gap:0;border-radius:11px;position:relative;flex-shrink:0}
+body.sidebar-icons-only .workspace .name,body.sidebar-icons-only .workspace .count,body.sidebar-icons-only .workspace .workspace-edit,body.sidebar-icons-only .workspace button{display:none!important}
+body.sidebar-icons-only .workspace .emoji{display:block;flex:none!important;font-size:20px!important;width:auto!important;margin:0!important}
+body.sidebar-icons-only .quick-jumps{display:flex;justify-content:center;align-content:flex-start;gap:6px;overflow-y:auto;overflow-x:hidden;padding:12px 2px;border-top:1px solid #3a3744}
+body.sidebar-icons-only .quick-jump{width:35px;height:35px;flex:0 0 35px}
+body.sidebar-icons-only .sidebar>*{min-width:0}
+body.panel-collapsed .sidebar{visibility:hidden;pointer-events:none}
+body.panel-collapsed #sidebar-resize-handle{display:block;left:calc(var(--hexora-content-left,64px) - 4px);width:8px}
+body.panel-collapsed #sidebar-resize-handle::before{background:transparent}
+body.panel-collapsed #sidebar-resize-handle:hover::before{background:var(--hx-accent,#ad95ff)}
