@@ -76,7 +76,17 @@ class TabStore {
    this.db.exec('COMMIT');
   }catch(e){this.db.exec('ROLLBACK');throw e;}
  }
- delete(id){this.db.prepare('DELETE FROM tab_stack_members WHERE tab_id=?').run(id);this.q.del.run(id);}
+ delete(id){
+  if(!Number.isSafeInteger(id)||id<1)return;
+  this.db.exec('BEGIN');
+  try{
+   this.db.prepare('DELETE FROM tab_stack_members WHERE tab_id=?').run(id);
+   this.q.del.run(id);
+   const remove=this.db.prepare('DELETE FROM meta WHERE key=?');
+   for(const prefix of ['chatgptDraft:','tabCustomTitle:','panelMode:','chromeMode:','windowBounds:'])remove.run(prefix+id);
+   this.db.exec('COMMIT');
+  }catch(err){this.db.exec('ROLLBACK');throw err;}
+ }
  reorderVisible(workspace,ids){
   if(typeof workspace!=='string'||!Array.isArray(ids)||ids.length<2||ids.length>16||!ids.every(Number.isSafeInteger)||new Set(ids).size!==ids.length)throw new Error('Invalid tab order');
   const rows=this.page(workspace,0,50);
