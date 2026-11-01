@@ -638,3 +638,18 @@ body.sidebar-trim-workspace-details:not(.sidebar-icons-only) .workspace{gap:6px}
 #new-tab-overlay .new-tab-error{margin:12px 0 0;min-height:17px;color:#ffb3b3;font-size:12px}
 #new-tab-overlay .new-tab-footer{display:flex;justify-content:space-between;align-items:center;padding:14px 25px;border-top:1px solid rgba(180,160,212,.13);color:#9f97af;font-size:11px;background:#1a1821}
 @media(max-width:580px){#new-tab-overlay .new-tab-shortcuts{grid-template-columns:repeat(2,minmax(0,1fr))}#new-tab-overlay .new-tab-hero{padding:15px}#new-tab-overlay .new-tab-content{padding:18px}#new-tab-overlay .new-tab-footer{padding:12px 18px}}
+
+#new-tab-overlay .new-tab-content{max-height:min(67vh,640px);overflow-y:auto}
+#new-tab-overlay .new-tab-extra-actions{display:flex;justify-content:flex-end;margin-top:9px}
+#new-tab-overlay .new-tab-extra-actions button{border:0;background:none;color:#c5aaff;cursor:pointer;font-size:12px}
+#new-tab-overlay .new-tab-extra-actions button:hover{text-decoration:underline}
+#new-tab-overlay .new-tab-custom-links,#new-tab-overlay .new-tab-recent{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}
+#new-tab-overlay .new-tab-custom-item{display:flex;align-items:center;min-width:0;border:1px solid rgba(179,164,209,.2);border-radius:9px;background:#262331}
+#new-tab-overlay .new-tab-custom-item button:first-child{flex:1;min-width:0;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:12px;border:0;background:transparent;color:#eee8fa;cursor:pointer}
+#new-tab-overlay .new-tab-custom-item button:last-child{padding:9px;border:0;background:transparent;color:#b4a7c5;cursor:pointer}
+#new-tab-overlay .new-tab-custom-item button:hover{color:#c9aaff}
+#new-tab-overlay .new-tab-recent-item{display:flex;flex-direction:column;align-items:flex-start;gap:4px;min-width:0;padding:12px;border:1px solid rgba(179,164,209,.18);border-radius:9px;background:#24212d;color:#ede9f5;text-align:left;cursor:pointer}
+#new-tab-overlay .new-tab-recent-item:hover{border-color:#a98bdb;background:#332b43}
+#new-tab-overlay .new-tab-recent-item strong,#new-tab-overlay .new-tab-recent-item span{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#new-tab-overlay .new-tab-recent-item span,#new-tab-overlay .new-tab-empty{font-size:11px;color:#a59cb7}
+@media(max-width:580px){#new-tab-overlay .new-tab-custom-links,#new-tab-overlay .new-tab-recent{grid-template-columns:repeat(2,minmax(0,1fr))}}
