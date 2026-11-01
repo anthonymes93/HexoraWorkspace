@@ -567,3 +567,13 @@ body.sidebar-trim-workspace-details:not(.sidebar-icons-only) .workspace{gap:6px}
 .workspace-tip-details strong{font-size:12px;font-weight:650;line-height:1.2;overflow-wrap:anywhere}
 .workspace-tip-details small{font-size:10px;color:#ada6bb}
 @keyframes workspace-tip-in{from{opacity:0;transform:translateX(-5px)}to{opacity:1;transform:translateX(0)}}
+
+/* Multi-tab selection: distinguish selected tabs without hiding the active tab. */
+.tabs .tab.multi-selected,.stack-rows .tab.multi-selected{
+ background:linear-gradient(180deg,#49405d,#302a43)!important;
+ border-color:var(--hx-accent,#ad95ff)!important;
+ box-shadow:inset 0 0 0 1px #ad95ff5c,0 0 0 1px #ad95ff27;
+ color:#f7f2ff!important;
+}
+#tab-menu-close-selected{color:#ffc6d0!important;background:#472d3a!important;border:1px solid #855365!important;border-radius:8px;margin:5px 6px;width:calc(100% - 12px)!important;font-weight:650}
+#tab-menu-close-selected:hover{background:#593544!important}
