@@ -1023,7 +1023,7 @@ async function vaultEdit(id=null){
 function vaultClose(){
  if(!vaultOpen)return;vaultOpen=false;v('vault-overlay').classList.add('hidden');
  v('vault-entry-form').classList.add('hidden');v('vault-password').value='';
- v('vault-master').value='';window.hexora.vault.lock().catch(()=>{});action('modal',false);
+ v('vault-master').value='';action('modal',false);
 }
 async function vaultShow(){
  vaultOpen=true;v('vault-overlay').classList.remove('hidden');action('modal',true);
