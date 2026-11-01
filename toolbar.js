@@ -1029,7 +1029,7 @@ async function vaultShow(){
  vaultOpen=true;v('vault-overlay').classList.remove('hidden');action('modal',true);
  v('vault-lock-error').textContent='';
  try{
-  const status=await window.hexora.vault.status();window.__vaultExists=status.exists;vaultDisplay(status.locked);
+  const status=await window.hexora.vault.status();window.__vaultExists=status.exists;v('vault-remember').disabled=!status.deviceUnlockAvailable;v('vault-remember').checked=status.deviceUnlockAvailable;vaultDisplay(status.locked);
   if(!status.locked)await vaultLoad();else v('vault-master').focus();
  }catch(err){v('vault-lock-error').textContent=err.message;}
 }
@@ -1038,7 +1038,7 @@ v('vault-close').onclick=vaultClose;
 v('vault-overlay').onclick=e=>{if(e.target===v('vault-overlay'))vaultClose();};
 v('vault-unlock-form').onsubmit=async e=>{
  e.preventDefault();v('vault-lock-error').textContent='';
- try{await window.hexora.vault.unlock(v('vault-master').value);v('vault-master').value='';window.__vaultExists=true;vaultDisplay(false);await vaultLoad();}
+ try{await window.hexora.vault.unlock(v('vault-master').value,v('vault-remember').checked);v('vault-master').value='';window.__vaultExists=true;vaultDisplay(false);await vaultLoad();}
  catch(err){v('vault-lock-error').textContent=err.message;}
 };
 v('vault-lock').onclick=async()=>{await window.hexora.vault.lock();vaultClearEditor();v('vault-entry-form').classList.add('hidden');vaultItems=[];vaultDisplay(true);v('vault-master').focus();};
