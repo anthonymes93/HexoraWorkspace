@@ -7,6 +7,7 @@ on:
       - 'feature/vscode-auto-project-detection'
       - 'experiment/vscode-no-flash'
       - 'feature/hexora-project-picker'
+      - 'integration/hexora-feature-reconciliation'
   pull_request:
     paths:
       - 'tab-store.js'
@@ -66,5 +67,11 @@ jobs:
         run: npm run test:code-project-sync
       - name: Verify real project browsing and saved favorites
         run: npm run test:project-picker
+      - name: Verify integrated feature wiring
+        run: npm run test:integration
+      - name: Verify workspace and tab deep links
+        run: npm run test:links
+      - name: Verify taskbar identity behavior
+        run: npm run test:taskbar
       - name: Check project picker and toolbar JavaScript syntax
         run: npm run test:project-picker-ui

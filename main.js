@@ -3,6 +3,7 @@ const {app,BrowserWindow,WebContentsView,View,session,ipcMain,shell,dialog,clipb
 const path=require('node:path');
 const {screen}=require('electron');
 const {TabStore}=require('./tab-store');
+const {workspaceLink,tabLink,parseDeepLink}=require('./deep-links');
 const {PasswordVault}=require('./password-vault');
 const fs=require('node:fs');
 const os=require('node:os');
@@ -72,12 +73,17 @@ function stopNativeCode(tabId){
 function stopAllNativeCode(){for(const id of [...nativeCodeHosts.keys()])stopNativeCode(id);nativeCodeLaunchQueue.length=0;}
 
 const {snapshot,stageRestore,applyPending,verifyBackup}=require('./recovery');
+if(process.platform==='win32'){
+ if(process.defaultApp&&process.argv[1])app.setAsDefaultProtocolClient('hexora',process.execPath,[path.resolve(process.argv[1])]);
+ else app.setAsDefaultProtocolClient('hexora');
+}else if(app.isPackaged)app.setAsDefaultProtocolClient('hexora');
 // Prevent two Hexora instances from accessing the same Chromium profile.
 const hasSingleInstanceLock=app.requestSingleInstanceLock();
 if(!hasSingleInstanceLock){
  app.quit();
 }else{
- app.on('second-instance',()=>{
+ app.on('second-instance',(_event,argv)=>{
+  for(const arg of argv)receiveDeepLink(arg);
   const main=BrowserWindow.getAllWindows().find(w=>!w.isDestroyed()&&w.getTitle().includes('Hexora Workspace'));
   if(main){if(main.isMinimized())main.restore();main.show();main.focus();}
  });
@@ -93,6 +99,12 @@ function savedDetachedIds(){try{const values=JSON.parse(store.getMeta(LAYOUT_KEY
 function setDetachedSaved(id,present){const ids=new Set(savedDetachedIds());if(present)ids.add(id);else ids.delete(id);store.setMeta(LAYOUT_KEY,JSON.stringify([...ids]));}
 let mainViewport=null,win,store,activeId=null,sidebarWidth=330,live=new Map(),favicons=new Map(),loading=new Map(),stateTimer=null,modalVisible=false,recoveryPassword=null,recoveryDir=null,recoveryTimer=null,recoveryBusy=false,lastBackup=null;
 const extensionPartition='persist:hexora-chatgpt';
+let deepLinkReady=false;
+const pendingDeepLinks=[];
+function deliverDeepLinks(){if(!deepLinkReady||!win||win.isDestroyed())return;while(pendingDeepLinks.length)win.webContents.send('deep-link:navigate',pendingDeepLinks.shift());}
+function receiveDeepLink(value){const target=parseDeepLink(value);if(!target)return false;pendingDeepLinks.push(target);if(pendingDeepLinks.length>20)pendingDeepLinks.shift();deliverDeepLinks();return true;}
+for(const arg of process.argv)receiveDeepLink(arg);
+app.on('open-url',(event,url)=>{event.preventDefault();receiveDeepLink(url);});
 let extensionRecords=[],extensionLoaded=new Map(),extensionSession=null,extensionConfigFile=null;
 const extensionPopups=new Map();
 const extensionRegistrations=new Map();
@@ -256,7 +268,8 @@ const CHATGPT_DRAFT_GUARD=`(()=>{
   if(!location.hostname.endsWith('chatgpt.com')){clearInterval(timer);return;}
   const el=find();if(!el||!el.isConnected)return;
   if(el!==currentEditor){currentEditor=el;write(el,ownDraft);}
-  else if(read(el)!==ownDraft&&document.activeElement!==el)write(el,ownDraft);
+  // Never reinsert a sent draft after ChatGPT clears its composer.
+   else if(read(el)!==ownDraft&&document.activeElement!==el){ownDraft=read(el);userEdited=false;}
  },400);
  window.addEventListener('pagehide',()=>clearInterval(timer),{once:true});
 })();`;
@@ -896,7 +909,8 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
    {label:count+' saved '+(count===1?'tab':'tabs'),enabled:false},
    {type:'separator'},
    {label:'Open workspace',click:()=>win.webContents.send('workspace:menu-action',{id,action:'open'})},
-   {label:'Rename / customize',click:()=>win.webContents.send('workspace:menu-action',{id,action:'rename'})}
+   {label:'Copy Link to Workspace',click:()=>{try{clipboard.writeText(workspaceLink(id));win.webContents.send('deep-link:copied','Workspace link copied');}catch(error){console.error(error);}}},
+    {label:'Rename / customize',click:()=>win.webContents.send('workspace:menu-action',{id,action:'rename'})}
   ]);
   menu.popup({window:win,x:Math.round(Math.max(0,Number(data?.x)||0)),y:Math.round(Math.max(0,Number(data?.y)||0))});
   return true;
@@ -907,9 +921,18 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
   if(event.sender!==win.webContents)throw Error('Invalid caller');
   return projectPicker.locations(store);
  });
- ipcMain.handle('code-picker:list',(event,folder)=>{
+ ipcMain.handle('code-picker:list',(event,folder,filter='')=>{
   if(event.sender!==win.webContents)throw Error('Invalid caller');
-  return projectPicker.listFolders(folder,projectPicker.readPaths(store,projectPicker.FAVORITES_KEY,100));
+  return projectPicker.listFolders(folder,projectPicker.readPaths(store,projectPicker.FAVORITES_KEY,100),1200,typeof filter==='string'?filter:'');
+ });
+ ipcMain.handle('code-picker:validate',(event,folder)=>{
+  if(event.sender!==win.webContents)throw Error('Invalid caller');
+  return projectPicker.validateFolder(folder);
+ });
+ ipcMain.handle('code-picker:focus',event=>{
+  if(event.sender!==win.webContents||!modalVisible)throw Error('Project picker must be active.');
+  if(!win.isDestroyed()){win.focus();win.webContents.focus();}
+  return true;
  });
  ipcMain.handle('code-picker:favorite',(event,folder)=>{
   if(event.sender!==win.webContents)throw Error('Invalid caller');
@@ -970,6 +993,7 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
  ipcMain.handle('tabs:search',(_e,term)=>store.search(term,50).map(pageRow));
  ipcMain.handle('tabs:lookup',(_e,id)=>{const row=store.get(Number(id));return row?pageRow(row):null;});
  ipcMain.handle('tabs:action',(_e,action,arg)=>{
+   if(action==='copy-tab-link'){const tab=store.get(Number(arg));if(!tab)throw Error('This tab no longer exists.');const link=tabLink(tab.workspace,tab.id);clipboard.writeText(link);win.webContents.send('deep-link:copied','Tab link copied');return link;}
   const current=store.get(activeId);const wc=live.get(activeId)?.webContents;
   if(action==='history-list')return store.historySearch(arg?.query||'',arg?.limit||250);
   if(action==='history-delete'){store.removeHistory(Number(arg));return true;}
@@ -1108,6 +1132,8 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
  setInterval(syncNativeCodeProjects,1000).unref();
  win.on('closed',()=>{if(nativeCodeLifecycleTimer){clearTimeout(nativeCodeLifecycleTimer);nativeCodeLifecycleTimer=null;}quitting=true;if(nativeCodeInstaller&&nativeCodeInstaller.exitCode===null)nativeCodeInstaller.kill();stopAllNativeCode();for(const folder of [...extensionPopups.keys()])closeExtensionPopup(folder);if(sidebarAnimation)clearInterval(sidebarAnimation);for(const popup of detached.values())if(!popup.isDestroyed())popup.close();detached.clear();clearInterval(recoveryTimer);recoveryPassword=null;clearTimeout(stateTimer);win=null;for(const id of Array.from(live.keys()))discard(id);vault?.lock();tabStoreClosing=true;store.close();});
  // Register every IPC handler before the renderer can issue actions.
- win.loadFile('toolbar.html').catch(err=>console.error('[Hexora] Toolbar load failed:',err));
+ win.webContents.on('did-start-loading',()=>{deepLinkReady=false;});
+  ipcMain.handle('deep-link:ready',event=>{if(event.sender!==win.webContents)throw Error('Invalid deep-link caller.');deepLinkReady=true;deliverDeepLinks();return true;});
+  win.loadFile('toolbar.html').catch(err=>console.error('[Hexora] Toolbar load failed:',err));
 });
 app.on('window-all-closed',()=>{if(process.platform!=='darwin')app.quit();});

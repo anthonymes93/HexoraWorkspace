@@ -584,3 +584,14 @@ body.sidebar-trim-workspace-details:not(.sidebar-icons-only) .workspace{gap:6px}
 /* Notion action-center launcher, following the VS Code button on the app rail. */
 #notion-rail{display:grid;place-items:center}
 .notion-mark{display:grid;place-items:center;width:24px;height:24px;border:2px solid currentColor;border-radius:4px;font:900 18px/1 Georgia,serif;letter-spacing:-2px;padding-right:2px;transform:rotate(-5deg)}
+
+/* Small nonblocking confirmation for Hexora deep-link actions. */
+.hexora-link-toast{
+ position:fixed;z-index:220;right:24px;bottom:24px;max-width:min(360px,calc(100vw - 48px));
+ padding:11px 17px;border:1px solid #76639a;border-radius:12px;
+ color:#f4eeff;background:linear-gradient(130deg,#2b2635,#1e1c27);
+ box-shadow:0 12px 32px #0009;font:500 12px/1.5 Inter,system-ui,sans-serif;
+ pointer-events:none;opacity:0;transform:translateY(9px);
+ transition:opacity .17s ease,transform .17s ease;
+}
+.hexora-link-toast.is-visible{opacity:1;transform:translateY(0);}

@@ -1,11 +1,14 @@
 const {contextBridge,ipcRenderer}=require('electron');
 contextBridge.exposeInMainWorld('hexora',{
- codePicker:{locations:()=>ipcRenderer.invoke('code-picker:locations'),list:folder=>ipcRenderer.invoke('code-picker:list',folder),favorite:folder=>ipcRenderer.invoke('code-picker:favorite',folder)},
+ codePicker:{locations:()=>ipcRenderer.invoke('code-picker:locations'),list:(folder,filter='')=>ipcRenderer.invoke('code-picker:list',folder,filter),validate:folder=>ipcRenderer.invoke('code-picker:validate',folder),focus:()=>ipcRenderer.invoke('code-picker:focus'),favorite:folder=>ipcRenderer.invoke('code-picker:favorite',folder)},
  nativeCode:{chooseProject:id=>ipcRenderer.invoke('native-code:choose-project',id),clearProject:id=>ipcRenderer.invoke('native-code:clear-project',id),repair:()=>ipcRenderer.invoke('native-code:repair'),toggle:()=>ipcRenderer.invoke('native-code:toggle'),detach:()=>ipcRenderer.invoke('native-code:detach'),onStopped:callback=>ipcRenderer.on('native-code:stopped',callback)},
  action:(name,arg)=>ipcRenderer.invoke('tabs:action',name,arg),
  page:(workspace,offset=0)=>ipcRenderer.invoke('tabs:page',{workspace,offset}),
  search:term=>ipcRenderer.invoke('tabs:search',term),
  lookupTab:id=>ipcRenderer.invoke('tabs:lookup',id),
+ readyForDeepLinks:()=>ipcRenderer.invoke('deep-link:ready'),
+ onDeepLink:callback=>ipcRenderer.on('deep-link:navigate',(_event,target)=>callback(target)),
+ onDeepLinkCopied:callback=>ipcRenderer.on('deep-link:copied',(_event,message)=>callback(message)),
  workspaceMenu:data=>ipcRenderer.invoke('workspace:context-menu',data),
  workspaceTooltip:{show:data=>ipcRenderer.invoke('workspace:tooltip-show',data),hide:()=>ipcRenderer.invoke('workspace:tooltip-hide')},
  onWorkspaceMenuAction:callback=>ipcRenderer.on('workspace:menu-action',(_event,data)=>callback(data)),
