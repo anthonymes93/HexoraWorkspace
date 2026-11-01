@@ -1683,12 +1683,12 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&vaultOpen)vaultClos
  function save(items){localStorage.setItem(key,JSON.stringify(items));render();}
  function favicon(url){try{return new URL('/favicon.ico',url).href;}catch{return '';}}
  function close(){panel.hidden=true;add.setAttribute('aria-expanded','false');error.textContent='';}
- function render(){const items=load();icons.replaceChildren();$('header-favorites-manage').replaceChildren();$('header-favorites-count').textContent=items.length+' / '+limit;add.disabled=items.length>=limit;add.title=add.disabled?'Maximum 10 favorites':'Add favorite link';
+ function render(){const items=load();icons.replaceChildren();$('header-favorites-manage').replaceChildren();$('header-favorites-count').textContent=items.length+' / '+limit;add.disabled=false;add.title=items.length>=limit?'Manage favorites (10 / 10)':'Add favorite link';form.hidden=items.length>=limit;
   items.forEach((item,index)=>{const button=document.createElement('button');button.type='button';button.className='header-favorite-icon';button.title=item.name+' — '+item.url;button.setAttribute('aria-label','Open '+item.name);const img=document.createElement('img');img.alt='';img.src=favicon(item.url);img.onerror=()=>{img.hidden=true;fallback.hidden=false;};const fallback=document.createElement('span');fallback.className='header-favorite-fallback';fallback.textContent=(item.name||'?').slice(0,1).toUpperCase();fallback.hidden=true;button.append(img,fallback);button.onclick=()=>launchNewTab(item.url,item.name);icons.append(button);
    const row=document.createElement('div');row.className='header-favorites-manage-row';const label=document.createElement('span');label.textContent=item.name;label.title=item.url;const remove=document.createElement('button');remove.type='button';remove.textContent='×';remove.title='Remove '+item.name;remove.setAttribute('aria-label','Remove '+item.name);remove.onclick=()=>save(load().filter((_,i)=>i!==index));row.append(label,remove);$('header-favorites-manage').append(row);});
-  if(add.disabled)close();
+
  }
- add.onclick=()=>{if(add.disabled)return;panel.hidden=!panel.hidden;add.setAttribute('aria-expanded',String(!panel.hidden));if(!panel.hidden)urlInput.focus();};
+ add.onclick=()=>{panel.hidden=!panel.hidden;add.setAttribute('aria-expanded',String(!panel.hidden));if(!panel.hidden&&load().length<limit)urlInput.focus();};
  $('header-favorites-cancel').onclick=close;
  form.onsubmit=e=>{e.preventDefault();const items=load();if(items.length>=limit){error.textContent='Maximum 10 links';return;}let url;try{url=new URL(urlInput.value.trim());if(!['http:','https:'].includes(url.protocol))throw Error('protocol');}catch{error.textContent='Enter a valid http or https URL';return;}if(items.some(x=>x.url===url.href)){error.textContent='This link is already saved';return;}items.push({url:url.href,name:nameInput.value.trim()||url.hostname.replace(/^www\\./,'')});save(items);form.reset();close();};
  document.addEventListener('pointerdown',e=>{if(!root.contains(e.target))close();});
