@@ -271,6 +271,39 @@ sidebarGrip.addEventListener('keydown',async event=>{
 function updateSidebar(persist=true){action('sidebar',!sidebarOpen);if(persist&&currentPage?.activeId)action('panel-mode',{id:currentPage.activeId,mode:sidebarOpen?'wide':'thin'});save();}
 // New Tab launcher: explicit choices, no surprise navigation or new tab until selection.
 const newTabOverlay=$('new-tab-overlay'),newTabAddress=$('new-tab-address'),newTabError=$('new-tab-error');
+const newTabCustomKey='hexora:new-tab-shortcuts:v1';
+function newTabSavedLinks(){try{const x=JSON.parse(localStorage.getItem(newTabCustomKey)||'[]');return Array.isArray(x)?x.filter(y=>typeof y.url==='string'&&typeof y.title==='string').slice(0,24):[];}catch{return [];}}
+function renderNewTabCustomLinks(){
+ const host=$('new-tab-custom-links');host.replaceChildren();
+ const links=newTabSavedLinks();
+ $('new-tab-custom-empty').hidden=!!links.length;
+ for(const item of links){
+  const row=document.createElement('div');row.className='new-tab-custom-item';
+  const open=document.createElement('button');open.type='button';open.textContent=item.title;open.title=item.url;open.onclick=()=>launchNewTab(item.url,item.title);
+  const remove=document.createElement('button');remove.type='button';remove.textContent='×';remove.title='Remove shortcut';remove.setAttribute('aria-label','Remove '+item.title);
+  remove.onclick=()=>{localStorage.setItem(newTabCustomKey,JSON.stringify(newTabSavedLinks().filter(x=>x.url!==item.url)));renderNewTabCustomLinks();};
+  row.append(open,remove);host.append(row);
+ }
+}
+async function renderNewTabRecent(){
+ const host=$('new-tab-recent');host.replaceChildren();
+ try{
+  const entries=await action('history-list',{limit:100});
+  if(newTabOverlay.classList.contains('hidden'))return;
+  const seen=new Set();
+  for(const item of (Array.isArray(entries)?entries:[])){
+   let parsed;try{parsed=new URL(item.url);}catch{continue;}
+   if(!['http:','https:'].includes(parsed.protocol)||seen.has(parsed.origin))continue;
+   seen.add(parsed.origin);
+   const button=document.createElement('button');button.type='button';button.className='new-tab-recent-item';
+   const name=document.createElement('strong');name.textContent=item.title||parsed.hostname;
+   const domain=document.createElement('span');domain.textContent=parsed.hostname;
+   button.append(name,domain);button.title=item.url;button.onclick=()=>launchNewTab(item.url,item.title);
+   host.append(button);if(seen.size>=6)break;
+  }
+  if(!seen.size)host.textContent='Recently visited websites will appear here.';
+ }catch{host.textContent='Recent websites unavailable.';}
+}
 function closeNewTabLauncher(){newTabOverlay.classList.add('hidden');action('modal',false);}
 function openNewTabLauncher(){
  newTabError.textContent='';
@@ -278,6 +311,8 @@ function openNewTabLauncher(){
  newTabOverlay.classList.remove('hidden');
  action('modal',true);
  newTabAddress.focus();
+ renderNewTabCustomLinks();
+ renderNewTabRecent();
 }
 async function launchNewTab(url,title){
  try{
@@ -292,6 +327,15 @@ async function launchNewTab(url,title){
   closeNewTabLauncher();
  }catch(error){newTabError.textContent='Could not open website: '+error.message;}
 }
+$('new-tab-save-shortcut').onclick=()=>{
+ const raw=newTabAddress.value.trim();
+ let parsed;try{parsed=new URL(/^[a-z][a-z0-9+.-]*:/i.test(raw)?raw:'https://'+raw);}catch{newTabError.textContent='Enter a valid URL before saving.';return;}
+ if(!['http:','https:'].includes(parsed.protocol)||!parsed.hostname){newTabError.textContent='Only HTTP and HTTPS links can be saved.';return;}
+ const items=newTabSavedLinks().filter(x=>x.url!==parsed.href);
+ if(items.length>=24){newTabError.textContent='Maximum 24 saved shortcuts.';return;}
+ items.unshift({title:parsed.hostname,url:parsed.href});
+ try{localStorage.setItem(newTabCustomKey,JSON.stringify(items));newTabError.textContent='Shortcut saved.';renderNewTabCustomLinks();}catch{newTabError.textContent='Could not save shortcut.';}
+};
 for(const id of ['new','new-rail','new-sidebar','add-tab'])$(id).onclick=openNewTabLauncher;
 $('new-tab-close').onclick=closeNewTabLauncher;
 newTabOverlay.onclick=e=>{if(e.target===newTabOverlay)closeNewTabLauncher();};
