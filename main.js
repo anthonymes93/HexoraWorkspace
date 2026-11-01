@@ -8,6 +8,7 @@ const fs=require('node:fs');
 const os=require('node:os');
 const {spawn}=require('node:child_process');
 let nativeCodeHost=null,nativeCodeActive=false,nativeCodeDetached=false;
+let tabStoreClosing=false;
 function nativeCodeCommand(message){const proc=nativeCodeHost;if(!proc||proc.exitCode!==null||proc.killed||proc.stdin?.destroyed||!proc.stdin?.writable)return false;try{proc.stdin.write(message+'\n',error=>{if(error&&error.code!=='EPIPE')console.error('[Native VS Code] stdin:',error.message);});return true;}catch(error){console.error('[Native VS Code] command failed:',error.message);return false;}}
 function nativeCodeBounds(){if(!win||win.isDestroyed()||!nativeCodeHost)return;const [w,h]=win.getContentSize();nativeCodeCommand('RECT '+sidebarWidth+' '+TOP_HEIGHT+' '+Math.max(0,w-sidebarWidth)+' '+Math.max(0,h-TOP_HEIGHT));}
 // Focus recovery is event-driven; avoid repeatedly stealing keyboard focus from VS Code.
@@ -205,6 +206,7 @@ const CHATGPT_DRAFT_GUARD=`(()=>{
 })();`;
 function originOf(url){try{return new URL(url).origin;}catch{return null;}}
 function rememberFavicon(tabId,pageUrl,iconUrl){
+ if(tabStoreClosing||quitting||!store)return;
  const origin=originOf(pageUrl);
  if(!origin||!/^https?:\/\//.test(origin)||!/^https?:\/\//.test(iconUrl))return;
  favicons.set(tabId,{url:iconUrl,origin});
@@ -217,14 +219,14 @@ function wire(t){const view=new WebContentsView({webPreferences:{partition:'pers
  if(chromeMode(t.id))wc.setUserAgent(chromeUserAgent(wc));
  view.setBackgroundColor('#111215');
  wc.on('did-fail-load',(_event,code,description,url,isMainFrame)=>{if(isMainFrame)console.error('[Hexora] Page load failed:',code,description,url);});
- const update=(title=false)=>{const row=store.get(t.id);if(!row)return;if(title)row.title=wc.getTitle()?.slice(0,100)||row.title;const url=wc.getURL();if(/^https?:/.test(url))row.url=url;store.save(toModel(row));emit();};
+ const update=(title=false)=>{if(tabStoreClosing||quitting)return;const row=store.get(t.id);if(!row)return;if(title)row.title=wc.getTitle()?.slice(0,100)||row.title;const url=wc.getURL();if(/^https?:/.test(url))row.url=url;store.save(toModel(row));emit();};
  wc.on('page-favicon-updated',(_event,icons)=>{
   const url=icons.find(candidate=>{try{const u=new URL(candidate);return ['https:','http:','data:'].includes(u.protocol);}catch{return false;}});
   if(url)rememberFavicon(t.id,wc.getURL(),url);
  });
- wc.on('page-title-updated',()=>{update(true);store.recordVisit(wc.getURL(),wc.getTitle(),t.id);});
- wc.on('did-navigate',()=>{if(favicons.get(t.id)?.origin!==originOf(wc.getURL()))favicons.delete(t.id);update();store.recordVisit(wc.getURL(),wc.getTitle(),t.id);});
- wc.on('did-navigate-in-page',()=>{update();store.recordVisit(wc.getURL(),wc.getTitle(),t.id);});
+ wc.on('page-title-updated',()=>{if(tabStoreClosing||quitting)return;update(true);store.recordVisit(wc.getURL(),wc.getTitle(),t.id);});
+ wc.on('did-navigate',()=>{if(tabStoreClosing||quitting)return;if(favicons.get(t.id)?.origin!==originOf(wc.getURL()))favicons.delete(t.id);update();store.recordVisit(wc.getURL(),wc.getTitle(),t.id);});
+ wc.on('did-navigate-in-page',()=>{if(tabStoreClosing||quitting)return;update();store.recordVisit(wc.getURL(),wc.getTitle(),t.id);});
  wc.on('did-start-loading',()=>{loading.set(t.id,true);emit();});
  wc.on('did-stop-loading',()=>{loading.delete(t.id);emit();});
  const draftKey='chatgptDraft:'+t.id;
@@ -804,6 +806,6 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
   emit();return true;
  });
  setInterval(sweep,60*1000).unref();
- win.on('closed',()=>{stopNativeCode();quitting=true;for(const folder of [...extensionPopups.keys()])closeExtensionPopup(folder);if(sidebarAnimation)clearInterval(sidebarAnimation);for(const popup of detached.values())if(!popup.isDestroyed())popup.close();detached.clear();clearInterval(recoveryTimer);recoveryPassword=null;clearTimeout(stateTimer);win=null;for(const id of Array.from(live.keys()))discard(id);vault?.lock();store.close();});
+ win.on('closed',()=>{stopNativeCode();quitting=true;for(const folder of [...extensionPopups.keys()])closeExtensionPopup(folder);if(sidebarAnimation)clearInterval(sidebarAnimation);for(const popup of detached.values())if(!popup.isDestroyed())popup.close();detached.clear();clearInterval(recoveryTimer);recoveryPassword=null;clearTimeout(stateTimer);win=null;for(const id of Array.from(live.keys()))discard(id);vault?.lock();tabStoreClosing=true;store.close();});
 });
 app.on('window-all-closed',()=>{if(process.platform!=='darwin')app.quit();});
