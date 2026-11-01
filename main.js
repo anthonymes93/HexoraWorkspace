@@ -406,7 +406,6 @@ function openRecoveryWindow(){
  recoveryWindow.on('closed',()=>{recoveryWindow=null;});
 }
 function sendPage(payload){const w=typeof payload?.workspace==='string'?payload.workspace:'web';const offset=Number.isSafeInteger(payload?.offset)?payload.offset:0;return state(w,offset);}
-if(hasSingleInstanceLock)
 function localEditorAddress(value){
  const u=new URL(String(value||'http://127.0.0.1:8080'));
  if(!['http:','https:'].includes(u.protocol)||!['localhost','127.0.0.1','[::1]'].includes(u.hostname)||u.username||u.password)throw Error('Use a local editor URL on localhost.');
@@ -432,6 +431,7 @@ async function toggleEditor(address){
  return {visible:true};
 }
 
+if(hasSingleInstanceLock)
 app.whenReady().then(()=>{
  const dataDir=app.getPath('userData');
  vault=new PasswordVault(dataDir);
