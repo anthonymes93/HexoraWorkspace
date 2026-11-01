@@ -187,3 +187,6 @@ body.reordering-tabs,body.reordering-tabs *{cursor:grabbing!important;user-selec
 /* Midpoint insertion preview while reordering tabs, distinct from stack glow. */
 .tabs .tab.tab-insert-before,.stack-tabs .tab.tab-insert-before{box-shadow:-3px 0 0 #b7a0ff!important}
 .tabs .tab.tab-insert-after,.stack-tabs .tab.tab-insert-after{box-shadow:3px 0 0 #b7a0ff!important}
+
+/* Normal arrow on tab hover; retain drag-and-drop interactions. */
+.tabs .tab,.tabs .tab *, .stack-tabs .tab,.stack-tabs .tab *{cursor:default!important}
