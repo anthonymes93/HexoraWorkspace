@@ -63,7 +63,7 @@ try {
    'RECT' {if($parts.Length -eq 5){$lastRect=@([int]$parts[1],[int]$parts[2],[Math]::Max(1,[int]$parts[3]),[Math]::Max(1,[int]$parts[4]));if(-not $detached){[void][HexoraNative]::SetWindowPos($child,[IntPtr]::Zero,$lastRect[0],$lastRect[1],$lastRect[2],$lastRect[3],0x0024)}}}
    'SHOW' {[void][HexoraNative]::ShowWindow($child,5);[HexoraNative]::FocusHosted($parent,$child)}
    'FOCUS' {[HexoraNative]::FocusHosted($parent,$child);Write-Output ('DIAG FOCUS '+[HexoraNative]::Diagnostic($child))}
-   'CHECK' {if(-not $detached -and [HexoraNative]::GetParent($child) -eq $parent -and [HexoraNative]::GetForegroundWindow() -eq $child){[HexoraNative]::FocusHosted($parent,$child);Write-Output ('DIAG REPAIRED '+[HexoraNative]::Diagnostic($child))}}
+   'CHECK' {if(-not $detached -and [HexoraNative]::IsWindow($child) -and [HexoraNative]::GetParent($child) -eq $parent -and [HexoraNative]::GetForegroundWindow() -eq $parent){$state=[HexoraNative]::Diagnostic($child);if($state -match ('focus='+$parent.ToInt64()+'(\s|$)')){[HexoraNative]::FocusHosted($parent,$child);Write-Output ('DIAG REPAIRED '+[HexoraNative]::Diagnostic($child))}}}
    'DIAG' {Write-Output ('DIAG '+($parts[1..($parts.Length-1)] -join ' ')+' '+[HexoraNative]::Diagnostic($child))}
    'HIDE' {[void][HexoraNative]::ShowWindow($child,0)}
    'DETACH' {if(-not $detached){[void][HexoraNative]::SetParent($child,[IntPtr]::Zero);[void][HexoraNative]::SetWindowLong($child,-16,$oldStyle);[void][HexoraNative]::SetWindowPos($child,[IntPtr]::Zero,120,120,1000,700,0x0024 -bor 0x0020);[void][HexoraNative]::ShowWindow($child,5);[HexoraNative]::Focus($child);$detached=$true;Write-Output ('DIAG DETACHED '+[HexoraNative]::Diagnostic($child));Write-Output 'DETACHED'}}
