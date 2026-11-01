@@ -395,6 +395,36 @@ function toggleUniversalSidebar(wc){
   };
   const label=el=>[el.getAttribute('aria-label'),el.getAttribute('title'),el.getAttribute('data-tooltip'),el.getAttribute('data-state'),el.textContent?.trim().slice(0,70)].filter(Boolean).join(' ').toLowerCase();
   const buttons=[...document.querySelectorAll('button,[role="button"]')].filter(visible);
+  // ChatGPT adapter: prefer its own sidebar control, preserving animations,
+  // state, and layout. The site may use icon-only buttons with test IDs.
+  if(['chatgpt.com','chat.openai.com'].includes(location.hostname)){
+   const candidates=buttons.filter(el=>{
+    const metadata=[el.getAttribute('data-testid'),el.getAttribute('aria-label'),el.getAttribute('title'),el.getAttribute('data-tooltip'),el.getAttribute('aria-controls')].filter(Boolean).join(' ').toLowerCase();
+    return /(?:sidebar|side-bar|side_panel|side-panel)/.test(metadata)&&/(?:toggle|open|close|collapse|expand|sidebar)/.test(metadata);
+   });
+   const preferred=candidates.filter(el=>/(?:toggle-sidebar|sidebar-toggle|open-sidebar|close-sidebar|sidebar-button)/i.test([el.getAttribute('data-testid'),el.getAttribute('aria-label'),el.getAttribute('title')].join(' ')));
+   const matches=preferred.length?preferred:candidates;
+   if(matches.length===1){
+    matches[0].click();
+    return {ok:true,action:'toggled',method:'chatgpt-native'};
+   }
+   // ChatGPT's icon-only sidebar control is typically in the top-left header.
+   // Use this only when exactly one plausible toggle is found.
+   const topLeft=buttons.filter(el=>{
+    const r=el.getBoundingClientRect();
+    if(r.left>Math.min(innerWidth*.38,540)||r.top>190||r.width<20||r.width>65||r.height<20||r.height>65)return false;
+    const svg=el.querySelector('svg');
+    if(!svg)return false;
+    const text=(el.innerText||'').trim();
+    if(text.length>2)return false;
+    const d=[...svg.querySelectorAll('path,rect,line')].map(n=>n.getAttribute('d')||'').join(' ');
+    return /sidebar/i.test([el.outerHTML.slice(0,700)].join(' '))||(/M3 3|M4 4/.test(d)&&svg.querySelectorAll('rect,line,path').length>=2);
+   });
+   if(topLeft.length===1){
+    topLeft[0].click();
+    return {ok:true,action:'toggled',method:'chatgpt-icon'};
+   }
+  }
   const sidebarWords=/(?:side\\s?bar|navigation panel|navigation menu|side panel)/i;
   const toggles=buttons.filter(el=>sidebarWords.test(label(el)) && /(?:toggle|open|close|hide|show|expand|collapse)/i.test(label(el)));
   if(toggles.length===1){
