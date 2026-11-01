@@ -3,6 +3,7 @@ const {app,BrowserWindow,WebContentsView,View,session,ipcMain,shell,dialog}=requ
 const path=require('node:path');
 const {screen}=require('electron');
 const {TabStore}=require('./tab-store');
+const {PasswordVault}=require('./password-vault');
 const fs=require('node:fs');
 const os=require('node:os');
 const {snapshot,stageRestore,applyPending,verifyBackup}=require('./recovery');
@@ -19,7 +20,7 @@ if(!hasSingleInstanceLock){
 const HOME='https://chatgpt.com/';
 const DETACHED_HEADER=44;
 let TOP_HEIGHT=120;const IDLE_MS=24*60*60*1000,MAX_LIVE=8;
-let recoveryWindow=null;
+let recoveryWindow=null,vault=null;
 const detached=new Map();
 let quitting=false;
 const LAYOUT_KEY='detachedWindowIds';
@@ -401,6 +402,7 @@ function openRecoveryWindow(){
 function sendPage(payload){const w=typeof payload?.workspace==='string'?payload.workspace:'web';const offset=Number.isSafeInteger(payload?.offset)?payload.offset:0;return state(w,offset);}
 if(hasSingleInstanceLock)app.whenReady().then(()=>{
  const dataDir=app.getPath('userData');
+ vault=new PasswordVault(dataDir);
  try{applyPending(dataDir);}catch(err){dialog.showErrorBox('Hexora restore could not be applied',err.message);}
  try{const prefs=JSON.parse(fs.readFileSync(path.join(dataDir,'hexora-recovery-config.json'),'utf8'));if(prefs.directory)recoveryDir=prefs.directory;}catch{}
  extensionConfigFile=path.join(dataDir,'hexora-extensions.json');
@@ -538,6 +540,13 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
   return {time:Date.now(),system:{totalMemory:os.totalmem(),freeMemory:os.freemem(),logicalCores:os.cpus().length},
    processes,tabs,liveTabs:live.size,savedTabs:store.total()};
  });
+ ipcMain.handle('vault:status',()=>vault.status());
+ ipcMain.handle('vault:unlock',(_e,password)=>vault.unlock(password));
+ ipcMain.handle('vault:lock',()=>{vault.lock();return true;});
+ ipcMain.handle('vault:list',()=>vault.list());
+ ipcMain.handle('vault:get',(_e,id)=>vault.get(id));
+ ipcMain.handle('vault:save',(_e,entry)=>vault.save(entry));
+ ipcMain.handle('vault:delete',(_e,id)=>vault.remove(id));
  ipcMain.handle('tabs:page',(_e,arg)=>sendPage(arg));
  ipcMain.handle('tabs:search',(_e,term)=>store.search(term,50).map(pageRow));
  ipcMain.handle('tabs:lookup',(_e,id)=>{const row=store.get(Number(id));return row?pageRow(row):null;});
@@ -649,6 +658,6 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
   emit();return true;
  });
  setInterval(sweep,60*1000).unref();
- win.on('closed',()=>{quitting=true;for(const folder of [...extensionPopups.keys()])closeExtensionPopup(folder);if(sidebarAnimation)clearInterval(sidebarAnimation);for(const popup of detached.values())if(!popup.isDestroyed())popup.close();detached.clear();clearInterval(recoveryTimer);recoveryPassword=null;clearTimeout(stateTimer);win=null;for(const id of Array.from(live.keys()))discard(id);store.close();});
+ win.on('closed',()=>{quitting=true;for(const folder of [...extensionPopups.keys()])closeExtensionPopup(folder);if(sidebarAnimation)clearInterval(sidebarAnimation);for(const popup of detached.values())if(!popup.isDestroyed())popup.close();detached.clear();clearInterval(recoveryTimer);recoveryPassword=null;clearTimeout(stateTimer);win=null;for(const id of Array.from(live.keys()))discard(id);vault?.lock();store.close();});
 });
 app.on('window-all-closed',()=>{if(process.platform!=='darwin')app.quit();});
