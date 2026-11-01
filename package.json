@@ -11,8 +11,5 @@
   },
   "devDependencies": {
     "electron": "^38.0.0"
-  },
-  "dependencies": {
-    "code-server": "^4.99.3"
   }
 }

@@ -2,7 +2,7 @@
 const {app,BrowserWindow,WebContentsView,View,session,ipcMain,shell,dialog,clipboard,safeStorage,Menu}=require('electron');
 const path=require('node:path');
 const {EditorSession,CAPABILITIES}=require('./integrations/code/editor-provider');
-const {LocalEditorRuntime}=require('./integrations/code/local-editor-runtime');
+
 const {screen}=require('electron');
 const {TabStore}=require('./tab-store');
 const {PasswordVault}=require('./password-vault');
@@ -29,7 +29,7 @@ const LAYOUT_KEY='detachedWindowIds';
 function savedDetachedIds(){try{const values=JSON.parse(store.getMeta(LAYOUT_KEY)||'[]');return Array.isArray(values)?values.filter(x=>Number.isSafeInteger(x)&&x>0).slice(0,32):[];}catch{return [];}}
 function setDetachedSaved(id,present){const ids=new Set(savedDetachedIds());if(present)ids.add(id);else ids.delete(id);store.setMeta(LAYOUT_KEY,JSON.stringify([...ids]));}
 let editorView=null,editorSession=null,editorVisible=false;
-const editorRuntime=new LocalEditorRuntime();
+
 let mainViewport=null,win,store,activeId=null,sidebarWidth=330,live=new Map(),favicons=new Map(),loading=new Map(),stateTimer=null,modalVisible=false,recoveryPassword=null,recoveryDir=null,recoveryTimer=null,recoveryBusy=false,lastBackup=null;
 const extensionPartition='persist:hexora-chatgpt';
 let extensionRecords=[],extensionLoaded=new Map(),extensionSession=null,extensionConfigFile=null;
@@ -419,15 +419,15 @@ async function toggleEditor(address){
   const current=live.get(activeId);if(current&&!modalVisible){mainViewport.addChildView(current);bounds();current.webContents.focus();}
   return {visible:false};
  }
- const url=address?localEditorAddress(address):await editorRuntime.start();
+ const url=address?localEditorAddress(address):null;
  if(!editorSession){
   editorSession=new EditorSession({id:'local-code-editor',capabilities:[CAPABILITIES.FOCUS,CAPABILITIES.EMBEDDED],
-   async start(){editorView=new WebContentsView({webPreferences:{sandbox:true,contextIsolation:true,nodeIntegration:false}});editorView.webContents.setWindowOpenHandler(()=>({action:'deny'}));await editorView.webContents.loadURL(url);},
+   async start(){editorView=new WebContentsView({webPreferences:{sandbox:false,contextIsolation:false,nodeIntegration:true}});editorView.webContents.setWindowOpenHandler(()=>({action:'deny'}));if(url)await editorView.webContents.loadURL(url);else await editorView.webContents.loadFile(path.join(__dirname,'integrations/code/editor.html'));},
    async stop(){if(editorView){mainViewport.removeChildView(editorView);editorView.webContents.close();editorView=null;}},
    async focus(){editorView.webContents.focus();}
   });
   try{await editorSession.start();}catch(e){await editorSession.stop();editorSession=null;throw Error('Local editor unavailable: '+e.message);}
- }else if(editorView.webContents.getURL()!==url)await editorView.webContents.loadURL(url);
+ }else if(url&&editorView.webContents.getURL()!==url)await editorView.webContents.loadURL(url);else if(!url&&!editorView.webContents.getURL().startsWith('file:'))await editorView.webContents.loadFile(path.join(__dirname,'integrations/code/editor.html'));
  for(const view of live.values())mainViewport.removeChildView(view);
  mainViewport.addChildView(editorView);editorVisible=true;bounds();editorView.webContents.focus();
  return {visible:true};
@@ -479,6 +479,8 @@ app.whenReady().then(()=>{
   if(!store.get(id)){setDetachedSaved(id,false);continue;}
   try{detachTab(id);}catch(err){console.error('Could not restore detached window',id,err);}
  }
+ ipcMain.handle('editor:file-open',async event=>{if(!editorView||event.sender!==editorView.webContents)throw Error('Invalid editor caller');const picked=await dialog.showOpenDialog(win,{properties:['openFile']});if(picked.canceled||!picked.filePaths[0])return null;const file=picked.filePaths[0];const stat=await fs.promises.stat(file);if(stat.size>5*1024*1024)throw Error('File exceeds 5 MB editor limit');return {path:file,text:await fs.promises.readFile(file,'utf8')};});
+ ipcMain.handle('editor:file-save',async(event,data)=>{if(!editorView||event.sender!==editorView.webContents)throw Error('Invalid editor caller');if(typeof data?.text!=='string'||Buffer.byteLength(data.text,'utf8')>5*1024*1024)throw Error('Invalid file contents');let file=data.path;if(!file){const picked=await dialog.showSaveDialog(win,{});if(picked.canceled||!picked.filePath)return null;file=picked.filePath;}if(typeof file!=='string'||!path.isAbsolute(file))throw Error('Invalid file path');await fs.promises.writeFile(file,data.text,'utf8');return {path:file};});
  ipcMain.handle('editor:toggle',async(event,address)=>{if(event.sender!==win.webContents)throw Error('Invalid caller');return toggleEditor(address);});
  ipcMain.handle('recovery:status',()=>({directory:recoveryDir,enabled:!!(recoveryDir&&recoveryPassword),lastBackup}));
  ipcMain.handle('recovery:configure',async(_e,password)=>{
@@ -810,6 +812,6 @@ app.whenReady().then(()=>{
   emit();return true;
  });
  setInterval(sweep,60*1000).unref();
- win.on('closed',()=>{editorRuntime.stop();if(editorView){editorView.webContents.close();editorView=null;}editorSession=null;editorVisible=false;quitting=true;for(const folder of [...extensionPopups.keys()])closeExtensionPopup(folder);if(sidebarAnimation)clearInterval(sidebarAnimation);for(const popup of detached.values())if(!popup.isDestroyed())popup.close();detached.clear();clearInterval(recoveryTimer);recoveryPassword=null;clearTimeout(stateTimer);win=null;for(const id of Array.from(live.keys()))discard(id);vault?.lock();store.close();});
+ win.on('closed',()=>{if(editorView){editorView.webContents.close();editorView=null;}editorSession=null;editorVisible=false;quitting=true;for(const folder of [...extensionPopups.keys()])closeExtensionPopup(folder);if(sidebarAnimation)clearInterval(sidebarAnimation);for(const popup of detached.values())if(!popup.isDestroyed())popup.close();detached.clear();clearInterval(recoveryTimer);recoveryPassword=null;clearTimeout(stateTimer);win=null;for(const id of Array.from(live.keys()))discard(id);vault?.lock();store.close();});
 });
 app.on('window-all-closed',()=>{if(process.platform!=='darwin')app.quit();});

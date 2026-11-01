@@ -1349,7 +1349,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&vaultOpen)vaultClos
 
 document.getElementById('editor-rail').addEventListener('click',async()=>{
  try{const state=await window.hexora.editor.toggle(localStorage.getItem('hexora-editor-url')||null);document.getElementById('editor-rail').classList.toggle('selected',state.visible);}
- catch(e){alert('Code editor: '+e.message+'\nCheck that the bundled editor runtime was installed successfully.');}
+ catch(e){alert('Code editor: '+e.message+'\nThe embedded editor could not start.');}
 });
 document.getElementById('editor-rail').addEventListener('contextmenu',e=>{
  e.preventDefault();const url=prompt('Local code editor URL',localStorage.getItem('hexora-editor-url')||'');
