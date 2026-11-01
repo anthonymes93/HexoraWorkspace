@@ -121,7 +121,7 @@ function render(p){
   if(p.tabs.slice(0,16).some(t=>t.id===item.id))el.addEventListener('pointerdown',beginTabPointerDrag);
   const name=document.createElement('span');name.className='name';name.textContent=(item.pinned?'◆ ':'')+(item.title||'ChatGPT');
   const close=document.createElement('span');close.className='close';close.textContent='×';close.onclick=e=>{e.stopPropagation();action('close',item.id);};
-  el.title=item.url;el.onclick=()=>action('activate',item.id);
+  el.title=item.url;el.onclick=()=>{stackRowsDismissed=false;selectedStackId=null;action('activate',item.id);};
   el.addEventListener('contextmenu',e=>{e.preventDefault();showTabMenu(e.clientX,e.clientY,item);});
   const pop=document.createElement('span');pop.className='close';pop.title='Detach tab into new window';pop.textContent='↗';pop.onclick=e=>{e.stopPropagation();action('detach',item.id);};
   el.append(name,pop,close);tabs.append(el);
@@ -181,9 +181,6 @@ function renderSecondTabRow(page){
  }else if(!stackRowsDismissed&&activeStack&&stacks.has(activeStack)){
   openStackPath=[];let node=stacks.get(activeStack),seen=new Set();
   while(node&&!seen.has(node.id)){seen.add(node.id);openStackPath.unshift(node.id);node=stacks.get(node.parent_id);}
- }else if(false&&selectedStackId&&stacks.has(selectedStackId)){
-  openStackPath=[];let node=stacks.get(selectedStackId),seen=new Set();
-  while(node&&!seen.has(node.id)){seen.add(node.id);openStackPath.unshift(node.id);node=stacks.get(node.parent_id);}
  }else openStackPath=[];
  for(let depth=0;depth<openStackPath.length;depth++){
   const stack=stacks.get(openStackPath[depth]);if(!stack)continue;
@@ -197,7 +194,7 @@ function renderSecondTabRow(page){
    el.dataset.tabId=String(id);el.dataset.stackId=String(stack.id);el.draggable=false;
    el.textContent=tab?.title||'Tab #'+id;el.title=tab?.url||'Open stacked tab';
    el.addEventListener('pointerdown',beginTabPointerDrag);
-   el.onclick=()=>action('activate',id);
+   el.onclick=()=>{stackRowsDismissed=false;selectedStackId=stack.id;action('activate',id);};
    tabs.append(el);
   }
   const close=document.createElement('button');close.className='stack-row-close';close.textContent='×';close.title='Hide stack rows';
