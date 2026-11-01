@@ -291,24 +291,47 @@ function paintNewTabSuggestions(){
   newTabSuggestions.append(item);
  });
 }
+// Site destinations are inferred from visited history; no independent site list.
+// Known app landing paths are only applied if that origin exists in history.
+function historyDestination(entry){
+ let parsed;try{parsed=new URL(entry.url);}catch{return null;}
+ if(!['http:','https:'].includes(parsed.protocol))return null;
+ const host=parsed.hostname.toLowerCase();
+ const cleanHost=host.replace(/^www\./,'');
+ const appLanding={'gemini.google.com':'/app','chatgpt.com':'/','chat.openai.com':'/','app.notion.com':'/'};
+ const path=appLanding[cleanHost]||'/';
+ const origin=parsed.origin;
+ // Search pages are not the destination site (e.g. a Google search for Gemini).
+ const title=entry.title||cleanHost;
+ const label=cleanHost==='gemini.google.com'?'Google Gemini':cleanHost==='chatgpt.com'||cleanHost==='chat.openai.com'?'ChatGPT':title;
+ return {url:origin+path,title:label,domain:cleanHost,sourceTitle:title,sourceUrl:entry.url};
+}
 async function updateNewTabSuggestions(){
  const request=++newTabHistoryRequest,query=newTabAddress.value.trim().toLowerCase();
  if(!query||newTabOverlay.classList.contains('hidden')){newTabHistoryMatches=[];hideNewTabSuggestions();return;}
  try{
-  // Fetch afresh on every input, so clearing history elsewhere cannot leave
-  // a stale cached list in the address bar.
   const entries=await action('history-list',{limit:500});
   if(request!==newTabHistoryRequest||newTabOverlay.classList.contains('hidden'))return;
-  const seen=new Set();
-  newTabHistoryMatches=(Array.isArray(entries)?entries:[]).filter(entry=>{
-   if(!entry||typeof entry.url!=='string')return false;
-   let parsed;try{parsed=new URL(entry.url);}catch{return false;}
-   if(!['http:','https:'].includes(parsed.protocol))return false;
-   const match=[entry.title,entry.url,entry.domain,parsed.hostname].filter(Boolean).join(' ').toLowerCase().includes(query);
-   if(!match||seen.has(entry.url))return false;
-   seen.add(entry.url);return true;
-  }).slice(0,8);
-  newTabHistorySelected=-1;paintNewTabSuggestions();
+  const groups=new Map();
+  for(const entry of (Array.isArray(entries)?entries:[])){
+   if(!entry||typeof entry.url!=='string')continue;
+   const dest=historyDestination(entry);if(!dest)continue;
+   // Match against the website identity, not a long tracking URL or an
+   // unrelated Google search query. This avoids spurious search results.
+   const identity=[dest.title,dest.domain,entry.domain].filter(Boolean).join(' ').toLowerCase();
+   if(!identity.includes(query))continue;
+   const key=dest.domain;
+   if(!groups.has(key))groups.set(key,{...dest,score:0});
+   const group=groups.get(key);
+   const hostMatch=dest.domain.startsWith(query)?5:dest.domain.includes(query)?3:0;
+   const titleMatch=dest.title.toLowerCase().startsWith(query)?4:0;
+   group.score=Math.max(group.score,hostMatch+titleMatch);
+   if(dest.title.length<group.title.length)group.title=dest.title;
+  }
+  newTabHistoryMatches=[...groups.values()].sort((a,b)=>b.score-a.score||a.domain.localeCompare(b.domain)).slice(0,8);
+  // Default Enter opens the best matching site, without requiring arrow keys.
+  newTabHistorySelected=newTabHistoryMatches.length?0:-1;
+  paintNewTabSuggestions();
  }catch{if(request===newTabHistoryRequest){newTabHistoryMatches=[];hideNewTabSuggestions();}}
 }
 newTabAddress.addEventListener('input',updateNewTabSuggestions);
