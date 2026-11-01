@@ -344,6 +344,11 @@ async function updateNewTabSuggestions(){
    // Preserve exact history destination, including search query parameters.
    // Display only a readable label; never replace a search with a homepage.
    const pageTitle=String(entry.title||'').trim();
+   // App routes, session IDs, and tracking URLs are variations of the same
+   // destination. Keep one canonical app suggestion, not multiple history rows.
+   // Search results on another domain (e.g. Google Search) remain exact pages.
+   const appDomains=new Set(['gemini.google.com','chatgpt.com','chat.openai.com','app.notion.com']);
+   if(appDomains.has(dest.domain))continue;
    if(pageTitle.toLowerCase().includes(query)&&entry.url!==dest.url&&!pages.has(entry.url))
     pages.set(entry.url,{url:entry.url,title:pageTitle,domain:dest.domain,kind:'history'});
   }
