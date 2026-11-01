@@ -289,9 +289,16 @@ function learnSmartChoice(entry,query){
  saveSmartState(state);
 }
 function hideNewTabSuggestions(){newTabSuggestions.hidden=true;newTabSuggestions.replaceChildren();newTabHistorySelected=-1;}
+function smartIsAddress(raw){
+ const value=String(raw||'').trim();
+ return /^(https?:\/\/|localhost(?::\d+)?(?:[/?#]|$)|(?:[a-z0-9-]+\.)+[a-z]{2,}(?::\d+)?(?:[/?#]|$))/i.test(value);
+}
+function smartGoogleUrl(query){return 'https://www.google.com/search?q='+encodeURIComponent(String(query||'').trim());}
+function smartSearchGoogle(){const q=newTabAddress.value.trim();if(q)return launchNewTab(smartGoogleUrl(q),'Google Search: '+q);}
+function smartOpenTyped(){const q=newTabAddress.value.trim();if(!q)return;if(smartIsAddress(q))return launchNewTab(q);return smartSearchGoogle();}
 function paintNewTabSuggestions(){
  newTabSuggestions.replaceChildren();
- newTabSuggestions.hidden=!newTabHistoryMatches.length;
+ newTabSuggestions.hidden=!newTabHistoryMatches.length&&!newTabAddress.value.trim();
  newTabHistoryMatches.forEach((entry,index)=>{
   const row=document.createElement('div');row.className='new-tab-suggestion-row '+(entry.kind==='site'?'new-tab-primary':'new-tab-secondary')+(index===newTabHistorySelected?' is-active':'');
   const item=document.createElement('button');item.type='button';item.className='new-tab-suggestion';
@@ -307,6 +314,13 @@ function paintNewTabSuggestions(){
   remove.onclick=()=>confirmSmartDismiss(entry);
   row.append(item,remove);newTabSuggestions.append(row);
  });
+ const q=newTabAddress.value.trim();
+ if(q&&!smartIsAddress(q)){
+  const search=document.createElement('button');search.type='button';search.className='new-tab-google-search';
+  const icon=document.createElement('span');icon.textContent='⌕';icon.setAttribute('aria-hidden','true');
+  const label=document.createElement('span');label.textContent='Search Google for “'+q+'”';
+  search.append(icon,label);search.onclick=smartSearchGoogle;newTabSuggestions.append(search);
+ }
 }
 function openSmartSuggestion(entry){learnSmartChoice(entry,newTabAddress.value);return launchNewTab(entry.url,entry.title);}
 function confirmSmartDismiss(entry){
@@ -364,10 +378,11 @@ async function updateNewTabSuggestions(){
   const secondary=ranked.filter(x=>x.kind==='history');
   newTabHistoryMatches=[...primary,...secondary].slice(0,8);
   newTabHistorySelected=newTabHistoryMatches.length?0:-1;paintNewTabSuggestions();
- }catch{if(request===newTabHistoryRequest){newTabHistoryMatches=[];hideNewTabSuggestions();}}
+ }catch{if(request===newTabHistoryRequest){newTabHistoryMatches=[];newTabHistorySelected=-1;paintNewTabSuggestions();}}
 }
 newTabAddress.addEventListener('input',updateNewTabSuggestions);
 newTabAddress.addEventListener('keydown',e=>{
+ if(e.key==='Enter'&&e.ctrlKey){e.preventDefault();e.stopPropagation();smartSearchGoogle();return;}
  if(e.key==='ArrowDown'||e.key==='ArrowUp'){
   if(!newTabHistoryMatches.length)return;
   e.preventDefault();newTabHistorySelected=(newTabHistorySelected+(e.key==='ArrowDown'?1:-1)+newTabHistoryMatches.length)%newTabHistoryMatches.length;paintNewTabSuggestions();
@@ -445,7 +460,7 @@ $('new-tab-save-shortcut').onclick=()=>{
 for(const id of ['new','new-rail','new-sidebar','add-tab'])$(id).onclick=openNewTabLauncher;
 $('new-tab-close').onclick=closeNewTabLauncher;
 newTabOverlay.onclick=e=>{if(e.target===newTabOverlay)closeNewTabLauncher();};
-$('new-tab-form').onsubmit=e=>{e.preventDefault();const entry=newTabHistorySelected>=0?newTabHistoryMatches[newTabHistorySelected]:null;entry?openSmartSuggestion(entry):launchNewTab(newTabAddress.value);};
+$('new-tab-form').onsubmit=e=>{e.preventDefault();const entry=newTabHistorySelected>=0?newTabHistoryMatches[newTabHistorySelected]:null;entry?openSmartSuggestion(entry):smartOpenTyped();};
 $('new-tab-chatgpt').onclick=()=>action('new',activeWorkspace).then(closeNewTabLauncher).catch(e=>newTabError.textContent=e.message);
 for(const el of document.querySelectorAll('[data-new-tab-url]'))el.addEventListener('click',()=>launchNewTab(el.dataset.newTabUrl,el.dataset.newTabTitle));
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!newTabOverlay.classList.contains('hidden'))closeNewTabLauncher();});
