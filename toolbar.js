@@ -171,7 +171,7 @@ function renderTabRow(host,page,parentId){
  }
  for(const stack of children){
   const anchor=page.tabs.find(t=>t.id===stack.anchor_tab_id);
-  items.push({type:'stack',id:stack.id,stack,ordinal:anchor?.ordinal||0});
+  items.push({type:'stack',id:stack.id,stack,ordinal:stack.ordinal||anchor?.ordinal||0});
  }
  items.sort((a,b)=>b.ordinal-a.ordinal||a.id-b.id);
  for(const item of items){
@@ -381,8 +381,17 @@ window.addEventListener('pointerup',async e=>{
   }else if(d.type==='tab'&&drop.parent!==((d.row.dataset.stackId&&Number(d.row.dataset.stackId))||null)){
    await action('stack-assign',{tabId:d.id,stackId:drop.parent});
    selectedStackId=drop.parent;stackRowsDismissed=drop.parent===null;
+  }else if(drop.kind==='between'||drop.kind==='end'){
+   const nodes=[...drop.parent===null?$('tabs').children:document.querySelector('.stack-tabs[data-stack-id="'+drop.parent+'"]').children];
+   const key=el=>el.dataset.stackContainerId?'s:'+el.dataset.stackContainerId:'t:'+el.dataset.tabId;
+   const id=d.type==='stack'?'s:'+d.id:'t:'+d.id;
+   const order=nodes.map(key).filter(x=>x!==id);
+   let index=drop.target?order.indexOf(key(drop.target)):-1;
+   if(index<0)index=order.length;
+   else if(drop.after)index++;
+   order.splice(index,0,id);
+   await action('reorder-row',{workspace:d.workspace,parentId:drop.parent,items:order});
   }
-  // Ordering will be separately persisted by the stable row-order action.
   await refresh();
  }catch(err){console.error('Tab drop failed',err);alert('Could not move tab: '+err.message);await refresh();}
  finally{dropSaving=false;}
