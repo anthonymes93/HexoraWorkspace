@@ -1010,7 +1010,9 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
    if(action==='copy-tab-link'){const tab=store.get(Number(arg));if(!tab)throw Error('This tab no longer exists.');const link=tabLink(tab.workspace,tab.id);clipboard.writeText(link);win.webContents.send('deep-link:copied','Tab link copied');return link;}
   const current=store.get(activeId);const wc=live.get(activeId)?.webContents;
   if(action==='notion-sidebar-demo'){
-   if(!current||!/^https:\/\/(?:www\.)?notion\.(?:so|com)\//i.test(current.url))return {ok:false,reason:'Select a Notion tab first.'};
+   const notionUrl=wc&&!wc.isDestroyed()?wc.getURL():current?.url;
+   let notionHost='';try{const parsed=new URL(notionUrl);if(parsed.protocol==='https:')notionHost=parsed.hostname.toLowerCase();}catch{}
+   if(!current||!['notion.so','www.notion.so','notion.com','www.notion.com','app.notion.com'].includes(notionHost))return {ok:false,reason:'Select a Notion tab first.'};
    if(!wc||wc.isDestroyed())return {ok:false,reason:'Notion tab is not loaded.'};
    const result=awaitNotionSidebarDemo(wc);
    return result;
