@@ -209,13 +209,17 @@ function queueSidebarResize(width){
 sidebarGrip.addEventListener('pointerdown',event=>{
  if(event.button!==0)return;
  event.preventDefault();
- sidebarDrag={pointerId:event.pointerId,last:clampSidebarWidth(event.clientX)};
+ sidebarDrag={pointerId:event.pointerId,last:clampSidebarWidth(event.clientX),previousX:event.clientX,previousTime:performance.now()};
  sidebarGrip.setPointerCapture(event.pointerId);
  document.body.classList.add('resizing-sidebar');
 });
 sidebarGrip.addEventListener('pointermove',event=>{
  if(!sidebarDrag||sidebarDrag.pointerId!==event.pointerId)return;
+ const now=performance.now(),elapsed=Math.max(1,now-sidebarDrag.previousTime);
+ const speed=Math.abs(event.clientX-sidebarDrag.previousX)/elapsed;
+ sidebarDrag.previousX=event.clientX;sidebarDrag.previousTime=now;
  sidebarDrag.last=clampSidebarWidth(event.clientX);
+ if(speed>0.85)sidebarFastDrag=true;
  queueSidebarResize(sidebarDrag.last);
 });
 async function endSidebarResize(event){
@@ -226,6 +230,8 @@ async function endSidebarResize(event){
  if(sidebarGrip.hasPointerCapture(event.pointerId))sidebarGrip.releasePointerCapture(event.pointerId);
  await queueSidebarResize(last);
  await action('sidebar-resize-save');
+ sidebarFastDrag=false;
+ applySidebarBreakpoint(last);
  sidebarOpen=last>65;
 }
 sidebarGrip.addEventListener('pointerup',endSidebarResize);
@@ -889,6 +895,14 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'){hideTabRowMenu();hi
 
 // The main process owns one animation timeline for both the native browser view and the toolbar layout.
 let sidebarWasAnimating=false;
+let sidebarFastDrag=false;
+function applySidebarBreakpoint(value){
+ const body=document.body,root=document.documentElement;
+ body.classList.toggle('panel-collapsed',value<=65);
+ body.classList.toggle('sidebar-icons-only',value>65&&value<=184);
+ body.classList.toggle('sidebar-icons-grid',value>=146&&value<=184);
+ root.style.setProperty('--hexora-sidebar-fluid',String(Math.max(0,Math.min(1,(value-240)/95))));
+}
 window.hexora.onSidebarFrame((width,transitioning=false,target=null)=>{
  const value=Math.max(64,Math.min(560,width));
  const root=document.documentElement,body=document.body;
@@ -911,10 +925,7 @@ window.hexora.onSidebarFrame((width,transitioning=false,target=null)=>{
  if(!sidebarDrag)sidebarOpen=value>65;
  if(!transitioning){
   body.classList.remove('sidebar-auto-transition','sidebar-transition-icons');
-  body.classList.toggle('panel-collapsed',value<=65);
-  body.classList.toggle('sidebar-icons-only',value>65&&value<=184);
-  body.classList.toggle('sidebar-icons-grid',value>=146&&value<=184);
-  root.style.setProperty('--hexora-sidebar-fluid',String(Math.max(0,Math.min(1,(value-240)/95))));
+  if(!sidebarFastDrag)applySidebarBreakpoint(value);
  }else{
   body.classList.remove('panel-collapsed');
   body.classList.toggle('sidebar-icons-only',body.classList.contains('sidebar-transition-icons'));
