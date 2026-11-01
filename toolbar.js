@@ -959,7 +959,6 @@ window.hexora.onSidebarFrame((width,transitioning=false,target=null)=>{
 let workspaceMenuId=null;
 function hideWorkspaceMenu(){
  $('workspace-context-menu').classList.add('hidden');workspaceMenuId=null;
- action('modal',false);
 }
 function showWorkspaceMenu(e,w){
  e.preventDefault();e.stopPropagation();
@@ -969,11 +968,12 @@ function showWorkspaceMenu(e,w){
  $('workspace-context-name').textContent=w.name;
  const count=currentPage?.counts.find(x=>x.workspace===w.id)?.count||0;
  $('workspace-context-count').textContent=count+' saved '+(count===1?'tab':'tabs');
+ // Position the menu in the toolbar header area so it is never clipped by the native website view.
+ document.body.append(menu);
  menu.classList.remove('hidden');
  const rect=menu.getBoundingClientRect();
  menu.style.left=Math.max(67,Math.min(e.clientX,window.innerWidth-rect.width-12))+'px';
  menu.style.top=Math.max(15,Math.min(e.clientY,window.innerHeight-rect.height-12))+'px';
- action('modal',true);
 }
 $('workspace-context-open').onclick=async()=>{
  const id=workspaceMenuId;if(!id)return;hideWorkspaceMenu();
