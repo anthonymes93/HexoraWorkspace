@@ -272,6 +272,55 @@ function updateSidebar(persist=true){action('sidebar',!sidebarOpen);if(persist&&
 // New Tab launcher: explicit choices, no surprise navigation or new tab until selection.
 const newTabOverlay=$('new-tab-overlay'),newTabAddress=$('new-tab-address'),newTabError=$('new-tab-error');
 const newTabCustomKey='hexora:new-tab-shortcuts:v1';
+// Address suggestions are derived from Hexora's history, never persisted separately.
+let newTabHistoryMatches=[],newTabHistorySelected=-1,newTabHistoryRequest=0;
+const newTabSuggestions=$('new-tab-suggestions');
+function hideNewTabSuggestions(){newTabSuggestions.hidden=true;newTabSuggestions.replaceChildren();newTabHistorySelected=-1;}
+function paintNewTabSuggestions(){
+ newTabSuggestions.replaceChildren();
+ newTabSuggestions.hidden=!newTabHistoryMatches.length;
+ newTabHistoryMatches.forEach((entry,index)=>{
+  const item=document.createElement('button');item.type='button';item.className='new-tab-suggestion';
+  item.setAttribute('role','option');item.setAttribute('aria-selected',String(index===newTabHistorySelected));
+  if(index===newTabHistorySelected)item.classList.add('selected');
+  const title=document.createElement('strong');title.textContent=entry.title||entry.domain||entry.url;
+  const url=document.createElement('span');url.textContent=entry.url;
+  item.append(title,url);
+  item.addEventListener('mousedown',e=>e.preventDefault());
+  item.onclick=()=>launchNewTab(entry.url,entry.title);
+  newTabSuggestions.append(item);
+ });
+}
+async function updateNewTabSuggestions(){
+ const request=++newTabHistoryRequest,query=newTabAddress.value.trim().toLowerCase();
+ if(!query||newTabOverlay.classList.contains('hidden')){newTabHistoryMatches=[];hideNewTabSuggestions();return;}
+ try{
+  // Fetch afresh on every input, so clearing history elsewhere cannot leave
+  // a stale cached list in the address bar.
+  const entries=await action('history-list',{limit:500});
+  if(request!==newTabHistoryRequest||newTabOverlay.classList.contains('hidden'))return;
+  const seen=new Set();
+  newTabHistoryMatches=(Array.isArray(entries)?entries:[]).filter(entry=>{
+   if(!entry||typeof entry.url!=='string')return false;
+   let parsed;try{parsed=new URL(entry.url);}catch{return false;}
+   if(!['http:','https:'].includes(parsed.protocol))return false;
+   const match=[entry.title,entry.url,entry.domain,parsed.hostname].filter(Boolean).join(' ').toLowerCase().includes(query);
+   if(!match||seen.has(entry.url))return false;
+   seen.add(entry.url);return true;
+  }).slice(0,8);
+  newTabHistorySelected=-1;paintNewTabSuggestions();
+ }catch{if(request===newTabHistoryRequest){newTabHistoryMatches=[];hideNewTabSuggestions();}}
+}
+newTabAddress.addEventListener('input',updateNewTabSuggestions);
+newTabAddress.addEventListener('keydown',e=>{
+ if(e.key==='ArrowDown'||e.key==='ArrowUp'){
+  if(!newTabHistoryMatches.length)return;
+  e.preventDefault();newTabHistorySelected=(newTabHistorySelected+(e.key==='ArrowDown'?1:-1)+newTabHistoryMatches.length)%newTabHistoryMatches.length;paintNewTabSuggestions();
+ }else if(e.key==='Enter'&&newTabHistorySelected>=0&&newTabHistoryMatches[newTabHistorySelected]){
+  e.preventDefault();const entry=newTabHistoryMatches[newTabHistorySelected];launchNewTab(entry.url,entry.title);
+ }else if(e.key==='Escape'&&!newTabSuggestions.hidden){e.stopPropagation();e.preventDefault();hideNewTabSuggestions();}
+});
+
 function newTabSavedLinks(){try{const x=JSON.parse(localStorage.getItem(newTabCustomKey)||'[]');return Array.isArray(x)?x.filter(y=>typeof y.url==='string'&&typeof y.title==='string').slice(0,24):[];}catch{return [];}}
 function renderNewTabCustomLinks(){
  const host=$('new-tab-custom-links');host.replaceChildren();
@@ -304,10 +353,11 @@ async function renderNewTabRecent(){
   if(!seen.size)host.textContent='Recently visited websites will appear here.';
  }catch{host.textContent='Recent websites unavailable.';}
 }
-function closeNewTabLauncher(){newTabOverlay.classList.add('hidden');action('modal',false);}
+function closeNewTabLauncher(){++newTabHistoryRequest;newTabHistoryMatches=[];hideNewTabSuggestions();newTabOverlay.classList.add('hidden');action('modal',false);}
 function openNewTabLauncher(){
  newTabError.textContent='';
  newTabAddress.value='';
+ newTabHistoryMatches=[];hideNewTabSuggestions();
  newTabOverlay.classList.remove('hidden');
  action('modal',true);
  newTabAddress.focus();
@@ -339,7 +389,7 @@ $('new-tab-save-shortcut').onclick=()=>{
 for(const id of ['new','new-rail','new-sidebar','add-tab'])$(id).onclick=openNewTabLauncher;
 $('new-tab-close').onclick=closeNewTabLauncher;
 newTabOverlay.onclick=e=>{if(e.target===newTabOverlay)closeNewTabLauncher();};
-$('new-tab-form').onsubmit=e=>{e.preventDefault();launchNewTab(newTabAddress.value);};
+$('new-tab-form').onsubmit=e=>{e.preventDefault();const entry=newTabHistorySelected>=0?newTabHistoryMatches[newTabHistorySelected]:null;launchNewTab(entry?entry.url:newTabAddress.value,entry?.title);};
 $('new-tab-chatgpt').onclick=()=>action('new',activeWorkspace).then(closeNewTabLauncher).catch(e=>newTabError.textContent=e.message);
 for(const el of document.querySelectorAll('[data-new-tab-url]'))el.addEventListener('click',()=>launchNewTab(el.dataset.newTabUrl,el.dataset.newTabTitle));
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!newTabOverlay.classList.contains('hidden'))closeNewTabLauncher();});
