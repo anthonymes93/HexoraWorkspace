@@ -15,7 +15,8 @@
     "test:project-picker": "node --test scripts/test-project-picker.cjs",
     "test:project-picker-ui": "node --check project-picker.js && node --check toolbar.js && node --check main.js",
     "test:taskbar": "node --test scripts/test-taskbar-identity.cjs",
-    "test:links": "node --test scripts/test-deep-links.cjs"
+    "test:links": "node --test scripts/test-deep-links.cjs",
+    "test:integration": "node --test scripts/test-integration-wiring.cjs"
   },
   "devDependencies": {
     "electron": "^38.0.0"
