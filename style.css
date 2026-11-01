@@ -271,3 +271,9 @@ body.reordering-tabs,body.reordering-tabs *{cursor:grabbing!important;user-selec
 :root .tab-context-menu .tab-menu-featured{background:var(--hx-accent-soft);border-color:var(--hx-accent-border)}
 :root .tab-menu-featured .menu-glyph{color:var(--hx-accent)}
 :root button:focus-visible,:root input:focus-visible{outline-color:var(--hx-accent)}
+
+
+/* Reorderable sidebar entries: restrained grab affordance and drop indicator. */
+#workspaces>.workspace[draggable="true"],#conversations>.chat-row[draggable="true"]{cursor:grab;user-select:none}
+#workspaces>.workspace.sidebar-dragging,#conversations>.chat-row.sidebar-dragging{opacity:.38;cursor:grabbing}
+#workspaces>.workspace.sidebar-drop-target,#conversations>.chat-row.sidebar-drop-target{outline:1px solid var(--hx-accent-border,#ad95ff75);outline-offset:-1px;background:var(--hx-accent-soft,#ad95ff24);box-shadow:inset 3px 0 var(--hx-accent,#ad95ff)}
