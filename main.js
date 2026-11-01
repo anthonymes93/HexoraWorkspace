@@ -204,7 +204,7 @@ function rememberFavicon(tabId,pageUrl,iconUrl){
  emit();
 }
 
-function wire(t){const view=new WebContentsView({webPreferences:{partition:'persist:hexora-chatgpt',sandbox:true,contextIsolation:true,nodeIntegration:false,webSecurity:true,javascript:true}});const wc=view.webContents;
+function wire(t){const view=new WebContentsView({webPreferences:{partition:'persist:hexora-chatgpt',preload:path.join(__dirname,'site-vault-preload.js'),sandbox:true,contextIsolation:true,nodeIntegration:false,webSecurity:true,javascript:true}});const wc=view.webContents;
  wc.setAudioMuted(!!t.muted);
  if(chromeMode(t.id))wc.setUserAgent(chromeUserAgent(wc));
  view.setBackgroundColor('#111215');
@@ -539,6 +539,31 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
   });
   return {time:Date.now(),system:{totalMemory:os.totalmem(),freeMemory:os.freemem(),logicalCores:os.cpus().length},
    processes,tabs,liveTabs:live.size,savedTabs:store.total()};
+ });
+
+ function verifiedSite(sender){
+  const match=[...live.values()].some(view=>view.webContents===sender);
+  if(!match)throw Error('Autofill is available only in Hexora website tabs.');
+  const url=new URL(sender.getURL());
+  if(url.protocol!=='https:')throw Error('Autofill requires HTTPS.');
+  return url;
+ }
+ ipcMain.handle('vault:site-suggestions',event=>{
+  const site=verifiedSite(event.sender);
+  if(vault.status().locked)return{locked:true,entries:[]};
+  const entries=vault.list().filter(item=>{
+   try{const saved=new URL(item.site);return saved.protocol==='https:'&&saved.hostname===site.hostname;}catch{return false;}
+  });
+  return{locked:false,entries};
+ });
+ ipcMain.handle('vault:site-fill',async(event,id)=>{
+  const sender=event.sender,site=verifiedSite(sender);
+  if(vault.status().locked)throw Error('Unlock the vault first.');
+  const entry=vault.get(id),saved=new URL(entry.site);
+  if(saved.protocol!=='https:'||saved.hostname!==site.hostname)throw Error('The login belongs to a different website.');
+  const values=JSON.stringify({username:entry.username,password:entry.password});
+  const fill='(()=>{const c='+values+';const visible=e=>e.getClientRects().length&&!e.disabled&&!e.readOnly;const all=[...document.querySelectorAll("input")].filter(visible);const pass=all.find(e=>e.type==="password");if(!pass)return{filled:false,reason:"No visible password field."};const user=all.find(e=>e!==pass&&["email","text","tel"].includes(e.type)&&/user|email|login|account/i.test([e.name,e.id,e.placeholder,e.autocomplete].join(" ")))||all.find(e=>e!==pass&&["email","text"].includes(e.type));const set=(el,value)=>{if(!el)return;const descriptor=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,"value");descriptor.set.call(el,value);el.dispatchEvent(new Event("input",{bubbles:true}));el.dispatchEvent(new Event("change",{bubbles:true}));};set(user,c.username);set(pass,c.password);return{filled:true,username:!!user};})()';
+  return sender.executeJavaScriptInIsolatedWorld(1001,[{code:fill}],true);
  });
  ipcMain.handle('vault:status',()=>vault.status());
  ipcMain.handle('vault:unlock',(_e,password)=>vault.unlock(password));
