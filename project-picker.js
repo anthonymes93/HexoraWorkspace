@@ -215,8 +215,27 @@
   // Code tab; otherwise the first SHOW can be swallowed by modalVisible.
   window.hexora.action('modal',false).catch(()=>{}).finally(()=>{if(resolve)resolve(value);});
  }
- function openSelected(){if(!loading&&selected)close(selected);}
+ function openSelected(){
+  if(loading||!opened)return;
+  // This is the actual editable address bar, not a cosmetic breadcrumb.
+  // Clicking Open Project should use newly typed/pasted paths even if the
+  // user hasn't clicked Go to browse that location.
+  const typed=q('hpp-path').value.trim();
+  if(!typed){error('Enter a folder path or select a folder.');return;}
+  const openButton=q('hpp-open');
+  openButton.disabled=true;
+  window.hexora.codePicker.validate(typed).then(folder=>{
+   if(opened)close(folder);
+  }).catch(e=>{
+   if(opened){error('Folder not found: '+e.message);openButton.disabled=false;q('hpp-path').focus();}
+  });
+ }
  function onKeydown(event){
+  // Prevent global Hexora shortcuts from interrupting typed folder paths.
+  event.stopPropagation();
+  if(event.ctrlKey&&event.key.toLowerCase()==='l'){
+   event.preventDefault();q('hpp-path').focus();q('hpp-path').select();return;
+  }
   if(event.key==='Escape'){
    event.preventDefault();
    if(!q('hpp-path-form').classList.contains('hidden'))q('hpp-path-form').classList.add('hidden');
@@ -242,12 +261,25 @@
  q('hpp-back').onclick=()=>goHistory(-1);
  q('hpp-forward').onclick=()=>goHistory(1);
  q('hpp-up').onclick=()=>where?navigate(parent(where)):null;
- q('hpp-edit-path').onclick=()=>{
-  const form=q('hpp-path-form');form.classList.toggle('hidden');
-  if(!form.classList.contains('hidden')){q('hpp-path').value=where||home;q('hpp-path').focus();q('hpp-path').select();}
- };
+ q('hpp-edit-path').onclick=()=>{q('hpp-path').focus();q('hpp-path').select();};
+ q('hpp-path').addEventListener('focus',()=>{
+  // Native child HWNDs can retain OS keyboard focus after showing an
+  // Electron overlay. Explicitly return focus to Hexora before typing.
+  window.hexora.codePicker.focus().catch(()=>{});
+ });
+ q('hpp-path').addEventListener('input',()=>{
+  selected=null;
+  q('hpp-open').disabled=!q('hpp-path').value.trim();
+  q('hpp-hint').textContent='Enter to browse · Open Project to select this folder';
+ });
  q('hpp-path-form').onsubmit=event=>{event.preventDefault();navigate(q('hpp-path').value);};
- q('hpp-search-input').oninput=renderRows;
+ q('hpp-search-input').oninput=()=>{
+  if(mode!=='browse'){renderRows();return;}
+  clearTimeout(searchTimer);
+  searchTimer=setTimeout(()=>{
+   if(opened&&where)navigate(where,false,q('hpp-search-input').value.trim());
+  },190);
+ };
  root.addEventListener('pointerdown',event=>{if(event.target===root)close(null);});
 
  async function open(){
