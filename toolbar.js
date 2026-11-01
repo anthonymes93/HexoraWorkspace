@@ -232,11 +232,12 @@ async function renameStack(stack){
 function attachFaviconMarquee(img,tab){
  if(img.dataset.marqueeBound)return;
  img.dataset.marqueeBound='1';
- let raf=0,last=0,hold=0;
+ let raf=0,last=0,hold=0,expanded=false;
  const stop=()=>{
   cancelAnimationFrame(raf);raf=0;last=0;hold=0;
   const title=tab.querySelector('.tab-title-lines > .name');
   if(title)title.scrollLeft=0;
+  if(expanded){tab.style.width='';tab.style.minWidth='';tab.style.maxWidth='';expanded=false;}
  };
  const tick=now=>{
   const title=tab.querySelector('.tab-title-lines > .name');
@@ -244,7 +245,7 @@ function attachFaviconMarquee(img,tab){
   const limit=title.scrollWidth-title.clientWidth;
   if(limit<=1){stop();return;}
   const elapsed=last?Math.min((now-last)/1000,.05):0;last=now;
-  if(hold>0){hold-=elapsed;}
+  if(hold>0)hold-=elapsed;
   else{
    title.scrollLeft=Math.min(limit,title.scrollLeft+105*elapsed);
    if(title.scrollLeft>=limit-1){hold=.65;title.scrollLeft=limit;}
@@ -252,7 +253,24 @@ function attachFaviconMarquee(img,tab){
   if(hold<=0&&title.scrollLeft>=limit-1){title.scrollLeft=0;hold=.3;}
   raf=requestAnimationFrame(tick);
  };
- img.addEventListener('mouseenter',()=>{if(raf)return;const title=tab.querySelector('.tab-title-lines > .name');if(!title||title.scrollWidth<=title.clientWidth+1)return;title.scrollLeft=0;raf=requestAnimationFrame(tick);});
+ img.addEventListener('mouseenter',()=>{
+  if(raf||expanded)return;
+  const title=tab.querySelector('.tab-title-lines > .name');
+  if(!title)return;
+  const overflow=title.scrollWidth-title.clientWidth;
+  if(overflow<=1)return;
+  // Barely clipped names look silly scrolling a few pixels. Expand only
+  // those tabs; long names continue using the regular marquee.
+  if(overflow<=42){
+   const width=Math.ceil(tab.getBoundingClientRect().width+overflow+12);
+   tab.style.width=width+'px';
+   tab.style.minWidth=width+'px';
+   tab.style.maxWidth=width+'px';
+   expanded=true;
+   return;
+  }
+  title.scrollLeft=0;raf=requestAnimationFrame(tick);
+ });
  img.addEventListener('mouseleave',stop);
  tab.addEventListener('pointerleave',stop);
 }
