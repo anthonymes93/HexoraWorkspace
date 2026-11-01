@@ -183,7 +183,7 @@ function render(p){
  const prev=document.createElement('button');prev.textContent='‹ Previous';prev.disabled=offset===0;prev.onclick=()=>{offset=Math.max(0,offset-50);refresh();};
  const next=document.createElement('button');next.textContent='Next ›';next.disabled=p.tabs.length<50;next.onclick=()=>{offset+=50;refresh();};
  const pos=document.createElement('span');pos.textContent=p.tabs.length?(offset+1)+'–'+(offset+p.tabs.length):'No tabs';nav.append(prev,pos,next);conversations.append(nav);
- let shortcuts=$('quick-jumps');if(!shortcuts){shortcuts=document.createElement('div');shortcuts.id='quick-jumps';shortcuts.className='quick-jumps';conversations.append(shortcuts);}
+ // Quick Jump lives outside the collapsible conversations list.
  renderQuickJumps();
  renderSecondTabRow(p);
  renderTabRow($('tabs'),p,null);
