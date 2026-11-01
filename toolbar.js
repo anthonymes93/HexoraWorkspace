@@ -314,6 +314,11 @@ window.hexora.onDeepLink(async target=>{
   await refresh();
  }catch(error){console.error('Could not open Hexora link',error);linkToast('Could not open the link');}
 });
+// Ensure a context menu never leaves the embedded browser in modal mode.
+window.addEventListener('blur',()=>{
+ const menu=$('tab-context-menu');
+ if(menu&&!menu.classList.contains('hidden'))hideTabMenu();
+});
 window.hexora.onDeepLinkCopied(linkToast);
 window.hexora.onState(()=>{refresh();});updateSidebar();
 action('switch-workspace',activeWorkspace).then(async()=>{await refresh();await window.hexora.readyForDeepLinks();}).catch(error=>console.error('Hexora initialization failed:',error));
