@@ -730,11 +730,11 @@ $('website-form').onsubmit=async e=>{
   hideWebsiteModal();refresh();
  }catch(err){$('website-error').textContent=err.message||'Enter a valid HTTP or HTTPS address.';}
 };
-function hideTabRowMenu(){$('tab-row-context-menu').classList.add('hidden');}
+function hideTabRowMenu(){const menu=$('tab-row-context-menu');if(menu.classList.contains('hidden'))return;menu.classList.add('hidden');action('modal',false);}
 document.querySelector('.tabsbar').addEventListener('contextmenu',e=>{
  if(e.target.closest('.tab,.tab-plus,.nav,.extension-actions,button'))return;
  e.preventDefault();e.stopPropagation();
- hideTabMenu();const menu=$('tab-row-context-menu');menu.classList.remove('hidden');
+ hideTabMenu();action('modal',true);const menu=$('tab-row-context-menu');menu.classList.remove('hidden');
  menu.style.left=Math.max(8,Math.min(e.clientX,innerWidth-menu.offsetWidth-8))+'px';
  menu.style.top=Math.max(8,Math.min(e.clientY,innerHeight-menu.offsetHeight-8))+'px';
 });
