@@ -16,7 +16,8 @@
   return icon;
  }
  const shortPath=path=>String(path||'').split(/[\\/]/).filter(Boolean).slice(-2).join(' / ')||String(path||'');
- let opened=false,finish=null,where=null,mode='recent',rows=[],recent=[],favorites=[],shortcuts=[],home='',selected=null;
+ let opened=false,finish=null,where=null,mode='recent',rows=[],recent=[],favorites=[],shortcuts=[],drives=[],home='',selected=null;
+ let currentCounts={folderCount:0,fileCount:0,truncated:false,total:0},searchTimer=null;
  let history=[],historyIndex=-1,sequence=0,loading=false;
 
  function error(message){
@@ -32,6 +33,7 @@
  }
  function setSelected(location){
   selected=location;
+  if(location)q('hpp-path').value=location;
   q('hpp-open').disabled=loading||!selected;
   q('hpp-hint').textContent=location?'Selected: '+shortPath(location):'Ctrl-click VS Code to open a blank tab';
   // Do not replace clicked DOM nodes: that breaks double-click to navigate.
@@ -65,6 +67,7 @@
   const host=q('hpp-sidebar');host.replaceChildren();
   const links=[
    {id:'recent',name:'Recent',icon:'◷'},
+   {id:'computer',name:'This PC',icon:'▣'},
    ...shortcuts.map(s=>({...s,icon:({home:'⌂',projects:'▤',clients:'♧',downloads:'↓',desktop:'▣'})[s.id]||'▤'})),
    {id:'favorites',name:'Favorites',icon:'☆'}
   ];
@@ -80,7 +83,7 @@
   const host=q('hpp-breadcrumbs');host.replaceChildren();
   if(mode!=='browse'){
    const text=document.createElement('span');text.className='hpp-current-crumb';
-   text.textContent=mode==='favorites'?'Favorites':'Recent projects';host.append(text);return;
+   text.textContent=mode==='favorites'?'Favorites':mode==='computer'?'This PC':'Recent projects';host.append(text);return;
   }
   if(!where)return;
   // Use each progressively longer ancestor path for clickable crumbs.
@@ -104,73 +107,98 @@
  function renderRows(){
   const host=q('hpp-folders');host.replaceChildren();
   const query=q('hpp-search-input').value.trim().toLocaleLowerCase();
-  const list=rows.filter(item=>item.name.toLocaleLowerCase().includes(query));
-  q('hpp-count').textContent=list.length+' '+(list.length===1?'folder':'folders');
+  // Browse-mode searches are sent to the main process so a match can be
+  // found even when it lies beyond the visible entry limit.
+  const list=mode==='browse'?rows:rows.filter(item=>item.name.toLocaleLowerCase().includes(query));
+  q('hpp-count').textContent=mode==='browse'
+   ?currentCounts.folderCount+' folders · '+currentCounts.fileCount+' files'+(currentCounts.truncated?' · more':'')
+   :list.length+' '+(list.length===1?'location':'locations');
   if(!list.length){
    const empty=document.createElement('p');empty.className='hpp-empty';
-   empty.textContent=loading?'Loading folders…':query?'No matching folders':'No folders to display';
+   empty.textContent=loading?'Loading files and folders…':query?'No matching files or folders':'No files or folders to display';
    host.append(empty);return;
   }
-  list.forEach(item=>{
-   // A div avoids invalid nested button elements around the favorite control.
-   const row=document.createElement('div');row.className='hpp-folder-row'+(selected===item.path?' selected':'');
-   row.tabIndex=0;row.setAttribute('role','option');row.setAttribute('aria-selected',String(selected===item.path));
+  for(const item of list){
+   const isFile=item.type==='file';
+   const row=document.createElement('div');
+   row.className='hpp-folder-row'+(!isFile&&selected===item.path?' selected':'')+(isFile?' hpp-file':'');
+   row.tabIndex=0;row.setAttribute('role','option');
+   row.setAttribute('aria-selected',String(!isFile&&selected===item.path));
    row.title=item.path;row.dataset.path=item.path;
    const name=document.createElement('span');name.className='hpp-row-name';
-   const icon=document.createElement('span');icon.className='hpp-folder-icon';icon.textContent='▰';
+   const icon=document.createElement('span');icon.className=isFile?'hpp-file-icon':'hpp-folder-icon';
+   icon.textContent=isFile?'▤':'▰';
    const label=document.createElement('span');label.textContent=item.name;
    name.append(icon,label);
    const date=document.createElement('span');date.className='hpp-row-date';date.textContent=formatDate(item.modified);
-   const favorite=button(item.favorite?'★':'☆','hpp-favorite'+(item.favorite?' active':''),item.favorite?'Remove favorite':'Add favorite');
-   favorite.setAttribute('aria-label',(item.favorite?'Unfavorite ':'Favorite ')+item.name);
-   favorite.onclick=async event=>{
-    event.stopPropagation();
-    try{
-     await window.hexora.codePicker.favorite(item.path);
-     await loadLocations();
-     if(mode==='favorites')rows=favorites;
-     else if(mode==='recent')rows=recent;
-     else rows=rows.map(row=>row.path===item.path?{...row,favorite:!row.favorite}:row);
-     renderRows();
-    }catch(e){error(e.message);}
+   let third;
+   if(isFile){
+    third=document.createElement('span');third.className='hpp-file-tag';third.textContent='File';
+   }else{
+    third=button(item.favorite?'★':'☆','hpp-favorite'+(item.favorite?' active':''),item.favorite?'Remove favorite':'Add favorite');
+    third.setAttribute('aria-label',(item.favorite?'Unfavorite ':'Favorite ')+item.name);
+    third.onclick=async event=>{
+     event.stopPropagation();
+     try{
+      await window.hexora.codePicker.favorite(item.path);
+      await loadLocations();
+      if(mode==='favorites')rows=favorites;
+      else if(mode==='recent')rows=recent;
+      else rows=rows.map(entry=>entry.path===item.path?{...entry,favorite:!entry.favorite}:entry);
+      renderRows();
+     }catch(e){error(e.message);}
+    };
+   }
+   row.append(name,date,third);
+   row.onclick=()=>{
+    if(isFile){error('This is a file. Choose a folder to open as a VS Code project.');return;}
+    error('');setSelected(item.path);
    };
-   row.append(name,date,favorite);
-   row.onclick=()=>setSelected(item.path);
-   row.ondblclick=()=>navigate(item.path);
+   row.ondblclick=()=>{if(!isFile)navigate(item.path);};
    row.onkeydown=event=>{
-    if(event.key==='Enter'||event.key==='ArrowRight'){event.preventDefault();navigate(item.path);}
+    if(event.key==='Enter'||event.key==='ArrowRight'){
+     event.preventDefault();
+     if(!isFile)navigate(item.path);
+     else error('Choose a folder, not a file.');
+    }
    };
    host.append(row);
-  });
+  }
  }
  async function loadLocations(){
   const data=await window.hexora.codePicker.locations();
-  home=data.home;recent=data.recent;favorites=data.favorites;shortcuts=data.shortcuts;
+  home=data.home;recent=data.recent;favorites=data.favorites;shortcuts=data.shortcuts;drives=data.drives||[];
   renderCards();renderSidebar();
  }
- async function navigate(path,record=true){
-  if(!path||!opened)return;
+ async function navigate(location,record=true,filter=null){
+  if(!location||!opened)return;
+  // Search refreshes preserve the search box, ordinary folder navigation
+  // clears it so users don't see an unexpectedly filtered directory.
+  if(filter===null){q('hpp-search-input').value='';filter='';}
   const ticket=++sequence;loading=true;error('');
   q('hpp-folders').replaceChildren();
-  const message=document.createElement('p');message.className='hpp-empty';message.textContent='Loading folders…';
+  const message=document.createElement('p');message.className='hpp-empty';message.textContent='Loading files and folders…';
   q('hpp-folders').append(message);q('hpp-open').disabled=true;
   try{
-   const data=await window.hexora.codePicker.list(path);
+   const data=await window.hexora.codePicker.list(location,filter);
    if(ticket!==sequence||!opened)return;
    mode='browse';where=data.path;rows=data.rows;
-   selected=where; // Current path is selectable without having to open a child.
+   currentCounts={folderCount:data.folderCount||0,fileCount:data.fileCount||0,total:data.total||0,truncated:!!data.truncated};
+   selected=where;
+   q('hpp-path').value=where;
    if(record){history=history.slice(0,historyIndex+1);history.push(where);historyIndex=history.length-1;}
-   q('hpp-path-form').classList.add('hidden');
    updateNavigation();renderRows();renderCards();
    q('hpp-hint').textContent='Selected: '+shortPath(where);
-   if(data.truncated)error('Showing the first '+data.rows.length+' folders. Enter a narrower path to continue.');
-  }catch(e){if(ticket===sequence&&opened)error('Cannot open folder: '+e.message);}
-  finally{if(ticket===sequence){loading=false;q('hpp-open').disabled=!selected;}}
+   if(data.truncated)error('Showing '+data.rows.length+' of '+data.total+' matching items. Search this folder for more.');
+  }catch(e){if(ticket===sequence&&opened)error('Cannot open location: '+e.message);}
+  finally{if(ticket===sequence){loading=false;q('hpp-open').disabled=!q('hpp-path').value.trim();}}
  }
  function showCollection(name){
-  sequence++;mode=name;where=null;rows=name==='favorites'?favorites:recent;selected=null;loading=false;
+  sequence++;mode=name;where=null;
+  rows=name==='favorites'?favorites:name==='computer'?drives.map(d=>({name:d.name,path:d.path,type:'folder',modified:0,favorite:false})):recent;
+  selected=null;loading=false;
   q('hpp-search-input').value='';
-  q('hpp-path-form').classList.add('hidden');
+  q('hpp-path').value=home;
   q('hpp-hint').textContent='Ctrl-click VS Code to open a blank tab';
   updateNavigation();renderRows();renderCards();q('hpp-open').disabled=true;error('');
  }
@@ -180,19 +208,36 @@
  }
  function close(value){
   if(!opened)return;
-  opened=false;sequence++;
+  opened=false;sequence++;clearTimeout(searchTimer);
   root.classList.add('hidden');root.removeEventListener('keydown',onKeydown);
   const resolve=finish;finish=null;
   // Complete the native HWND visibility transition before creating a new
   // Code tab; otherwise the first SHOW can be swallowed by modalVisible.
   window.hexora.action('modal',false).catch(()=>{}).finally(()=>{if(resolve)resolve(value);});
  }
- function openSelected(){if(!loading&&selected)close(selected);}
+ function openSelected(){
+  if(loading||!opened)return;
+  // This is the actual editable address bar, not a cosmetic breadcrumb.
+  // Clicking Open Project should use newly typed/pasted paths even if the
+  // user hasn't clicked Go to browse that location.
+  const typed=q('hpp-path').value.trim();
+  if(!typed){error('Enter a folder path or select a folder.');return;}
+  const openButton=q('hpp-open');
+  openButton.disabled=true;
+  window.hexora.codePicker.validate(typed).then(folder=>{
+   if(opened)close(folder);
+  }).catch(e=>{
+   if(opened){error('Folder not found: '+e.message);openButton.disabled=false;q('hpp-path').focus();}
+  });
+ }
  function onKeydown(event){
+  // Prevent global Hexora shortcuts from interrupting typed folder paths.
+  event.stopPropagation();
+  if(event.ctrlKey&&event.key.toLowerCase()==='l'){
+   event.preventDefault();q('hpp-path').focus();q('hpp-path').select();return;
+  }
   if(event.key==='Escape'){
-   event.preventDefault();
-   if(!q('hpp-path-form').classList.contains('hidden'))q('hpp-path-form').classList.add('hidden');
-   else close(null);
+   event.preventDefault();close(null);return;
   }
   if(event.altKey&&event.key==='ArrowLeft'){event.preventDefault();goHistory(-1);}
   if(event.altKey&&event.key==='ArrowRight'){event.preventDefault();goHistory(1);}
@@ -214,19 +259,34 @@
  q('hpp-back').onclick=()=>goHistory(-1);
  q('hpp-forward').onclick=()=>goHistory(1);
  q('hpp-up').onclick=()=>where?navigate(parent(where)):null;
- q('hpp-edit-path').onclick=()=>{
-  const form=q('hpp-path-form');form.classList.toggle('hidden');
-  if(!form.classList.contains('hidden')){q('hpp-path').value=where||home;q('hpp-path').focus();q('hpp-path').select();}
- };
+ q('hpp-edit-path').onclick=()=>{q('hpp-path').focus();q('hpp-path').select();};
+ q('hpp-path').addEventListener('focus',()=>{
+  // Native child HWNDs can retain OS keyboard focus after showing an
+  // Electron overlay. Explicitly return focus to Hexora before typing.
+  window.hexora.codePicker.focus().then(()=>{
+   if(opened&&document.activeElement!==q('hpp-path'))q('hpp-path').focus();
+  }).catch(()=>{});
+ });
+ q('hpp-path').addEventListener('input',()=>{
+  selected=null;
+  q('hpp-open').disabled=!q('hpp-path').value.trim();
+  q('hpp-hint').textContent='Enter to browse · Open Project to select this folder';
+ });
  q('hpp-path-form').onsubmit=event=>{event.preventDefault();navigate(q('hpp-path').value);};
- q('hpp-search-input').oninput=renderRows;
+ q('hpp-search-input').oninput=()=>{
+  if(mode!=='browse'){renderRows();return;}
+  clearTimeout(searchTimer);
+  searchTimer=setTimeout(()=>{
+   if(opened&&where)navigate(where,false,q('hpp-search-input').value.trim());
+  },190);
+ };
  root.addEventListener('pointerdown',event=>{if(event.target===root)close(null);});
 
  async function open(){
   if(opened)return null;
   opened=true;sequence++;where=null;rows=[];selected=null;mode='recent';history=[];historyIndex=-1;
   error('');root.classList.remove('hidden');root.addEventListener('keydown',onKeydown);
-  q('hpp-search-input').value='';q('hpp-path-form').classList.add('hidden');q('hpp-open').disabled=true;
+  q('hpp-search-input').value='';q('hpp-path').value='';q('hpp-open').disabled=true;
   const promise=new Promise(resolve=>{finish=resolve;});
   try{
    // Hide attached native VS Code HWND while its toolbar owns the modal.
@@ -234,6 +294,7 @@
    if(!opened)return promise;
    await loadLocations();
    if(!opened)return promise;
+   q('hpp-path').value=home;
    if(recent.length)showCollection('recent');
    else await navigate(shortcuts.find(s=>s.id==='projects')?.path||home);
    q('hpp-search-input').focus();
