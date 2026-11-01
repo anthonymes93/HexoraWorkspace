@@ -169,6 +169,21 @@ async function renameStack(stack){
  try{await action('stack-edit',{id:stack.id,operation:'rename',value:name});await refresh();}
  catch(error){alert('Unable to rename stack: '+error.message);}
 }
+function updateTabFavicon(el,tab){
+ let img=el.querySelector('.tab-favicon');
+ if(!tab.favicon){
+  if(img)img.remove();
+  return;
+ }
+ if(!img){
+  img=document.createElement('img');img.className='tab-favicon';
+  img.alt='';img.draggable=false;img.referrerPolicy='no-referrer';
+  el.insertBefore(img,el.querySelector('.name')||el.firstChild);
+ }
+ if(img.getAttribute('src')!==tab.favicon)img.src=tab.favicon;
+ img.onerror=()=>{img.style.visibility='hidden';};
+ img.onload=()=>{img.style.visibility='visible';};
+}
 function renderTabRow(host,page,parentId){
  const data=page.stackData||{stacks:[],members:[]};
  const memberOf=new Map(data.members.map(m=>[m.tab_id,m.stack_id]));
@@ -196,6 +211,7 @@ function renderTabRow(host,page,parentId){
     const label=el.querySelector('.name');
     const title=(tab.pinned?'◆ ':'')+(tab.title||'New Tab');
     if(label&&label.textContent!==title)label.textContent=title;
+    updateTabFavicon(el,tab);
     el.title=tab.url||'Open tab';
    }
    if(stack){const title='▤ '+stack.name;if(el.textContent!==title)el.textContent=title;}
@@ -219,6 +235,7 @@ function renderTabRow(host,page,parentId){
    const close=document.createElement('span');close.className='close';close.textContent='×';
    close.onclick=e=>{e.stopPropagation();action('close',item.id);};
    el.append(name,close);
+   updateTabFavicon(el,item.tab);
    el.title=item.tab.url||'Open tab';
    el.onclick=()=>{selectedRootTabId=null;selectedStackId=parentId;stackRowsDismissed=parentId===null;action('activate',item.id);};
    el.addEventListener('contextmenu',e=>{e.preventDefault();showTabMenu(e.clientX,e.clientY,item.tab);});
