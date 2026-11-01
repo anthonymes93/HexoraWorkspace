@@ -685,3 +685,10 @@ body.sidebar-trim-workspace-details:not(.sidebar-icons-only) .workspace{gap:6px}
 #new-tab-overlay .new-tab-secondary span{font-size:10px;color:#9d92ad}
 #new-tab-overlay .new-tab-secondary .new-tab-dismiss{opacity:.7}
 #new-tab-overlay .new-tab-secondary:hover .new-tab-dismiss{opacity:1}
+
+/* Primary result ≠ keyboard selection: only one row can appear selected. */
+#new-tab-overlay .new-tab-suggestion-row.new-tab-primary{background:#292334;border-color:rgba(177,145,248,.19)}
+#new-tab-overlay .new-tab-suggestion-row.new-tab-primary .new-tab-suggestion.selected{background:transparent}
+#new-tab-overlay .new-tab-suggestion-row.is-active{background:linear-gradient(110deg,#45335f,#36294e);border:1px solid #ac86f4;box-shadow:inset 0 0 0 1px rgba(172,134,244,.22)}
+#new-tab-overlay .new-tab-suggestion-row.new-tab-secondary.is-active{background:#3b3051}
+#new-tab-overlay .new-tab-suggestion-row.is-active .new-tab-suggestion.selected{background:transparent}
