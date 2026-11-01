@@ -50,7 +50,7 @@ function stopNativeCode(tabId){
  nativeCodeCommand('QUIT',tabId);
  entry.stopped=true;entry.visible=false;nativeCodeHosts.delete(tabId);
  if(entry.proc){const proc=entry.proc;setTimeout(()=>{if(proc.exitCode===null&&!proc.killed)proc.kill();},2500).unref?.();}
- if(nativeCodeLaunchingId===tabId){nativeCodeLaunchingId=null;setImmediate(pumpNativeCodeLaunchQueue);}
+ // Keep the launch lock until the terminated host actually exits, preventing HWND races.
 }
 function stopAllNativeCode(){for(const id of [...nativeCodeHosts.keys()])stopNativeCode(id);nativeCodeLaunchQueue.length=0;}
 

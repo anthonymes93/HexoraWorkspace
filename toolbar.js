@@ -188,7 +188,7 @@ function render(p){
  renderSecondTabRow(p);
  renderTabRow($('tabs'),p,null);
  $('tabs').classList.toggle('compact-titles', $('tabs').querySelectorAll(':scope > .tab').length>=11);
-  $('native-code-rail').classList.toggle('selected',!!p.active&&p.active.url==='hexora-native://vscode');
+  $('native-code-rail').classList.toggle('selected',!!p.active&&/^hexora-native:\/\/vscode(?:\/\d+)?$/.test(p.active.url));
 }
 // Sidebar grip: one serialized resize stream, without competing layout updates.
 const sidebarGrip=$('sidebar-resize-handle');
@@ -1356,7 +1356,7 @@ v('vault-entry-form').onsubmit=async e=>{
 v('vault-delete').onclick=async()=>{if(!vaultSelected||!confirm('Delete this saved login permanently?'))return;await window.hexora.vault.delete(vaultSelected);vaultClearEditor();v('vault-entry-form').classList.add('hidden');await vaultLoad();};
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&vaultOpen)vaultClose();});
 
-// Desktop VS Code now has a persistent SQLite-backed workspace tab.
+// Each click creates a new SQLite-backed tab with its own native VS Code desktop window.
  $('native-code-rail').addEventListener('click',async event=>{
   try{
    if(event.shiftKey){await window.hexora.nativeCode.repair();return;}
@@ -1373,4 +1373,4 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&vaultOpen)vaultClos
    if(state.detached){$('native-code-rail').title='VS Code detached — click its tab to reattach';await refresh();}
   }catch(error){alert('Detach VS Code: '+error.message);}
  });
- window.hexora.nativeCode.onStopped(()=>{$('native-code-rail').classList.remove('selected');});
+ window.hexora.nativeCode.onStopped(()=>{refresh();});

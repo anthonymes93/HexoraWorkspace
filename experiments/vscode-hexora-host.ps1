@@ -124,7 +124,9 @@ try {
  [void][HexoraNative]::SetWindowLong($child,-16,$newStyle)
  [void][HexoraNative]::SetParent($child,$parent)
  $attached=$true
- [HexoraNative]::FocusHosted($parent,$child)
+ # The parent may switch to a different VS Code tab while this window launches.
+ # Hide first; only the owner tab's READY handler is allowed to show and focus it.
+ [void][HexoraNative]::ShowWindow($child,0)
  Write-Output ('DIAG READY '+[HexoraNative]::Diagnostic($child))
  Write-Output ('FOCUS_TRACE READY '+[HexoraNative]::FocusTrace($parent,$child))
  Write-Output 'READY'
