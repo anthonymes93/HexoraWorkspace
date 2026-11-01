@@ -1006,7 +1006,7 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
  ipcMain.handle('tabs:page',(_e,arg)=>sendPage(arg));
  ipcMain.handle('tabs:search',(_e,term)=>store.search(term,50).map(pageRow));
  ipcMain.handle('tabs:lookup',(_e,id)=>{const row=store.get(Number(id));return row?pageRow(row):null;});
- ipcMain.handle('tabs:action',(_e,action,arg)=>{
+ ipcMain.handle('tabs:action',async(_e,action,arg)=>{
    if(action==='copy-tab-link'){const tab=store.get(Number(arg));if(!tab)throw Error('This tab no longer exists.');const link=tabLink(tab.workspace,tab.id);clipboard.writeText(link);win.webContents.send('deep-link:copied','Tab link copied');return link;}
   const current=store.get(activeId);const wc=live.get(activeId)?.webContents;
   if(action==='notion-sidebar-demo'){
@@ -1014,7 +1014,7 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
    let notionHost='';try{const parsed=new URL(notionUrl);if(parsed.protocol==='https:')notionHost=parsed.hostname.toLowerCase();}catch{}
    if(!current||!['notion.so','www.notion.so','notion.com','www.notion.com','app.notion.com'].includes(notionHost))return {ok:false,reason:'Select a Notion tab first.'};
    if(!wc||wc.isDestroyed())return {ok:false,reason:'Notion tab is not loaded.'};
-   const result=awaitNotionSidebarDemo(wc);
+   const result=await awaitNotionSidebarDemo(wc);
    if(result?.ok)return result;
    // Notion's collapsed sidebar can be an unlabeled icon. Use Notion's
    // documented Ctrl+\\ sidebar shortcut in the active webContents only.
