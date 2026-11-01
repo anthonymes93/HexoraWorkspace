@@ -467,3 +467,51 @@ body.sidebar-icons-only .workspace{width:36px;height:36px;border-radius:10px;pad
 body.sidebar-icons-only .workspace .emoji{font-size:18px!important}
 body.sidebar-icons-only .quick-jumps{display:flex;flex-direction:column;flex-wrap:nowrap;align-items:center;justify-content:flex-start;gap:5px;min-height:0;padding:10px 0 4px;margin:3px auto 0;width:min(46px,100%);border-top:1px solid #393641}
 body.sidebar-icons-only .quick-jump{width:34px;height:34px;min-height:34px;flex:0 0 34px}
+
+/* Fluid icon shelf: every glyph and button fits the ACTUAL available panel width.
+   Use a single geometric scale instead of leaving fixed 34px items clipped. */
+body.sidebar-icons-only .sidebar{
+ --hx-icon-space:max(1px,calc(var(--hexora-panel-width) - 8px));
+ --hx-icon-button:clamp(4px,calc(var(--hexora-panel-width) - 10px),52px);
+ --hx-icon-glyph:clamp(3px,calc(var(--hexora-panel-width) * .34),23px);
+ padding:10px 3px 8px!important;
+ gap:clamp(2px,calc(var(--hexora-panel-width) * .06),9px);
+ overflow:hidden;
+}
+body.sidebar-icons-only .sidebar-title{display:none!important}
+body.sidebar-icons-only .workspaces{
+ display:flex!important;flex-direction:column;align-items:center;
+ width:100%;min-width:0;max-width:100%;gap:clamp(2px,calc(var(--hexora-panel-width) * .035),7px);
+ overflow:hidden;
+}
+body.sidebar-icons-only .workspace{
+ box-sizing:border-box;display:flex!important;flex:none!important;
+ width:var(--hx-icon-button)!important;height:var(--hx-icon-button)!important;
+ min-width:0!important;min-height:0!important;max-width:100%!important;
+ padding:0!important;margin:0!important;border-radius:clamp(2px,calc(var(--hx-icon-button) * .25),12px)!important;
+ align-items:center;justify-content:center;overflow:hidden;
+}
+body.sidebar-icons-only .workspace .emoji{
+ display:grid!important;place-items:center;
+ width:100%!important;height:100%!important;min-width:0!important;
+ flex:0 1 auto!important;font-size:var(--hx-icon-glyph)!important;line-height:1!important;
+ overflow:hidden;text-align:center;
+}
+body.sidebar-icons-only .quick-jumps{
+ box-sizing:border-box;display:flex!important;flex-direction:column!important;flex-wrap:nowrap!important;
+ align-items:center!important;justify-content:flex-start!important;
+ width:100%!important;max-width:100%!important;margin:0!important;
+ padding:clamp(2px,calc(var(--hexora-panel-width) * .09),12px) 0 0!important;
+ gap:clamp(2px,calc(var(--hexora-panel-width) * .035),7px)!important;
+ overflow-x:hidden!important;overflow-y:auto!important;
+}
+body.sidebar-icons-only .quick-jump{
+ display:grid!important;place-items:center;
+ width:var(--hx-icon-button)!important;height:var(--hx-icon-button)!important;
+ min-width:0!important;min-height:0!important;max-width:100%!important;
+ flex:0 0 var(--hx-icon-button)!important;
+ padding:0!important;margin:0!important;
+ font-size:var(--hx-icon-glyph)!important;line-height:1!important;
+ border-radius:clamp(2px,calc(var(--hx-icon-button) * .25),10px)!important;
+ overflow:hidden;
+}
