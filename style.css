@@ -183,3 +183,7 @@ body.reordering-tabs,body.reordering-tabs *{cursor:grabbing!important;user-selec
 
 /* Show the full ancestry of the open nested tab row. */
 .tabs .tab.stack-path-active,.stack-tabs .tab.stack-path-active{background:#3a3050!important;border-color:#9b84ea!important;color:#fff!important;box-shadow:inset 0 0 0 1px #ad94ff40,0 0 0 1px #a18aff20!important}
+
+/* Midpoint insertion preview while reordering tabs, distinct from stack glow. */
+.tabs .tab.tab-insert-before,.stack-tabs .tab.tab-insert-before{box-shadow:-3px 0 0 #b7a0ff!important}
+.tabs .tab.tab-insert-after,.stack-tabs .tab.tab-insert-after{box-shadow:3px 0 0 #b7a0ff!important}
