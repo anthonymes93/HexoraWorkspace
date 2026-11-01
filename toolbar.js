@@ -74,6 +74,7 @@ const save=()=>localStorage.setItem('hexora-workspace-settings',JSON.stringify({
 if(!workspaces.some(w=>w.id===activeWorkspace))activeWorkspace=workspaces[0].id;
 const action=(name,arg)=>window.hexora.action(name,arg);
 async function refresh(){
+ if(tabPointer?.moving)return;
  if(refreshing){refreshPending=true;return;}refreshing=true;
  try{const p=await window.hexora.page(activeWorkspace,offset);if(!p)return;currentPage=p;render(p);}
  catch(e){console.error('Could not read saved tabs',e);}
@@ -113,7 +114,8 @@ function render(p){
  const shown=[...p.tabs.slice(0,16)];
  if(p.active&&!shown.some(x=>x.id===p.active.id))shown.unshift({...p.active,active:true,suspended:false});
  for(const item of shown){
-  const el=document.createElement('button');el.dataset.tabId=String(item.id);el.draggable=p.tabs.slice(0,16).some(t=>t.id===item.id);el.addEventListener('dragstart',e=>{if(!el.draggable){e.preventDefault();return;}draggedTab=el;dragWorkspace=activeWorkspace;e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain','hexora-tab:'+item.id);el.classList.add('dragging');});el.addEventListener('dragend',()=>{el.classList.remove('dragging');draggedTab=null;dragWorkspace=null;});el.className='tab'+(item.id===p.activeId?' active':'');
+  const el=document.createElement('button');el.dataset.tabId=String(item.id);el.draggable=false;el.className='tab'+(item.id===p.activeId?' active':'');
+  if(p.tabs.slice(0,16).some(t=>t.id===item.id))el.addEventListener('pointerdown',beginTabPointerDrag);
   const name=document.createElement('span');name.className='name';name.textContent=(item.pinned?'◆ ':'')+(item.title||'ChatGPT');
   const close=document.createElement('span');close.className='close';close.textContent='×';close.onclick=e=>{e.stopPropagation();action('close',item.id);};
   el.title=item.url;el.onclick=()=>action('activate',item.id);
@@ -160,38 +162,82 @@ async function recoveryAction(name){
 }
 for(const name of ['backup','configure','unlock','restore'])$('recovery-'+name).onclick=()=>recoveryAction(name);
 
-// Smooth in-place tab reordering; detached tabs still dock on drop.
+// Pointer-based reorder: no native Chromium drag image or dotted cursor rectangle.
 const tabStrip=$('tabs');
-let draggedTab=null,dragWorkspace=null,dropSaving=false;
-tabStrip.addEventListener('dragover',e=>{
- e.preventDefault();e.dataTransfer.dropEffect='move';
- if(!draggedTab||dragWorkspace!==activeWorkspace)return;
- const over=e.target.closest('.tab');
- if(!over||over===draggedTab||!over.draggable)return;
- const old=new Map([...tabStrip.children].map(el=>[el,el.getBoundingClientRect().left]));
- const bounds=over.getBoundingClientRect();
- const after=e.clientX>bounds.left+bounds.width/2;
- tabStrip.insertBefore(draggedTab,after?over.nextSibling:over);
+let tabPointer=null,dropSaving=false,suppressTabClickUntil=0;
+function beginTabPointerDrag(e){
+ if(e.button!==0||!e.isPrimary||e.target.closest('.close'))return;
+ const tab=e.currentTarget;
+ tabPointer={tab,id:Number(tab.dataset.tabId),workspace:activeWorkspace,startX:e.clientX,startY:e.clientY,moving:false};
+ // Do not capture until the movement threshold is met; a normal click still activates.
+}
+function shiftTabWithAnimation(tab,other,after){
+ const before=new Map([...tabStrip.children].map(el=>[el,el.getBoundingClientRect().left]));
+ tabStrip.insertBefore(tab,after?other.nextSibling:other);
  for(const el of tabStrip.children){
-  const dx=old.get(el)-el.getBoundingClientRect().left;
-  if(Math.abs(dx)>1)el.animate([{transform:'translateX('+dx+'px)'},{transform:'translateX(0)'}],{duration:150,easing:'ease-out'});
+  if(el===tab)continue;
+  const delta=before.get(el)-el.getBoundingClientRect().left;
+  if(Math.abs(delta)>1)el.animate([{transform:'translateX('+delta+'px)'},{transform:'translateX(0)'}],{duration:130,easing:'ease-out'});
+ }
+}
+window.addEventListener('pointermove',e=>{
+ const d=tabPointer;if(!d||e.pointerId!==undefined&&e.isPrimary===false)return;
+ if(!d.tab.isConnected||activeWorkspace!==d.workspace){cancelTabPointer();return;}
+ if(!d.moving){
+  if(Math.hypot(e.clientX-d.startX,e.clientY-d.startY)<5)return;
+  d.moving=true;d.tab.classList.add('dragging');
+  document.body.classList.add('reordering-tabs');
+ }
+ e.preventDefault();
+ const rect=tabStrip.getBoundingClientRect();
+ if(e.clientX>rect.right-24)tabStrip.scrollLeft+=15;
+ else if(e.clientX<rect.left+24)tabStrip.scrollLeft-=15;
+ const others=[...tabStrip.querySelectorAll('.tab')].filter(el=>el!==d.tab);
+ const target=others.find(el=>e.clientX<el.getBoundingClientRect().left+el.getBoundingClientRect().width/2);
+ const ordered=[...tabStrip.querySelectorAll('.tab')].filter(el=>el!==d.tab);
+ const next=target||null;
+ if(next!==d.tab.nextElementSibling){
+  const oldIndex=[...tabStrip.children].indexOf(d.tab);
+  const targetIndex=next?[...tabStrip.children].indexOf(next):tabStrip.children.length;
+  if(oldIndex!==targetIndex&&oldIndex+1!==targetIndex) {
+   const before=new Map([...tabStrip.children].map(el=>[el,el.getBoundingClientRect().left]));
+   tabStrip.insertBefore(d.tab,next);
+   for(const el of tabStrip.children){
+    if(el===d.tab)continue;
+    const dx=before.get(el)-el.getBoundingClientRect().left;
+    if(Math.abs(dx)>1)el.animate([{transform:'translateX('+dx+'px)'},{transform:'translateX(0)'}],{duration:140,easing:'ease-out'});
+   }
+  }
  }
 });
-tabStrip.addEventListener('drop',async e=>{
- e.preventDefault();
- const match=/^hexora-tab:(\d+)$/.exec(e.dataTransfer.getData('text/plain')||'');
- if(!match)return;
- const id=Number(match[1]);
- if(!draggedTab||Number(draggedTab.dataset.tabId)!==id||dragWorkspace!==activeWorkspace){
-  await action('dock',id);return;
- }
- if(dropSaving)return;
+function cancelTabPointer(){
+ if(!tabPointer)return;
+ tabPointer.tab.classList.remove('dragging');
+ document.body.classList.remove('reordering-tabs');
+ tabPointer=null;
+}
+window.addEventListener('pointerup',async e=>{
+ const d=tabPointer;if(!d)return;
+ const moving=d.moving;
+ if(moving)suppressTabClickUntil=Date.now()+300;
+ cancelTabPointer();
+ if(!moving||dropSaving)return;
  dropSaving=true;
- const ids=[...tabStrip.querySelectorAll('.tab')].filter(el=>el.draggable).map(el=>Number(el.dataset.tabId));
- draggedTab.classList.remove('dragging');draggedTab=null;dragWorkspace=null;
- try{await action('reorder-tabs',{workspace:activeWorkspace,ids});}
+ const ids=[...tabStrip.querySelectorAll('.tab')].map(el=>Number(el.dataset.tabId)).filter(Number.isSafeInteger);
+ try{await action('reorder-tabs',{workspace:d.workspace,ids});}
  catch(error){console.error('Could not reorder tabs',error);refresh();}
  finally{dropSaving=false;}
+});
+window.addEventListener('pointercancel',()=>{cancelTabPointer();refresh();});
+tabStrip.addEventListener('click',e=>{
+ if(Date.now()<suppressTabClickUntil){e.preventDefault();e.stopPropagation();}
+},true);
+// Native drag from an external detached window can still be docked here.
+tabStrip.addEventListener('dragover',e=>{e.preventDefault();e.dataTransfer.dropEffect='move';});
+tabStrip.addEventListener('drop',e=>{
+ e.preventDefault();
+ const match=/^hexora-tab:(\\d+)$/.exec(e.dataTransfer.getData('text/plain')||'');
+ if(match)action('dock',Number(match[1]));
 });
 
 // Right-click any tab to turn it into a website, or open a website in a separate tab.
