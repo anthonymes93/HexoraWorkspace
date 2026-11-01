@@ -1,5 +1,19 @@
 const $=id=>document.getElementById(id);
 const workspaces=[{id:'web',name:'Web Development',emoji:'◈'},{id:'business',name:'Business',emoji:'▤'},{id:'personal',name:'Personal',emoji:'☼'},{id:'ideas',name:'Ideas Lab',emoji:'✦'}];
+const conversationsCollapsedKey='hexora-conversations-collapsed';
+function setConversationsCollapsed(collapsed){
+ const list=document.getElementById('conversations'),toggle=document.getElementById('toggle-conversations');
+ if(!list||!toggle)return;
+ list.classList.toggle('conversations-collapsed',collapsed);
+ toggle.setAttribute('aria-expanded',String(!collapsed));
+ toggle.title=collapsed?'Expand open conversations':'Collapse open conversations';
+ document.getElementById('conversations-chevron').textContent=collapsed?'›':'⌄';
+ localStorage.setItem(conversationsCollapsedKey,collapsed?'true':'false');
+}
+document.getElementById('toggle-conversations').addEventListener('click',()=>{
+ setConversationsCollapsed(document.getElementById('toggle-conversations').getAttribute('aria-expanded')==='true');
+});
+setConversationsCollapsed(localStorage.getItem(conversationsCollapsedKey)==='true');
 const sidebarWorkspaceOrderKey='hexora-sidebar-workspace-order';
 const sidebarConversationOrderPrefix='hexora-sidebar-conversation-order:';
 function sidebarOrder(key){
