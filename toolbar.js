@@ -889,14 +889,20 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'){hideTabRowMenu();hi
 
 // The main process owns one animation timeline for both the native browser view and the toolbar layout.
 let sidebarWasAnimating=false;
-window.hexora.onSidebarFrame((width,transitioning=false)=>{
+window.hexora.onSidebarFrame((width,transitioning=false,target=null)=>{
  const value=Math.max(64,Math.min(560,width));
  const root=document.documentElement,body=document.body;
  if(transitioning&&!sidebarWasAnimating){
   // Keep one presentation style while native viewport width animates.
   // Opening from fully closed should reveal the regular expanded layout.
   const fromClosed=body.classList.contains('panel-collapsed');
-  body.classList.toggle('sidebar-transition-icons',!fromClosed&&body.classList.contains('sidebar-icons-only'));
+  const opening=Number(target)>65;
+  // Apply the FINAL layout dimensions before the opening animation begins.
+  // Otherwise the frozen typography suddenly enlarges on the final frame.
+  body.classList.toggle('sidebar-transition-icons',!opening&&!fromClosed&&body.classList.contains('sidebar-icons-only'));
+  if(opening){
+   root.style.setProperty('--hexora-sidebar-fluid',String(Math.max(0,Math.min(1,(Number(target)-240)/95))));
+  }
   body.classList.add('sidebar-auto-transition');
  }
  sidebarWasAnimating=transitioning;
