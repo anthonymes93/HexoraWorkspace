@@ -229,3 +229,11 @@ body.reordering-tabs,body.reordering-tabs *{cursor:grabbing!important;user-selec
 .tabs::-webkit-scrollbar-track{background:transparent}
 .tabs::-webkit-scrollbar-thumb{background:#51495f;border-radius:20px}
 .tabs::-webkit-scrollbar-thumb:hover{background:#786a8e}
+
+/* Nearly invisible neutral scrollbar, brighter only when the tab strip is hovered. */
+.tabs{scrollbar-width:thin;scrollbar-color:#292a30 transparent}
+.tabs:hover{scrollbar-color:#383941 transparent}
+.tabs::-webkit-scrollbar{height:4px}
+.tabs::-webkit-scrollbar-thumb{background:#292a30;border-radius:99px}
+.tabs:hover::-webkit-scrollbar-thumb{background:#383941}
+.tabs::-webkit-scrollbar-thumb:hover{background:#474850}
