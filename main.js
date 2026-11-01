@@ -474,6 +474,7 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
    if(candidate)activate(candidate);else newTab(workspace);
    return true;
   }
+  else if(action==='reorder-tabs'){store.reorderVisible(arg?.workspace,arg?.ids);emit();return true;}
   else if(action==='move-tab'){
    const id=Number(arg?.id),workspace=arg?.workspace,raw=store.get(id);
    if(!raw||typeof workspace!=='string'||workspace.length>80)throw new Error('Invalid tab or workspace');
