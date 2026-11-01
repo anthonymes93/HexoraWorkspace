@@ -653,3 +653,11 @@ body.sidebar-trim-workspace-details:not(.sidebar-icons-only) .workspace{gap:6px}
 #new-tab-overlay .new-tab-recent-item strong,#new-tab-overlay .new-tab-recent-item span{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #new-tab-overlay .new-tab-recent-item span,#new-tab-overlay .new-tab-empty{font-size:11px;color:#a59cb7}
 @media(max-width:580px){#new-tab-overlay .new-tab-custom-links,#new-tab-overlay .new-tab-recent{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+#new-tab-overlay .new-tab-suggestions[hidden]{display:none}
+#new-tab-overlay .new-tab-suggestions{margin-top:7px;max-height:255px;overflow-y:auto;border:1px solid rgba(169,139,219,.35);border-radius:11px;background:#211e2b;padding:5px}
+#new-tab-overlay .new-tab-suggestion{width:100%;display:flex;flex-direction:column;align-items:flex-start;gap:4px;padding:10px 12px;text-align:left;background:transparent;border:0;border-radius:7px;color:#eee9f8;cursor:pointer}
+#new-tab-overlay .new-tab-suggestion:hover,#new-tab-overlay .new-tab-suggestion.selected{background:#3a3050}
+#new-tab-overlay .new-tab-suggestion strong,#new-tab-overlay .new-tab-suggestion span{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#new-tab-overlay .new-tab-suggestion strong{font-size:12px}
+#new-tab-overlay .new-tab-suggestion span{font-size:11px;color:#aca2bd}
