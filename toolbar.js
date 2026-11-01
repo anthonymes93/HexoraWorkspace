@@ -384,7 +384,15 @@ async function updateNewTabSuggestions(){
   newTabHistorySelected=newTabHistoryMatches.length?0:-1;paintNewTabSuggestions();
  }catch{if(request===newTabHistoryRequest){newTabHistoryMatches=[];newTabHistorySelected=smartSuggestionCount()?0:-1;paintNewTabSuggestions();}}
 }
-newTabAddress.addEventListener('input',updateNewTabSuggestions);
+newTabAddress.addEventListener('input',()=>{
+ // Show a selected Google action immediately while the asynchronous history lookup runs.
+ // Without this, the only result can look inactive until history-list resolves.
+ newTabHistoryRequest++;
+ newTabHistoryMatches=[];
+ newTabHistorySelected=smartHasGoogleOption()?0:-1;
+ paintNewTabSuggestions();
+ updateNewTabSuggestions();
+});
 newTabAddress.addEventListener('keydown',e=>{
  if(e.key==='Enter'&&e.ctrlKey){e.preventDefault();e.stopPropagation();smartSearchGoogle();return;}
  if(e.key==='ArrowDown'||e.key==='ArrowUp'){
