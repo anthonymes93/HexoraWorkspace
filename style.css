@@ -212,3 +212,17 @@ body.reordering-tabs,body.reordering-tabs *{cursor:grabbing!important;user-selec
 .tab-context-menu .tab-menu-separator{height:1px;background:#ffffff12;margin:8px 6px}
 .tab-context-menu button:disabled{opacity:.32}
 .tab-workspace-submenu{background:#24212e;border-color:#534961;border-radius:11px;box-shadow:0 16px 45px #000a}
+
+/* Subtle Hexora scrollbars: dark, compact and low contrast. */
+.tabs,.stack-tabs,.conversation-list,.tab-context-menu,.tab-workspace-submenu,.dialog #search-results,.stats-dialog,.stats-scroll,.extensions-list{
+ scrollbar-color:#51495f transparent;
+ scrollbar-width:thin;
+}
+.tabs::-webkit-scrollbar,.stack-tabs::-webkit-scrollbar{height:5px}
+.conversation-list::-webkit-scrollbar,.tab-context-menu::-webkit-scrollbar,.tab-workspace-submenu::-webkit-scrollbar,.dialog #search-results::-webkit-scrollbar,.stats-dialog::-webkit-scrollbar,.stats-scroll::-webkit-scrollbar{width:6px}
+.tabs::-webkit-scrollbar-track,.stack-tabs::-webkit-scrollbar-track,.conversation-list::-webkit-scrollbar-track,.tab-context-menu::-webkit-scrollbar-track,.tab-workspace-submenu::-webkit-scrollbar-track,.dialog #search-results::-webkit-scrollbar-track,.stats-dialog::-webkit-scrollbar-track,.stats-scroll::-webkit-scrollbar-track{background:transparent}
+.tabs::-webkit-scrollbar-thumb,.stack-tabs::-webkit-scrollbar-thumb,.conversation-list::-webkit-scrollbar-thumb,.tab-context-menu::-webkit-scrollbar-thumb,.tab-workspace-submenu::-webkit-scrollbar-thumb,.dialog #search-results::-webkit-scrollbar-thumb,.stats-dialog::-webkit-scrollbar-thumb,.stats-scroll::-webkit-scrollbar-thumb{background:#51495f;border-radius:20px}
+.tabs::-webkit-scrollbar-thumb:hover,.stack-tabs::-webkit-scrollbar-thumb:hover,.conversation-list::-webkit-scrollbar-thumb:hover,.tab-context-menu::-webkit-scrollbar-thumb:hover,.tab-workspace-submenu::-webkit-scrollbar-thumb:hover{background:#786a8e}
+/* Keep the primary tab strip clean while remaining scrollable via wheel/touchpad. */
+.tabs{scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
