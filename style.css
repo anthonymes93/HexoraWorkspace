@@ -661,3 +661,15 @@ body.sidebar-trim-workspace-details:not(.sidebar-icons-only) .workspace{gap:6px}
 #new-tab-overlay .new-tab-suggestion strong,#new-tab-overlay .new-tab-suggestion span{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #new-tab-overlay .new-tab-suggestion strong{font-size:12px}
 #new-tab-overlay .new-tab-suggestion span{font-size:11px;color:#aca2bd}
+
+#new-tab-overlay .new-tab-suggestion-row{display:flex;align-items:center;gap:3px;border-radius:7px}
+#new-tab-overlay .new-tab-suggestion-row:hover{background:#342b47}
+#new-tab-overlay .new-tab-suggestion-row .new-tab-suggestion{flex:1;min-width:0}
+#new-tab-overlay .new-tab-dismiss{flex-shrink:0;border:0;background:transparent;color:#b8a9ca;font-size:19px;padding:8px 12px;cursor:pointer;border-radius:7px}
+#new-tab-overlay .new-tab-dismiss:hover{background:#56334b;color:#fff}
+#new-tab-overlay .new-tab-confirm[hidden]{display:none}
+#new-tab-overlay .new-tab-confirm{padding:15px;margin:9px 0;background:#2c2536;border:1px solid #795b8b;border-radius:11px;color:#eee8f8}
+#new-tab-overlay .new-tab-confirm p{font-size:12px;line-height:1.5;color:#c8bed5}
+#new-tab-overlay .new-tab-confirm>div{display:flex;gap:9px;justify-content:flex-end}
+#new-tab-overlay .new-tab-confirm button{border:1px solid #6c587b;background:#393046;color:#eee8f8;padding:8px 16px;border-radius:8px;cursor:pointer}
+#new-tab-overlay .new-tab-confirm button:last-child{background:#9b6b8e}
