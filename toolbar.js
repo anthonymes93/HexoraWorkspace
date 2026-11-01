@@ -193,10 +193,11 @@ function render(p){
 const sidebarGrip=$('sidebar-resize-handle');
 let sidebarDrag=null,sidebarDesired=null,sidebarWorker=null;
 const clampSidebarWidth=x=>Math.round(Math.max(64,Math.min(560,Math.max(64,window.innerWidth-420),x)));
-function snapSidebarWidth(width,drag){
- // Hysteresis avoids a sliver of tiny, clipped icons and prevents edge flicker.
- if(drag.snapClosed){if(width<105)return 64;drag.snapClosed=false;}
- else if(width<=88){drag.snapClosed=true;return 64;}
+function snapSidebarWidth(width,drag,direction){
+ // Snap only while shrinking. Expanding follows the pointer exactly.
+ if(direction>0){drag.snapClosed=false;return width;}
+ if(direction<0&&width<=88){drag.snapClosed=true;return 64;}
+ if(drag.snapClosed&&direction<=0)return 64;
  return width;
 }
 function queueSidebarResize(width){
@@ -222,9 +223,10 @@ sidebarGrip.addEventListener('pointerdown',event=>{
 sidebarGrip.addEventListener('pointermove',event=>{
  if(!sidebarDrag||sidebarDrag.pointerId!==event.pointerId)return;
  const now=performance.now(),elapsed=Math.max(1,now-sidebarDrag.previousTime);
- const speed=Math.abs(event.clientX-sidebarDrag.previousX)/elapsed;
+ const delta=event.clientX-sidebarDrag.previousX;
+ const speed=Math.abs(delta)/elapsed;
  sidebarDrag.previousX=event.clientX;sidebarDrag.previousTime=now;
- sidebarDrag.last=snapSidebarWidth(clampSidebarWidth(event.clientX),sidebarDrag);
+ sidebarDrag.last=snapSidebarWidth(clampSidebarWidth(event.clientX),sidebarDrag,Math.sign(delta));
  // Only a genuinely rapid sweep freezes responsive previews.
  // A normal drag should show the layout at the width under the cursor.
  // Average out mouse-event spikes; use hysteresis to avoid rapidly switching modes.
