@@ -48,6 +48,30 @@ public static class HexoraNative {
  [DllImport("user32.dll",SetLastError=true)] public static extern bool GetGUIThreadInfo(uint idThread,ref GUITHREADINFO info);
  public static string ThreadInfo(uint thread) {var i=new GUITHREADINFO();i.cbSize=(uint)Marshal.SizeOf(typeof(GUITHREADINFO));bool ok=GetGUIThreadInfo(thread,ref i);return "thread="+thread+" ok="+ok+" active="+i.hwndActive.ToInt64()+" focus="+i.hwndFocus.ToInt64()+" capture="+i.hwndCapture.ToInt64()+" flags="+i.flags;}
  public static string FocusTrace(IntPtr parent,IntPtr child) {uint pid;uint ct=GetWindowThreadProcessId(child,out pid);uint pt=GetWindowThreadProcessId(parent,out pid);uint fg=GetWindowThreadProcessId(GetForegroundWindow(),out pid);return "childEnabled="+IsWindowEnabled(child)+" parentEnabled="+IsWindowEnabled(parent)+" foreground="+GetForegroundWindow().ToInt64()+" foregroundThread="+fg+" child="+child.ToInt64()+" parent="+parent.ToInt64()+" childGUI=["+ThreadInfo(ct)+"] parentGUI=["+ThreadInfo(pt)+"] foregroundGUI=["+ThreadInfo(fg)+"]";}
+ // Re-activation can put Electron's render-widget HWND above the reparented Code HWND.
+ // Check actual Windows hit-testing during the activation transition instead of guessing.
+ public static int zOrderRecoverySequence=0;
+ public static void RecoverZOrder(IntPtr parent,IntPtr child) {
+  int sequence=System.Threading.Interlocked.Increment(ref zOrderRecoverySequence);
+  System.Threading.ThreadPool.QueueUserWorkItem(_=>{
+   try{
+    int[] offsets={0,40,100,200,350,550,850,1300,2000};
+    int last=0;
+    foreach(int offset in offsets) {
+     System.Threading.Thread.Sleep(offset-last);last=offset;
+     if(sequence!=zOrderRecoverySequence||!IsWindow(child)||GetParent(child)!=parent||!IsWindowVisible(child)||GetForegroundWindow()!=parent)break;
+     RECT rect; if(!GetWindowRect(child,out rect)||rect.right<=rect.left||rect.bottom<=rect.top)continue;
+     POINT p=new POINT();p.x=rect.left+(rect.right-rect.left)/2;p.y=rect.top+(rect.bottom-rect.top)/2;
+     IntPtr hit=WindowFromPoint(p);
+     if(hit!=child&&!IsChild(child,hit)) {
+      bool raised=SetWindowPos(child,IntPtr.Zero,0,0,0,0,0x0013);
+      IntPtr after=WindowFromPoint(p);
+      Console.WriteLine("Z_ORDER_RECOVERY offsetMs="+offset+" blockedBy="+hit.ToInt64()+" raised="+raised+" hitAfter="+after.ToInt64()+" restored="+(after==child||IsChild(child,after))+" child="+child.ToInt64());
+     }
+    }
+   }catch(Exception error){Console.WriteLine("Z_ORDER_RECOVERY_ERROR "+error.Message);}
+  });
+ }
  public static int mouseProbeSequence=0;
  public static void WatchMouse(IntPtr parent,IntPtr child) {
   int sequence=System.Threading.Interlocked.Increment(ref mouseProbeSequence);
@@ -109,6 +133,7 @@ try {
    'CHECK' {if(-not $detached -and [HexoraNative]::IsWindow($child) -and [HexoraNative]::GetParent($child) -eq $parent -and [HexoraNative]::GetForegroundWindow() -eq $parent){$state=[HexoraNative]::Diagnostic($child);if($state -match ('focus='+$parent.ToInt64()+'(\s|$)')){[HexoraNative]::FocusHosted($parent,$child);Write-Output ('DIAG REPAIRED '+[HexoraNative]::Diagnostic($child))}}}
    'TRACE' {Write-Output ('FOCUS_TRACE '+($parts[1..($parts.Length-1)] -join ' ')+' '+[HexoraNative]::FocusTrace($parent,$child))}
    'WATCH_MOUSE' {if(-not $detached){[HexoraNative]::WatchMouse($parent,$child);Write-Output 'MOUSE_PROBE ARMED'}}
+   'RECOVER_Z' {if(-not $detached -and [HexoraNative]::GetParent($child) -eq $parent){[HexoraNative]::RecoverZOrder($parent,$child);Write-Output 'Z_ORDER_RECOVERY ARMED'}}
    'DIAG' {Write-Output ('DIAG '+($parts[1..($parts.Length-1)] -join ' ')+' '+[HexoraNative]::Diagnostic($child))}
    'HIDE' {[void][HexoraNative]::ShowWindow($child,0)}
    'DETACH' {if(-not $detached){[void][HexoraNative]::SetParent($child,[IntPtr]::Zero);[void][HexoraNative]::SetWindowLong($child,-16,$oldStyle);[void][HexoraNative]::SetWindowPos($child,[IntPtr]::Zero,120,120,1000,700,0x0024 -bor 0x0020);[void][HexoraNative]::ShowWindow($child,5);[HexoraNative]::Focus($child);$detached=$true;Write-Output ('DIAG DETACHED '+[HexoraNative]::Diagnostic($child));Write-Output 'DETACHED'}}
