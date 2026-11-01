@@ -9,6 +9,7 @@ const path = require('node:path');
 const zlib = require('node:zlib');
 
 const ID_PREFIX = 'app.hexora.taskbar-demo';
+const demoWindows = new Set(); // Keep strong references so Electron never GC-closes a window.
 app.setName('Hexora Taskbar Demo');
 app.setPath('userData', path.join(app.getPath('appData'), 'hexora-taskbar-demo'));
 if (process.platform === 'win32') app.setAppUserModelId(ID_PREFIX);
@@ -162,6 +163,8 @@ function createDemoWindow(kind, position) {
       appIconIndex: 0
     });
   }
+  demoWindows.add(window);
+  window.on('closed', () => demoWindows.delete(window));
   window.once('ready-to-show', () => window.show());
   window.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(htmlFor(kind)));
   return window;
