@@ -146,3 +146,6 @@
 :root[data-hexora-theme="obsidian"] .tab-context-menu button:hover{background:#282c35}
 :root[data-hexora-theme="obsidian"] .quick-jump{background:#20242c!important;border-color:#3b404a!important}
 :root[data-hexora-theme="obsidian"] button:focus-visible{outline-color:#a8a1ff}
+
+/* Drag-to-reorder tabs. */
+.tabs .tab{cursor:grab;touch-action:pan-x}.tabs .tab:active{cursor:grabbing}.tabs .tab.dragging{opacity:.48;background:#383344;border-color:#a897ef;box-shadow:0 5px 18px #0008}.tabs .tab:not(.dragging){transition:background-color .12s,color .12s}
