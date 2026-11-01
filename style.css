@@ -239,4 +239,4 @@ body.reordering-tabs,body.reordering-tabs *{cursor:grabbing!important;user-selec
 .tabs::-webkit-scrollbar-thumb:hover{background:#474850}
 
 /* Compact titles automatically when first row has 11+ tabs. */
-.tabs.compact-titles > .tab .name{font-size:50%;line-height:1.2}
+.tabs.compact-titles > .tab .name{font-size:80%;line-height:1.25}
