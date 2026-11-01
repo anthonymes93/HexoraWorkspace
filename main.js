@@ -475,6 +475,7 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
    return true;
   }
   else if(action==='stack-row-height'){TOP_HEIGHT=Number.isFinite(arg)?Math.max(120,Math.min(120+44*100,Math.round(arg))):120;bounds();return true;}
+  else if(action==='stack-create-pair'){const id=store.createStackPair(arg?.workspace,arg?.name,Number(arg?.sourceId),Number(arg?.targetId),arg?.parentId??null);emit();return id;}
   else if(action==='stack-create'){const id=store.createStack(arg?.workspace,arg?.name,arg?.tabId??null,arg?.parentId??null);emit();return id;}
   else if(action==='stack-assign'){store.putTabInStack(Number(arg?.tabId),arg?.stackId===null?null:Number(arg?.stackId));emit();return true;}
   else if(action==='stack-nest'){store.moveStack(Number(arg?.id),arg?.parentId===null?null:Number(arg?.parentId));emit();return true;}
