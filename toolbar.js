@@ -293,7 +293,7 @@ function paintNewTabSuggestions(){
  newTabSuggestions.replaceChildren();
  newTabSuggestions.hidden=!newTabHistoryMatches.length;
  newTabHistoryMatches.forEach((entry,index)=>{
-  const row=document.createElement('div');row.className='new-tab-suggestion-row '+(entry.kind==='site'?'new-tab-primary':'new-tab-secondary');
+  const row=document.createElement('div');row.className='new-tab-suggestion-row '+(entry.kind==='site'?'new-tab-primary':'new-tab-secondary')+(index===newTabHistorySelected?' is-active':'');
   const item=document.createElement('button');item.type='button';item.className='new-tab-suggestion';
   item.setAttribute('role','option');item.setAttribute('aria-selected',String(index===newTabHistorySelected));
   if(index===newTabHistorySelected)item.classList.add('selected');
