@@ -516,48 +516,27 @@ body.sidebar-icons-only .quick-jump{
  overflow:hidden;
 }
 
-/* Two-column shelf: sizes and gaps scale continuously with the panel. */
-body.sidebar-icons-grid .sidebar{
- --hx-grid-cell:clamp(15px,calc((var(--hexora-panel-width) - 19px) / 2),34px);
- --hx-grid-gap:clamp(3px,calc(var(--hexora-panel-width) * .07),7px);
- padding:9px 4px 8px!important;
- gap:clamp(7px,calc(var(--hexora-panel-width) * .10),12px)!important;
-}
+/* Mid-width icon shelf: balanced 2-column grid; preserve existing button sizes. */
+body.sidebar-icons-grid .sidebar{padding-left:5px!important;padding-right:5px!important}
 body.sidebar-icons-grid .workspaces,
 body.sidebar-icons-grid .quick-jumps{
  display:grid!important;
- grid-template-columns:repeat(2,var(--hx-grid-cell))!important;
+ grid-template-columns:repeat(2,minmax(0,38px))!important;
+ justify-content:center!important;
+ align-content:start!important;
+ justify-items:center!important;
+ column-gap:6px!important;
+ row-gap:7px!important;
  width:100%!important;
  max-width:100%!important;
  min-width:0!important;
- justify-content:center!important;
- justify-items:center!important;
- align-content:start!important;
- column-gap:var(--hx-grid-gap)!important;
- row-gap:clamp(5px,calc(var(--hexora-panel-width) * .07),8px)!important;
 }
 body.sidebar-icons-grid .workspace,
 body.sidebar-icons-grid .quick-jump{
- display:grid!important;place-items:center!important;
- width:var(--hx-grid-cell)!important;
- height:var(--hx-grid-cell)!important;
- min-width:0!important;min-height:0!important;
- max-width:var(--hx-grid-cell)!important;
- max-height:var(--hx-grid-cell)!important;
- padding:0!important;
+ width:34px!important;height:34px!important;
+ min-width:0!important;max-width:34px!important;
  flex:none!important;
- border-radius:clamp(4px,calc(var(--hx-grid-cell) * .23),9px)!important;
- font-size:clamp(9px,calc(var(--hx-grid-cell) * .48),17px)!important;
+ font-size:17px!important;
 }
-body.sidebar-icons-grid .workspace .emoji{
- font-size:clamp(9px,calc(var(--hx-grid-cell) * .53),18px)!important;
- line-height:1!important;
-}
-body.sidebar-icons-grid .quick-jumps{
- box-sizing:border-box;
- padding:clamp(6px,calc(var(--hexora-panel-width) * .10),10px) 0 0!important;
- margin:0!important;
- overflow-x:hidden!important;
- overflow-y:auto!important;
- border-top:1px solid #393641;
-}
+body.sidebar-icons-grid .workspace .emoji{font-size:18px!important}
+body.sidebar-icons-grid .quick-jumps{padding-top:11px!important}
