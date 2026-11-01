@@ -167,6 +167,7 @@ for(const name of ['backup','configure','unlock','restore'])$('recovery-'+name).
 
 // Render one horizontal row per level along the current nested-stack path.
 let openStackPath=[];
+let stackRowsDismissed=false;
 let lastRowHeight=120;
 function renderSecondTabRow(page){
  const host=$('stack-rows');host.replaceChildren();
@@ -174,10 +175,13 @@ function renderSecondTabRow(page){
  const stacks=new Map(data.stacks.map(s=>[s.id,s]));
  const members=new Map(data.members.map(m=>[m.tab_id,m.stack_id]));
  const activeStack=members.get(page.activeId);
- if(activeStack&&stacks.has(activeStack)){
+ if(!stackRowsDismissed&&selectedStackId&&stacks.has(selectedStackId)){
+  openStackPath=[];let node=stacks.get(selectedStackId),seen=new Set();
+  while(node&&!seen.has(node.id)){seen.add(node.id);openStackPath.unshift(node.id);node=stacks.get(node.parent_id);}
+ }else if(!stackRowsDismissed&&activeStack&&stacks.has(activeStack)){
   openStackPath=[];let node=stacks.get(activeStack),seen=new Set();
   while(node&&!seen.has(node.id)){seen.add(node.id);openStackPath.unshift(node.id);node=stacks.get(node.parent_id);}
- }else if(selectedStackId&&stacks.has(selectedStackId)){
+ }else if(false&&selectedStackId&&stacks.has(selectedStackId)){
   openStackPath=[];let node=stacks.get(selectedStackId),seen=new Set();
   while(node&&!seen.has(node.id)){seen.add(node.id);openStackPath.unshift(node.id);node=stacks.get(node.parent_id);}
  }else openStackPath=[];
@@ -197,7 +201,7 @@ function renderSecondTabRow(page){
    tabs.append(el);
   }
   const close=document.createElement('button');close.className='stack-row-close';close.textContent='×';close.title='Hide stack rows';
-  close.onclick=()=>{selectedStackId=null;openStackPath=[];renderSecondTabRow({...page,activeId:null});};
+  close.onclick=()=>{selectedStackId=null;stackRowsDismissed=true;openStackPath=[];renderSecondTabRow({...page,activeId:null});};
   row.append(label,tabs,close);host.append(row);
  }
  const height=120+44*openStackPath.length;
@@ -292,13 +296,15 @@ window.addEventListener('pointermove',e=>{
  const targetId=targetTab&&targetTab!==d.tab?Number(targetTab.dataset.tabId):null;
  const targetRow=under?.closest('.stack-tabs');
  d.targetRow=targetRow?Number(targetRow.dataset.stackId):under?.closest('#tabs')?null:undefined;
+ if(d.targetRow===undefined){d.hoverId=null;d.hoverSince=0;}
  if(targetId&&targetId!==d.id){
   if(d.hoverId!==targetId){d.hoverId=targetId;d.hoverSince=performance.now();}
  }else{d.hoverId=null;d.hoverSince=0;}
  for(const node of document.querySelectorAll('.stack-drop-target'))node.classList.remove('stack-drop-target');
- if(d.hoverId&&performance.now()-d.hoverSince>320)targetTab?.classList.add('stack-drop-target');
+ if(d.hoverId&&performance.now()-d.hoverSince>420)targetTab?.classList.add('stack-drop-target');
  // Preserve the original fluid 10%-overlap reorder within each row.
  if(d.targetRow!==d.sourceStack)return;
+ if(d.hoverId&&performance.now()-d.hoverSince>150)return;
  const direction=Math.sign(e.clientX-d.lastX);d.lastX=e.clientX;
  const sibling=direction>0?d.tab.nextElementSibling:direction<0?d.tab.previousElementSibling:null;
  if(sibling&&sibling.classList.contains('tab')){
@@ -324,7 +330,7 @@ window.addEventListener('pointerup',async()=>{
  const d=tabPointer;if(!d)return;
  if(d.moving)suppressTabClickUntil=Date.now()+300;
  const moving=d.moving;
- const targetId=d.hoverId&&performance.now()-d.hoverSince>=320?d.hoverId:null;
+ const targetId=d.hoverId&&performance.now()-d.hoverSince>=420?d.hoverId:null;
  const destination=d.targetRow;
  const source=d.sourceStack;
  for(const node of document.querySelectorAll('.stack-drop-target'))node.classList.remove('stack-drop-target');
@@ -337,13 +343,20 @@ window.addEventListener('pointerup',async()=>{
   if(targetId&&targetId!==d.id){
    // Dropping onto a tab creates a child stack below its existing row.
    const parent=membership.get(targetId)||null;
-   const newStack=await action('stack-create',{workspace:d.workspace,name:'New Stack',tabId:targetId,parentId:parent});
-   await action('stack-assign',{tabId:d.id,stackId:newStack});
-   selectedStackId=newStack;await refresh();
+   // A new group is a child of the destination row. Existing stacks are
+   // entered directly when dropping from a different row onto a member.
+   if(destination!==source&&parent!==null){
+    await action('stack-assign',{tabId:d.id,stackId:parent});
+    selectedStackId=parent;
+   }else{
+    const newStack=await action('stack-create-pair',{workspace:d.workspace,name:'New Stack',sourceId:d.id,targetId,parentId:parent});
+    selectedStackId=newStack;
+   }
+   stackRowsDismissed=false;await refresh();
   }else if(destination!==undefined&&destination!==source){
    // Empty space in another row moves the tab into that row.
    await action('stack-assign',{tabId:d.id,stackId:destination});
-   selectedStackId=destination;await refresh();
+   selectedStackId=destination;stackRowsDismissed=false;await refresh();
   }else if(source===null){
    const ids=[...tabStrip.querySelectorAll('.tab')].map(el=>Number(el.dataset.tabId)).filter(Number.isSafeInteger);
    await action('reorder-tabs',{workspace:d.workspace,ids});
