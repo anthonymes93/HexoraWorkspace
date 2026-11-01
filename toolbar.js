@@ -493,6 +493,7 @@ tabStrip.addEventListener('drop',e=>{
 function hideTabMenu(restore=true){ $('tab-workspace-submenu').classList.add('hidden');$('tab-menu-move').setAttribute('aria-expanded','false'); const wasOpen=!$('tab-context-menu').classList.contains('hidden');$('tab-context-menu').classList.add('hidden');contextTab=null;if(wasOpen&&restore&&!websiteTarget)action('modal',false); }
 function showTabMenu(x,y,item){
  contextTab=item;
+ $('tab-menu-current-title').textContent=item.title||'Untitled tab';
  action('modal',true);
  $('tab-menu-chrome').textContent=item.chromeMode?'✓ Disable Chrome compatibility':'◉ Enable Chrome compatibility';
  const pref=item.panelPreference||{mode:item.panelMode,source:'default'};
@@ -519,6 +520,17 @@ function showWebsiteModal(newTab){
 function hideWebsiteModal(){
  $('website-overlay').classList.add('hidden');websiteTarget=null;action('modal',false);
 }
+$('tab-menu-rename').onclick=async()=>{
+ const tab=contextTab;if(!tab)return;
+ hideTabMenu();
+ const name=prompt('Rename tab:',tab.title||'New tab');
+ if(name===null)return;
+ const trimmed=name.trim();
+ if(!trimmed){alert('Enter a tab name.');return;}
+ if(trimmed.length>100){alert('Tab names must be 100 characters or less.');return;}
+ try{await action('rename-tab',{id:tab.id,name:trimmed});await refresh();}
+ catch(error){alert('Could not rename tab: '+error.message);}
+};
 $('tab-menu-replace').onclick=()=>showWebsiteModal(false);
 $('tab-menu-new').onclick=()=>showWebsiteModal(true);
 for(const mode of ['wide','thin']){
