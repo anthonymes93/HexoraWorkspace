@@ -4,6 +4,27 @@ On the `experiment/vscode-no-flash` implementation, Hexora already saves native
 VS Code tab IDs and workspaces in SQLite. This change adds a **separate, durable
 project folder per tab**, saved in the same database.
 
+## Hexora project picker: Windows paths and real files
+
+The branded picker displays the **real local filesystem**, not a demo list.
+Under **This PC** you can browse available Windows drive letters; shortcuts
+for Home, Projects, Clients, Downloads and Desktop are derived from actual
+directories that exist on the machine. Recent project cards are based on
+Hexora's saved VS Code projects. Folders and ordinary files are both visible;
+only folders can be launched as VS Code projects.
+
+The address bar under the breadcrumbs is **always editable**. Click it or
+press **Ctrl+L**, then type/paste a full path such as `C:\\Projects\\MySite`
+or a local `file:///C:/Projects/MySite` URL. Press **Enter / Go** to browse,
+or select **Open Project** to validate and launch the typed directory directly.
+Web URLs (such as `https://example.com`) are intentionally not accepted as
+local folder paths.
+
+Search filters the current directory via the Electron main process, so even
+if a very large directory displays only the first 1,200 matching entries,
+search still covers every immediate child. File contents are never opened or
+read by the picker. It displays file/folder names and modified timestamps.
+
 ## Fast native opening without tab context menus
 
 1. Click **⌘ VS Code** in Hexora. A native Windows folder picker appears
