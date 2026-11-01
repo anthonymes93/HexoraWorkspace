@@ -22,5 +22,22 @@
     "untrustedWorkspaces": {
       "supported": true
     }
+  },
+  "contributes": {
+    "commands": [
+      {
+        "command": "hexoraSession.openProject",
+        "title": "Open Project in This Tab",
+        "category": "Hexora"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "hexoraSession.openProject",
+        "key": "ctrl+k ctrl+o",
+        "mac": "cmd+k cmd+o",
+        "when": "hexoraSession.active"
+      }
+    ]
   }
 }
