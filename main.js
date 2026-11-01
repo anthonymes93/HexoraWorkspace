@@ -1,5 +1,5 @@
 'use strict';
-const {app,BrowserWindow,WebContentsView,View,session,ipcMain,shell,dialog,clipboard,safeStorage}=require('electron');
+const {app,BrowserWindow,WebContentsView,View,session,ipcMain,shell,dialog,clipboard,safeStorage,Menu}=require('electron');
 const path=require('node:path');
 const {screen}=require('electron');
 const {TabStore}=require('./tab-store');
@@ -598,6 +598,21 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
   return true;
  });
 
+ ipcMain.handle('workspace:context-menu',(event,data)=>{
+  if(event.sender!==win.webContents)throw Error('Invalid menu caller');
+  const id=String(data?.id||'');
+  const name=String(data?.name||'Workspace').slice(0,120);
+  const count=Math.max(0,Number(data?.count)||0);
+  const menu=Menu.buildFromTemplate([
+   {label:name,enabled:false},
+   {label:count+' saved '+(count===1?'tab':'tabs'),enabled:false},
+   {type:'separator'},
+   {label:'Open workspace',click:()=>win.webContents.send('workspace:menu-action',{id,action:'open'})},
+   {label:'Rename / customize',click:()=>win.webContents.send('workspace:menu-action',{id,action:'rename'})}
+  ]);
+  menu.popup({window:win,x:Math.round(Math.max(0,Number(data?.x)||0)),y:Math.round(Math.max(0,Number(data?.y)||0))});
+  return true;
+ });
  ipcMain.handle('tabs:page',(_e,arg)=>sendPage(arg));
  ipcMain.handle('tabs:search',(_e,term)=>store.search(term,50).map(pageRow));
  ipcMain.handle('tabs:lookup',(_e,id)=>{const row=store.get(Number(id));return row?pageRow(row):null;});
