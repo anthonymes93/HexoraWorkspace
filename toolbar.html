@@ -8,6 +8,7 @@
   <button id="new-rail" class="railbtn" title="New ChatGPT tab">＋</button>
   <button id="split-rail" class="railbtn" title="Split view — coming soon" disabled>◫</button>
   <button id="recovery-rail" class="railbtn" title="Encrypted backups">⛨</button>
+  <button id="history-rail" class="railbtn" title="Browsing history" aria-label="Browsing history">◷</button>
   <button id="statistics-rail" class="railbtn" title="Statistics and task manager">▥</button>
   <button id="extensions-rail" class="railbtn" title="Chrome extensions" aria-label="Chrome extensions"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 13.5V18a2 2 0 0 1-2 2h-4.5a2.5 2.5 0 1 0-5 0H6a2 2 0 0 1-2-2v-4.5a2.5 2.5 0 1 0 0-5V6a2 2 0 0 1 2-2h4.5a2.5 2.5 0 1 0 5 0H18a2 2 0 0 1 2 2v2.5a2.5 2.5 0 1 0 0 5Z"/></svg></button>
   <button id="theme-rail" class="railbtn" title="Appearance / themes">◐</button>
@@ -109,6 +110,13 @@
   <p id="quick-jump-error" class="website-error" role="alert"></p>
   <div class="website-actions"><button id="quick-jump-cancel" class="pill" type="button">Cancel</button><button class="pill primary" type="submit">Add shortcut</button></div>
  </form></div></div>
+<div id="history-overlay" class="overlay hidden"><section class="history-dialog" role="dialog" aria-modal="true" aria-label="Browsing history">
+ <header class="history-header"><div><span class="history-eyebrow">HEXORA / BROWSER</span><h2><span>◷</span> History</h2><p>Your browsing timeline, beautifully organized.</p></div><button id="history-close" class="history-icon-button" aria-label="Close history">×</button></header>
+ <div class="history-tools"><div class="history-search"><span>⌕</span><input id="history-search" type="search" placeholder="Search titles, websites, or URLs…" autocomplete="off" aria-label="Search history"/></div><select id="history-range" aria-label="Date filter"><option value="all">All time</option><option value="today">Today</option><option value="week">Last 7 days</option><option value="month">Last 30 days</option></select><button id="history-clear" class="history-clear">Clear history</button></div>
+ <div class="history-summary"><div><strong id="history-count">0</strong><span>Visits shown</span></div><div><strong id="history-sites">0</strong><span>Websites</span></div><div class="history-tip">Select any entry to open it in a new tab</div></div>
+ <div class="history-content"><div id="history-list" class="history-list"></div></div>
+ <footer class="history-footer"><span>History begins recording after this update; previous visits cannot be reconstructed.</span><span id="history-message" role="status"></span></footer>
+ </section></div>
 <div id="appearance-overlay" class="overlay hidden"><section class="dialog theme-dialog" role="dialog" aria-modal="true" aria-label="Appearance settings">
  <div class="dialog-header"><b>Appearance</b><button id="appearance-close" aria-label="Close">×</button></div>
  <p class="hint">Choose how Hexora looks. Your selection is saved and restored automatically.</p>
