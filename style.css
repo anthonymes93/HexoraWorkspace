@@ -673,3 +673,15 @@ body.sidebar-trim-workspace-details:not(.sidebar-icons-only) .workspace{gap:6px}
 #new-tab-overlay .new-tab-confirm>div{display:flex;gap:9px;justify-content:flex-end}
 #new-tab-overlay .new-tab-confirm button{border:1px solid #6c587b;background:#393046;color:#eee8f8;padding:8px 16px;border-radius:8px;cursor:pointer}
 #new-tab-overlay .new-tab-confirm button:last-child{background:#9b6b8e}
+
+/* Smart Bar hierarchy: primary destinations first, history visually secondary */
+#new-tab-overlay .new-tab-suggestion-row.new-tab-primary{background:linear-gradient(110deg,#3a2d55,#302741);border:1px solid rgba(177,145,248,.42);margin-bottom:5px}
+#new-tab-overlay .new-tab-suggestion-row.new-tab-primary .new-tab-suggestion{display:grid;grid-template-columns:32px minmax(0,1fr);grid-template-rows:auto auto;column-gap:10px;align-items:center;padding:13px}
+#new-tab-overlay .new-tab-primary-icon{grid-column:1;grid-row:1/3;display:grid;place-items:center;width:31px;height:31px;border-radius:9px;background:#594278;color:#dac7ff;font-size:19px}
+#new-tab-overlay .new-tab-primary strong{grid-column:2;grid-row:1;font-size:14px;color:#fff}
+#new-tab-overlay .new-tab-primary span:not(.new-tab-primary-icon){grid-column:2;grid-row:2;color:#c5b3df;font-size:11px}
+#new-tab-overlay .new-tab-secondary .new-tab-suggestion{padding:8px 12px 8px 17px}
+#new-tab-overlay .new-tab-secondary strong{font-size:12px;font-weight:550;color:#ded7e9}
+#new-tab-overlay .new-tab-secondary span{font-size:10px;color:#9d92ad}
+#new-tab-overlay .new-tab-secondary .new-tab-dismiss{opacity:.7}
+#new-tab-overlay .new-tab-secondary:hover .new-tab-dismiss{opacity:1}
