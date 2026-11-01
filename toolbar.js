@@ -232,8 +232,9 @@ async function renameStack(stack){
 function attachFaviconMarquee(img,tab){
  if(img.dataset.marqueeBound)return;
  img.dataset.marqueeBound='1';
- let raf=0,last=0,hold=0,expanded=false;
+ let raf=0,last=0,hold=0,expanded=false,hoverTimer=null;
  const stop=()=>{
+  clearTimeout(hoverTimer);hoverTimer=null;
   cancelAnimationFrame(raf);raf=0;last=0;hold=0;
   const title=tab.querySelector('.tab-title-lines > .name');
   if(title)title.scrollLeft=0;
@@ -254,7 +255,10 @@ function attachFaviconMarquee(img,tab){
   raf=requestAnimationFrame(tick);
  };
  img.addEventListener('mouseenter',()=>{
-  if(raf||expanded)return;
+  if(raf||expanded||hoverTimer)return;
+  hoverTimer=setTimeout(()=>{
+   hoverTimer=null;
+   if(!img.matches(':hover')||!img.isConnected)return;
   const title=tab.querySelector('.tab-title-lines > .name');
   if(!title)return;
   const overflow=title.scrollWidth-title.clientWidth;
@@ -270,6 +274,7 @@ function attachFaviconMarquee(img,tab){
    return;
   }
   title.scrollLeft=0;raf=requestAnimationFrame(tick);
+  },120);
  });
  img.addEventListener('mouseleave',stop);
  tab.addEventListener('pointerleave',stop);
