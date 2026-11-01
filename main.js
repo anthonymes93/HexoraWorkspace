@@ -1,5 +1,5 @@
 'use strict';
-const {app,BrowserWindow,WebContentsView,View,session,ipcMain,shell,dialog}=require('electron');
+const {app,BrowserWindow,WebContentsView,View,session,ipcMain,shell,dialog,clipboard}=require('electron');
 const path=require('node:path');
 const {screen}=require('electron');
 const {TabStore}=require('./tab-store');
@@ -547,6 +547,17 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
  ipcMain.handle('vault:get',(_e,id)=>vault.get(id));
  ipcMain.handle('vault:save',(_e,entry)=>vault.save(entry));
  ipcMain.handle('vault:delete',(_e,id)=>vault.remove(id));
+ ipcMain.handle('vault:copy',(_e,args)=>{
+  if(vault.status().locked)throw Error('Vault locked');
+  const entry=vault.get(args?.id);
+  const field=args?.field;
+  if(field!=='username'&&field!=='password')throw Error('Invalid field');
+  const value=entry[field]||'';
+  clipboard.writeText(value);
+  setTimeout(()=>{if(clipboard.readText()===value)clipboard.clear();},30000).unref?.();
+  return true;
+ });
+
  ipcMain.handle('tabs:page',(_e,arg)=>sendPage(arg));
  ipcMain.handle('tabs:search',(_e,term)=>store.search(term,50).map(pageRow));
  ipcMain.handle('tabs:lookup',(_e,id)=>{const row=store.get(Number(id));return row?pageRow(row):null;});
