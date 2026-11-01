@@ -1390,15 +1390,18 @@ v('vault-entry-form').onsubmit=async e=>{
 v('vault-delete').onclick=async()=>{if(!vaultSelected||!confirm('Delete this saved login permanently?'))return;await window.hexora.vault.delete(vaultSelected);vaultClearEditor();v('vault-entry-form').classList.add('hidden');await vaultLoad();};
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&vaultOpen)vaultClose();});
 
-// Each click creates a new SQLite-backed tab with its own native VS Code desktop window.
+// One click opens the Hexora project browser; Ctrl-click preserves the fast
+// native blank Code path, and Shift-click still repairs a hosted editor.
  $('native-code-rail').addEventListener('click',async event=>{
   try{
    if(event.shiftKey){await window.hexora.nativeCode.repair();return;}
-   const tab=await action('open-native-code',{workspace:activeWorkspace,skipPicker:event.ctrlKey});
+   const project=event.ctrlKey?null:await window.hexoraProjectPicker.open();
+   if(!event.ctrlKey&&!project)return; // Cancel never creates a VS Code tab.
+   const tab=await action('open-native-code',{workspace:activeWorkspace,skipPicker:true,...(project?{projectPath:project}:{})});
    if(tab.workspace!==activeWorkspace){activeWorkspace=tab.workspace;offset=0;save();}
    await refresh();
    if(document.activeElement instanceof HTMLElement)document.activeElement.blur();
-  }catch(error){alert('Native VS Code: '+error.message);}
+  }catch(error){alert('VS Code project: '+error.message);}
  });
  $('native-code-rail').addEventListener('contextmenu',async event=>{
   event.preventDefault();
