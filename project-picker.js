@@ -171,8 +171,10 @@
   if(!opened)return;
   opened=false;sequence++;
   root.classList.add('hidden');root.removeEventListener('keydown',onKeydown);
-  window.hexora.action('modal',false).catch(()=>{});
-  const resolve=finish;finish=null;if(resolve)resolve(value);
+  const resolve=finish;finish=null;
+  // Complete the native HWND visibility transition before creating a new
+  // Code tab; otherwise the first SHOW can be swallowed by modalVisible.
+  window.hexora.action('modal',false).catch(()=>{}).finally(()=>{if(resolve)resolve(value);});
  }
  function openSelected(){if(!loading&&selected)close(selected);}
  function onKeydown(event){
