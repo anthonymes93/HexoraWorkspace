@@ -888,7 +888,31 @@ document.addEventListener('contextmenu',e=>{if(!e.target.closest('.tab, .chat-ro
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){hideTabRowMenu();hideTabMenu();if(websiteTarget)hideWebsiteModal();}});
 
 // The main process owns one animation timeline for both the native browser view and the toolbar layout.
-window.hexora.onSidebarFrame(width=>{const value=Math.max(64,Math.min(560,width));document.documentElement.style.setProperty('--hexora-panel-width',(value-64)+'px');document.documentElement.style.setProperty('--hexora-content-left',value+'px');document.body.classList.toggle('panel-collapsed',value<=65);if(!sidebarDrag)sidebarOpen=value>65;document.body.classList.toggle('sidebar-icons-only',value>65&&value<=184);document.documentElement.style.setProperty('--hexora-sidebar-fluid',String(Math.max(0,Math.min(1,(value-240)/95))));});
+let sidebarWasAnimating=false;
+window.hexora.onSidebarFrame((width,transitioning=false)=>{
+ const value=Math.max(64,Math.min(560,width));
+ const root=document.documentElement,body=document.body;
+ if(transitioning&&!sidebarWasAnimating){
+  // Keep one presentation style while native viewport width animates.
+  // Opening from fully closed should reveal the regular expanded layout.
+  const fromClosed=body.classList.contains('panel-collapsed');
+  body.classList.toggle('sidebar-transition-icons',!fromClosed&&body.classList.contains('sidebar-icons-only'));
+  body.classList.add('sidebar-auto-transition');
+ }
+ sidebarWasAnimating=transitioning;
+ root.style.setProperty('--hexora-panel-width',(value-64)+'px');
+ root.style.setProperty('--hexora-content-left',value+'px');
+ if(!sidebarDrag)sidebarOpen=value>65;
+ if(!transitioning){
+  body.classList.remove('sidebar-auto-transition','sidebar-transition-icons');
+  body.classList.toggle('panel-collapsed',value<=65);
+  body.classList.toggle('sidebar-icons-only',value>65&&value<=184);
+  root.style.setProperty('--hexora-sidebar-fluid',String(Math.max(0,Math.min(1,(value-240)/95))));
+ }else{
+  body.classList.remove('panel-collapsed');
+  body.classList.toggle('sidebar-icons-only',body.classList.contains('sidebar-transition-icons'));
+ }
+});
 
 function openWorkspaceEditor(id){
  const workspace=id?workspaces.find(w=>w.id===id):null;workspaceEditing=id||null;
