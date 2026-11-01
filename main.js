@@ -331,7 +331,8 @@ function setSidebarWidth(collapsed){
  frame();
 }
 
-function pageRow(r){return{id:r.id,url:r.url,nativeCode:isCodeTab(r),title:store.getMeta('tabCustomTitle:'+r.id)||r.title,workspace:r.workspace,pinned:!!r.pinned,muted:!!r.muted,lastActive:r.last_active,ordinal:r.ordinal,favicon:(favicons.get(r.id)?.origin===originOf(r.url)?favicons.get(r.id)?.url:null)||store.getMeta('favicon:'+originOf(r.url))||null,faviconFallback:(()=>{try{const u=new URL(r.url);return ['http:','https:'].includes(u.protocol)?u.origin+'/favicon.ico':null;}catch{return null;}})(),active:r.id===activeId,detached:detached.has(r.id),loading:!!loading.get(r.id),suspended:isCodeTab(r)?false:!live.has(r.id),chromeMode:chromeMode(r.id),panelMode:panelMode(r.id),panelPreference:panelPreference(r.id)};}
+function pageRow(r){const codeProject=isCodeTab(r)?store.getCodeProject(r.id)?.project_path||null:null;
+ return{id:r.id,url:r.url,nativeCode:isCodeTab(r),nativeCodeProject:codeProject,nativeCodeProjectMissing:!!codeProject&&!fs.existsSync(codeProject),title:store.getMeta('tabCustomTitle:'+r.id)||r.title,workspace:r.workspace,pinned:!!r.pinned,muted:!!r.muted,lastActive:r.last_active,ordinal:r.ordinal,favicon:(favicons.get(r.id)?.origin===originOf(r.url)?favicons.get(r.id)?.url:null)||store.getMeta('favicon:'+originOf(r.url))||null,faviconFallback:(()=>{try{const u=new URL(r.url);return ['http:','https:'].includes(u.protocol)?u.origin+'/favicon.ico':null;}catch{return null;}})(),active:r.id===activeId,detached:detached.has(r.id),loading:!!loading.get(r.id),suspended:isCodeTab(r)?false:!live.has(r.id),chromeMode:chromeMode(r.id),panelMode:panelMode(r.id),panelPreference:panelPreference(r.id)};}
 function state(workspace='web',offset=0){const active=activeId?store.get(activeId):null;return{activeId,total:store.total(),counts:store.counts(),tabs:store.page(workspace,offset,50).map(pageRow),active:active?.workspace===workspace?active:null,activePanelMode:activeId?panelMode(activeId):'wide',stackData:store.stacks(workspace),offset};}
 function emit(){if(!win||win.isDestroyed())return;clearTimeout(stateTimer);stateTimer=setTimeout(()=>{if(!win||win.isDestroyed())return;win.webContents.send('tabs:changed');},70);}
 function activate(id){
@@ -392,8 +393,16 @@ function pumpNativeCodeLaunchQueue(){
 function startNativeCodeHost(tabId,entry){
  const script=path.join(__dirname,'experiments','vscode-hexora-host.ps1');
  const hwnd=win.getNativeWindowHandle().readBigUInt64LE(0).toString();
+ // Each tab uses its own saved project path. Passing an argument vector to
+ // PowerShell (rather than interpolating into a command) avoids shell injection.
+ const configured=store.getCodeProject(tabId)?.project_path;
+ let projectPath=null;
+ if(configured){
+  try{if(fs.statSync(configured).isDirectory())projectPath=configured;}
+  catch(error){console.warn('[Native VS Code tab '+tabId+'] Saved project unavailable; opening Code without a folder:',configured,error.message);}
+ }
  let proc;
- try{proc=spawn('powershell.exe',['-NoProfile','-STA','-ExecutionPolicy','Bypass','-File',script,'-ParentHwnd',hwnd],{stdio:['pipe','pipe','pipe'],windowsHide:true});}
+ try{proc=spawn('powershell.exe',['-NoProfile','-STA','-ExecutionPolicy','Bypass','-File',script,'-ParentHwnd',hwnd,...(projectPath?['-ProjectPath',projectPath]:[])],{stdio:['pipe','pipe','pipe'],windowsHide:true});}
  catch(error){console.error('[Native VS Code tab '+tabId+'] spawn:',error.message);nativeCodeHosts.delete(tabId);nativeCodeLaunchingId=null;setImmediate(pumpNativeCodeLaunchQueue);return;}
  entry.proc=proc;
  let stdoutBuffer='',finished=false;
@@ -793,6 +802,39 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
   menu.popup({window:win,x:Math.round(Math.max(0,Number(data?.x)||0)),y:Math.round(Math.max(0,Number(data?.y)||0))});
   return true;
  });
+ ipcMain.handle('native-code:choose-project',async(event,id)=>{
+  if(event.sender!==win.webContents)throw new Error('Invalid caller');
+  const tabId=Number(id),row=store.get(tabId);
+  if(!Number.isSafeInteger(tabId)||!row||!isCodeTab(row))throw new Error('VS Code tab no longer exists.');
+  const previous=store.getCodeProject(tabId)?.project_path;
+  const selected=await dialog.showOpenDialog(win,{
+   title:'Choose project folder for this VS Code tab',
+   defaultPath:previous&&fs.existsSync(previous)?previous:app.getPath('home'),
+   properties:['openDirectory']
+  });
+  if(selected.canceled||!selected.filePaths[0])return {cancelled:true};
+  // A user-picked directory, not arbitrary renderer-provided filesystem input.
+  const selectedPath=path.resolve(selected.filePaths[0]);
+  if(!fs.statSync(selectedPath).isDirectory())throw new Error('Selected project is not a folder.');
+  // The tab may have been closed while the native directory picker was open.
+  if(!isCodeTab(store.get(tabId)))throw new Error('VS Code tab was closed.');
+  store.setCodeProject(tabId,selectedPath);
+  if(!store.getMeta('tabCustomTitle:'+tabId)){
+   const updated=toModel(store.get(tabId));
+   updated.title=('VS Code · '+path.basename(selectedPath)).slice(0,100);
+   store.save(updated);
+  }
+  emit();
+  return {cancelled:false,projectPath:selectedPath,appliesOnNextLaunch:nativeCodeHosts.has(tabId)};
+ });
+ ipcMain.handle('native-code:clear-project',async(event,id)=>{
+  if(event.sender!==win.webContents)throw new Error('Invalid caller');
+  const tabId=Number(id),row=store.get(tabId);
+  if(!Number.isSafeInteger(tabId)||!isCodeTab(row))throw new Error('VS Code tab no longer exists.');
+  store.clearCodeProject(tabId);
+  if(!store.getMeta('tabCustomTitle:'+tabId)){const updated=toModel(row);updated.title='Visual Studio Code';store.save(updated);}
+  emit();return {cleared:true,appliesOnNextLaunch:nativeCodeHosts.has(tabId)};
+ });
  ipcMain.handle('native-code:repair',async event=>{
   if(event.sender!==win.webContents)throw Error('Invalid caller');
   const tabId=activeId,entry=activeCodeEntry();
@@ -858,7 +900,7 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
    const title=typeof arg?.title==='string'&&arg.title.trim()?arg.title.trim().slice(0,100):new URL(url).hostname;
    const id=arg?.newTab?newTab(typeof arg.workspace==='string'?arg.workspace:'web',url):Number(arg?.id);
    const row=store.get(id);if(!row)throw new Error('Tab no longer exists.');
-   if(isCodeTab(row))stopNativeCode(id);
+   if(isCodeTab(row)){stopNativeCode(id);store.clearCodeProject(id);}
    const t=toModel(row);t.url=url;t.title=title;store.save(t);
    const view=live.get(id);
    if(view){view.webContents.loadURL(url).catch(err=>console.error('Could not open website',err));}

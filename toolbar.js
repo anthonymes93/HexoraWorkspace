@@ -172,7 +172,7 @@ function render(p){
  renderStackTree(conversations,p);
  for(const item of p.tabs){
   const el=document.createElement('button');el.className='chat-row'+(item.active?' active':'');
-  const symbol=document.createElement('span');symbol.className='symbol';symbol.textContent=item.nativeCode?'⌘':item.suspended?'☾':'▤';
+  const symbol=document.createElement('span');symbol.className='symbol';symbol.textContent=item.nativeCodeProjectMissing?'⚠':item.nativeCode?'⌘':item.suspended?'☾':'▤';
   const name=document.createElement('span');name.className='label';name.textContent=item.title||'New tab';
   const mute=document.createElement('span');mute.className='quick-pin';mute.title=item.muted?'Unmute':'Mute';mute.textContent=item.muted?'◉':'♫';mute.onclick=e=>{e.stopPropagation();action('mute',item.id);};
   const detach=document.createElement('span');detach.className='quick-pin';detach.title='Detach into another window';detach.textContent='↗';detach.onclick=e=>{e.stopPropagation();action('detach',item.id);};
@@ -826,6 +826,12 @@ function showTabMenu(x,y,item){
  action('modal',true);
  $('tab-menu-chrome').textContent=item.chromeMode?'✓ Disable Chrome compatibility':'◉ Enable Chrome compatibility';
   $('tab-menu-chrome').disabled=!!item.nativeCode;
+ const projectName=item.nativeCodeProject?.split(/[\\/]/).filter(Boolean).pop();
+ $('tab-menu-code-project').classList.toggle('hidden',!item.nativeCode);
+ $('tab-menu-code-clear').classList.toggle('hidden',!item.nativeCodeProject);
+ $('tab-menu-code-project').querySelector('span:last-child').textContent=
+  item.nativeCodeProjectMissing?'⚠ Saved project missing — choose folder…':
+  projectName?'Change VS Code project: '+projectName:'Choose VS Code project folder…';
  const pref=item.panelPreference||{mode:item.panelMode,source:'default'};
  $('tab-menu-panel-wide').textContent=(pref.tabOverride==='wide'?'✓ ':'')+'This tab: Wide';
  $('tab-menu-panel-thin').textContent=(pref.tabOverride==='thin'?'✓ ':'')+'This tab: Thin';
@@ -889,6 +895,24 @@ $('tab-menu-rename').onclick=()=>{
   catch(err){error.textContent=err.message;save.disabled=false;}
  };
  requestAnimationFrame(()=>{input.focus();input.select();});
+};
+$('tab-menu-code-project').onclick=async()=>{
+ const tab=contextTab;if(!tab?.nativeCode)return;
+ hideTabMenu(false);
+ let result;
+ try{result=await window.hexora.nativeCode.chooseProject(tab.id);}
+ catch(error){alert('VS Code project: '+error.message);}
+ finally{await action('modal',false);await refresh();}
+ if(result&&!result.cancelled&&result.appliesOnNextLaunch)alert('Project saved for this VS Code tab. It will load when Hexora next launches this editor (for example, after restarting Hexora). The current editor window is unchanged to protect unsaved work.');
+};
+$('tab-menu-code-clear').onclick=async()=>{
+ const tab=contextTab;if(!tab?.nativeCode)return;
+ hideTabMenu(false);
+ try{
+  const result=await window.hexora.nativeCode.clearProject(tab.id);
+  if(result.appliesOnNextLaunch)alert('Saved project cleared. The change takes effect next time Hexora launches this editor.');
+ }catch(error){alert('VS Code project: '+error.message);}
+ finally{await action('modal',false);await refresh();}
 };
 $('tab-menu-url-form').onsubmit=async e=>{
  e.preventDefault();

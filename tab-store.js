@@ -26,6 +26,13 @@ class TabStore {
   if(!this.db.prepare('PRAGMA table_info(tab_stacks)').all().some(c=>c.name==='ordinal'))this.db.exec('ALTER TABLE tab_stacks ADD COLUMN ordinal INTEGER NOT NULL DEFAULT 0');
   this.db.exec('UPDATE tab_stacks SET ordinal=COALESCE((SELECT ordinal FROM tabs WHERE id=tab_stacks.anchor_tab_id),id) WHERE ordinal=0');
   this.db.exec('PRAGMA foreign_keys=ON');
+  // A stable project association belongs to a tab ID, not a transient VS Code HWND.
+  // Keeping this in the same WAL database includes it in Hexora recovery snapshots.
+  this.db.exec(`CREATE TABLE IF NOT EXISTS native_code_projects (
+   tab_id INTEGER PRIMARY KEY REFERENCES tabs(id) ON DELETE CASCADE,
+   project_path TEXT NOT NULL,
+   updated_at INTEGER NOT NULL
+  );`);
   this.db.exec(`CREATE TABLE IF NOT EXISTS browsing_history (id INTEGER PRIMARY KEY AUTOINCREMENT,url TEXT NOT NULL,title TEXT NOT NULL,domain TEXT NOT NULL,visited_at INTEGER NOT NULL,tab_id INTEGER);
    CREATE INDEX IF NOT EXISTS idx_history_time ON browsing_history(visited_at DESC,id DESC);`);
   this.q={
@@ -78,11 +85,26 @@ class TabStore {
    this.db.exec('COMMIT');
   }catch(e){this.db.exec('ROLLBACK');throw e;}
  }
+ getCodeProject(tabId){
+  if(!Number.isSafeInteger(tabId)||tabId<1)return null;
+  return this.db.prepare('SELECT project_path,updated_at FROM native_code_projects WHERE tab_id=?').get(tabId)||null;
+ }
+ setCodeProject(tabId,projectPath){
+  if(!Number.isSafeInteger(tabId)||tabId<1||!this.get(tabId))throw new Error('VS Code tab not found');
+  if(typeof projectPath!=='string'||projectPath.length>32767||!path.isAbsolute(projectPath))throw new Error('Invalid absolute project path');
+  this.db.prepare(`INSERT INTO native_code_projects(tab_id,project_path,updated_at) VALUES(?,?,?)
+   ON CONFLICT(tab_id) DO UPDATE SET project_path=excluded.project_path,updated_at=excluded.updated_at`).run(tabId,projectPath,Date.now());
+ }
+ clearCodeProject(tabId){
+  if(!Number.isSafeInteger(tabId)||tabId<1)return;
+  this.db.prepare('DELETE FROM native_code_projects WHERE tab_id=?').run(tabId);
+ }
  delete(id){
   if(!Number.isSafeInteger(id)||id<1)return;
   this.db.exec('BEGIN');
   try{
    this.db.prepare('DELETE FROM tab_stack_members WHERE tab_id=?').run(id);
+   this.clearCodeProject(id);
    this.q.del.run(id);
    const remove=this.db.prepare('DELETE FROM meta WHERE key=?');
    for(const prefix of ['chatgptDraft:','tabCustomTitle:','panelMode:','chromeMode:','windowBounds:'])remove.run(prefix+id);
