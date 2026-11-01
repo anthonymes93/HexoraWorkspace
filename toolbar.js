@@ -296,6 +296,9 @@ function smartIsAddress(raw){
 function smartGoogleUrl(query){return 'https://www.google.com/search?q='+encodeURIComponent(String(query||'').trim());}
 function smartSearchGoogle(){const q=newTabAddress.value.trim();if(q)return launchNewTab(smartGoogleUrl(q),'Google Search: '+q);}
 function smartOpenTyped(){const q=newTabAddress.value.trim();if(!q)return;if(smartIsAddress(q))return launchNewTab(q);return smartSearchGoogle();}
+function smartHasGoogleOption(){return !!newTabAddress.value.trim()&&!smartIsAddress(newTabAddress.value);}
+function smartSuggestionCount(){return newTabHistoryMatches.length+(smartHasGoogleOption()?1:0);}
+function smartSubmitSelection(){const entry=newTabHistoryMatches[newTabHistorySelected];if(entry)return openSmartSuggestion(entry);if(smartHasGoogleOption())return smartSearchGoogle();return smartOpenTyped();}
 function paintNewTabSuggestions(){
  newTabSuggestions.replaceChildren();
  newTabSuggestions.hidden=!newTabHistoryMatches.length&&!newTabAddress.value.trim();
@@ -315,8 +318,9 @@ function paintNewTabSuggestions(){
   row.append(item,remove);newTabSuggestions.append(row);
  });
  const q=newTabAddress.value.trim();
- if(q&&!smartIsAddress(q)){
-  const search=document.createElement('button');search.type='button';search.className='new-tab-google-search';
+ if(smartHasGoogleOption()){
+  const search=document.createElement('button');search.type='button';search.className='new-tab-google-search'+(newTabHistorySelected===newTabHistoryMatches.length?' is-active':'');
+  search.setAttribute('role','option');search.setAttribute('aria-selected',String(newTabHistorySelected===newTabHistoryMatches.length));
   const icon=document.createElement('span');icon.textContent='⌕';icon.setAttribute('aria-hidden','true');
   const label=document.createElement('span');label.textContent='Search Google for “'+q+'”';
   search.append(icon,label);search.onclick=smartSearchGoogle;newTabSuggestions.append(search);
@@ -334,7 +338,7 @@ function confirmSmartDismiss(entry){
   for(const choices of Object.values(state.choices))if(choices&&typeof choices==='object')delete choices[id];
   saveSmartState(state);dialog.hidden=true;
   newTabHistoryMatches=newTabHistoryMatches.filter(x=>smartIdentity(x)!==id);
-  newTabHistorySelected=newTabHistoryMatches.length?0:-1;paintNewTabSuggestions();newTabAddress.focus();
+  newTabHistorySelected=smartSuggestionCount()?0:-1;paintNewTabSuggestions();newTabAddress.focus();
  };
 }
 function historyDestination(entry){
@@ -378,16 +382,16 @@ async function updateNewTabSuggestions(){
   const secondary=ranked.filter(x=>x.kind==='history');
   newTabHistoryMatches=[...primary,...secondary].slice(0,8);
   newTabHistorySelected=newTabHistoryMatches.length?0:-1;paintNewTabSuggestions();
- }catch{if(request===newTabHistoryRequest){newTabHistoryMatches=[];newTabHistorySelected=-1;paintNewTabSuggestions();}}
+ }catch{if(request===newTabHistoryRequest){newTabHistoryMatches=[];newTabHistorySelected=smartSuggestionCount()?0:-1;paintNewTabSuggestions();}}
 }
 newTabAddress.addEventListener('input',updateNewTabSuggestions);
 newTabAddress.addEventListener('keydown',e=>{
  if(e.key==='Enter'&&e.ctrlKey){e.preventDefault();e.stopPropagation();smartSearchGoogle();return;}
  if(e.key==='ArrowDown'||e.key==='ArrowUp'){
-  if(!newTabHistoryMatches.length)return;
-  e.preventDefault();newTabHistorySelected=(newTabHistorySelected+(e.key==='ArrowDown'?1:-1)+newTabHistoryMatches.length)%newTabHistoryMatches.length;paintNewTabSuggestions();
- }else if(e.key==='Enter'&&newTabHistorySelected>=0&&newTabHistoryMatches[newTabHistorySelected]){
-  e.preventDefault();openSmartSuggestion(newTabHistoryMatches[newTabHistorySelected]);
+  const count=smartSuggestionCount();if(!count)return;
+  e.preventDefault();newTabHistorySelected=(newTabHistorySelected+(e.key==='ArrowDown'?1:-1)+count)%count;paintNewTabSuggestions();
+ }else if(e.key==='Enter'&&newTabHistorySelected>=0&&smartSuggestionCount()){
+  e.preventDefault();smartSubmitSelection();
  }else if(e.key==='Escape'&&!$('new-tab-dismiss-confirm').hidden){
   e.stopPropagation();e.preventDefault();$('new-tab-dismiss-confirm').hidden=true;
  }else if(e.key==='Escape'&&!newTabSuggestions.hidden){e.stopPropagation();e.preventDefault();hideNewTabSuggestions();}
@@ -460,7 +464,7 @@ $('new-tab-save-shortcut').onclick=()=>{
 for(const id of ['new','new-rail','new-sidebar','add-tab'])$(id).onclick=openNewTabLauncher;
 $('new-tab-close').onclick=closeNewTabLauncher;
 newTabOverlay.onclick=e=>{if(e.target===newTabOverlay)closeNewTabLauncher();};
-$('new-tab-form').onsubmit=e=>{e.preventDefault();const entry=newTabHistorySelected>=0?newTabHistoryMatches[newTabHistorySelected]:null;entry?openSmartSuggestion(entry):smartOpenTyped();};
+$('new-tab-form').onsubmit=e=>{e.preventDefault();smartSubmitSelection();};
 $('new-tab-chatgpt').onclick=()=>action('new',activeWorkspace).then(closeNewTabLauncher).catch(e=>newTabError.textContent=e.message);
 for(const el of document.querySelectorAll('[data-new-tab-url]'))el.addEventListener('click',()=>launchNewTab(el.dataset.newTabUrl,el.dataset.newTabTitle));
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!newTabOverlay.classList.contains('hidden'))closeNewTabLauncher();});
