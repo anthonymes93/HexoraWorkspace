@@ -229,6 +229,33 @@ async function renameStack(stack){
  try{await action('stack-edit',{id:stack.id,operation:'rename',value:name});await refresh();}
  catch(error){alert('Unable to rename stack: '+error.message);}
 }
+function attachFaviconMarquee(img,tab){
+ if(img.dataset.marqueeBound)return;
+ img.dataset.marqueeBound='1';
+ let raf=0,last=0,hold=0;
+ const stop=()=>{
+  cancelAnimationFrame(raf);raf=0;last=0;hold=0;
+  const title=tab.querySelector('.tab-title-lines > .name');
+  if(title)title.scrollLeft=0;
+ };
+ const tick=now=>{
+  const title=tab.querySelector('.tab-title-lines > .name');
+  if(!title||!img.isConnected){stop();return;}
+  const limit=title.scrollWidth-title.clientWidth;
+  if(limit<=1){stop();return;}
+  const elapsed=last?Math.min((now-last)/1000,.05):0;last=now;
+  if(hold>0){hold-=elapsed;}
+  else{
+   title.scrollLeft=Math.min(limit,title.scrollLeft+105*elapsed);
+   if(title.scrollLeft>=limit-1){hold=.65;title.scrollLeft=limit;}
+  }
+  if(hold<=0&&title.scrollLeft>=limit-1){title.scrollLeft=0;hold=.3;}
+  raf=requestAnimationFrame(tick);
+ };
+ img.addEventListener('mouseenter',()=>{if(raf)return;const title=tab.querySelector('.tab-title-lines > .name');if(!title||title.scrollWidth<=title.clientWidth+1)return;title.scrollLeft=0;raf=requestAnimationFrame(tick);});
+ img.addEventListener('mouseleave',stop);
+ tab.addEventListener('pointerleave',stop);
+}
 function updateTabFavicon(el,tab){
  const preferred=tab.favicon||tab.faviconFallback;
  let img=el.querySelector('.tab-favicon');
@@ -238,6 +265,7 @@ function updateTabFavicon(el,tab){
   img.alt='';img.draggable=false;
   el.insertBefore(img,el.querySelector('.tab-title-lines')||el.querySelector('.name')||el.firstChild);
  }
+ if(el.closest('#tabs'))attachFaviconMarquee(img,el);
  // Use the favicon advertised by the page when available; fall back to the
  // site's /favicon.ico when Electron has not fired page-favicon-updated.
  const fallback=tab.faviconFallback;
