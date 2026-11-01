@@ -449,7 +449,7 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
  sidebarWidth=Math.max(64,Math.min(560,Number(store.getMeta('sidebarCustomWidth'))||330));
  win=new BrowserWindow({width:1360,height:900,minWidth:700,minHeight:400,title:'Hexora Workspace',autoHideMenuBar:true,backgroundColor:'#111215',webPreferences:{preload:path.join(__dirname,'preload.js'),contextIsolation:true,sandbox:true,nodeIntegration:false}});
  mainViewport=new View();win.contentView.addChildView(mainViewport);
- win.loadFile('toolbar.html');win.on('focus',()=>{if(nativeCodeHost){nativeCodeCommand('DIAG HEXORA_FOCUS');if(nativeCodeActive&&!nativeCodeDetached)setTimeout(()=>{if(nativeCodeHost&&nativeCodeActive&&!nativeCodeDetached)nativeCodeCommand('ACTIVATE');},120);}});win.on('blur',()=>{if(nativeCodeHost)nativeCodeCommand('DIAG HEXORA_BLUR');});win.on('resize',bounds);win.webContents.on('did-finish-load',emit);
+ win.loadFile('toolbar.html');win.on('focus',()=>{if(nativeCodeHost)nativeCodeCommand('DIAG HEXORA_FOCUS');});win.on('blur',()=>{if(nativeCodeHost)nativeCodeCommand('DIAG HEXORA_BLUR');});win.on('resize',bounds);win.webContents.on('did-finish-load',emit);
  const last=Number(store.getMeta('activeId'));if(!last||!activate(last)){const backup=store.lastActiveId();if(!backup||!activate(backup))newTab();}
  // Reopen each detached tab at its saved screen position after the primary workspace starts.
  // Missing/deleted tab IDs are cleaned up, and one bad window cannot prevent startup.
@@ -659,6 +659,7 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
   menu.popup({window:win,x:Math.round(Math.max(0,Number(data?.x)||0)),y:Math.round(Math.max(0,Number(data?.y)||0))});
   return true;
  });
+ ipcMain.handle('native-code:repair',async event=>{if(event.sender!==win.webContents)throw Error('Invalid caller');if(!nativeCodeHost||nativeCodeDetached||!nativeCodeActive)return {repaired:false};nativeCodeCommand('DIAG BEFORE_REPAIR');nativeCodeCommand('DETACH');await new Promise(resolve=>setTimeout(resolve,300));if(!nativeCodeHost||!nativeCodeActive)return {repaired:false};nativeCodeCommand('ATTACH');nativeCodeBounds();return {repaired:true};});
  ipcMain.handle('native-code:detach',async event=>{if(event.sender!==win.webContents)throw Error('Invalid caller');if(!nativeCodeHost)return {detached:false};nativeCodeDetached=true;nativeCodeActive=false;nativeCodeCommand('DIAG BEFORE_DETACH');nativeCodeCommand('DETACH');restoreNativeWebView();return {detached:true};});
  ipcMain.handle('native-code:toggle',async event=>{
   if(event.sender!==win.webContents)throw Error('Invalid caller');
