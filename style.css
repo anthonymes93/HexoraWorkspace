@@ -402,3 +402,12 @@ body.reordering-tabs,body.reordering-tabs *{cursor:grabbing!important;user-selec
 /* Keep first-row tab widths stable: flex shrink was clipping even short names like ClickUp™. */
 #tabs>.tab{flex:0 0 auto;box-sizing:border-box;min-width:125px;max-width:220px}
 #tabs>.tab .tab-title-lines{min-width:0}
+
+/* Collapsible Open Conversations sidebar section */
+.conversation-head{display:flex;align-items:center}
+.conversation-collapse{display:flex;align-items:center;justify-content:space-between;flex:1;min-width:0;gap:7px;text-align:left;border:0;background:transparent;padding:6px 5px;border-radius:7px;color:inherit}
+.conversation-collapse:hover{background:#ffffff0b}
+.conversation-collapse .eyebrow{pointer-events:none}
+#conversations-chevron{font-size:17px;line-height:1;color:#908a9e;transition:transform .16s ease}
+.conversation-collapse:hover #conversations-chevron{color:var(--hx-accent,#ad95ff)}
+#conversations.conversations-collapsed{display:none}
