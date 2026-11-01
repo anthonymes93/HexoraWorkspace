@@ -30,6 +30,13 @@ function workspaceForTab(userData,tabId,projectFolder){
  }
  return workspace;
 }
+function managedWorkspaceOrBlank(userData,tabId,projectFolder){
+ validTabId(tabId);
+ // Preserve VS Code's native fast blank startup instead of booting a synthetic
+ // empty .code-workspace (which can interfere with its Open Folder workflow).
+ if(!projectFolder)return null;
+ return workspaceForTab(userData,tabId,projectFolder);
+}
 function clearSession(userData,tabId){
  // Leave the workspace descriptor intact: when Hexora closes a tab it
  // deliberately detaches (rather than kills) a VS Code window that may
@@ -39,4 +46,4 @@ function clearSession(userData,tabId){
  // Fence off stale detached VS Code windows when an old tab is closed or reset.
  fs.rmSync(ownerFile(userData,tabId),{force:true});
 }
-module.exports={workspaceForTab,sessionFile,projectUpdateFile,ownerFile,clearSession,codeSessionDirectory};
+module.exports={workspaceForTab,managedWorkspaceOrBlank,sessionFile,projectUpdateFile,ownerFile,clearSession,codeSessionDirectory};
