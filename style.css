@@ -607,3 +607,34 @@ body.sidebar-trim-workspace-details:not(.sidebar-icons-only) .workspace{gap:6px}
 .new-tab-shortcuts button:hover,.new-tab-shortcuts button:focus-visible{border-color:#a99bf7;background:rgba(155,130,255,.15)}
 .new-tab-shortcuts button span{font-size:12px}
 #new-tab-error{min-height:18px}
+
+/* Hexora New Tab Launcher — visual parity with the native project picker */
+#new-tab-overlay{background:rgba(4,5,11,.79);backdrop-filter:blur(9px)}
+#new-tab-overlay .new-tab-dialog{box-sizing:border-box;overflow:hidden;padding:0;width:min(760px,calc(100vw - 48px));max-width:760px;border:1px solid rgba(178,149,255,.35);border-radius:19px;background:#191820;box-shadow:0 32px 95px rgba(0,0,0,.58),0 0 0 1px rgba(255,255,255,.025);color:#f2effb}
+#new-tab-overlay .new-tab-hero{display:flex;align-items:center;gap:16px;min-height:94px;padding:19px 24px;background:radial-gradient(ellipse at 83% -20%,rgba(168,128,255,.27),transparent 60%),linear-gradient(110deg,#24202e,#24212e 62%,#292439);border-bottom:1px solid rgba(183,166,221,.14)}
+#new-tab-overlay .new-tab-hero-icon{display:grid;place-items:center;width:48px;height:48px;flex-shrink:0;border:1px solid rgba(184,150,255,.36);border-radius:14px;background:linear-gradient(145deg,#503a77,#36294e);color:#c8adff;font-size:25px}
+#new-tab-overlay .new-tab-hero-copy{flex:1;min-width:0}
+#new-tab-overlay .new-tab-hero h2{margin:0 0 5px;font-size:20px;letter-spacing:-.4px;font-weight:750;color:#f7f4ff}
+#new-tab-overlay .new-tab-hero p{margin:0;color:#b7b0c9;font-size:12px}
+#new-tab-overlay .new-tab-close{align-self:flex-start;border:0;background:transparent;color:#bcb4ca;font-size:23px;cursor:pointer;width:32px;height:32px;border-radius:8px}
+#new-tab-overlay .new-tab-close:hover{background:rgba(255,255,255,.08);color:white}
+#new-tab-overlay .new-tab-content{padding:25px 25px 19px}
+#new-tab-overlay .new-tab-label{margin:0 0 10px;display:block;font-size:10px;letter-spacing:.09em;font-weight:800;color:#b8b0c8}
+#new-tab-overlay .new-tab-address-row{display:flex;align-items:center;gap:0;border:1px solid #5a4b72;border-radius:11px;background:#101016;transition:border-color .15s,box-shadow .15s}
+#new-tab-overlay .new-tab-address-row:focus-within{border-color:#b29aff;box-shadow:0 0 0 3px rgba(165,131,255,.15)}
+#new-tab-overlay .new-tab-address-icon{padding-left:15px;color:#a89bbd;font-size:20px}
+#new-tab-overlay .new-tab-address-row input{height:49px;min-width:0;flex:1;border:0;outline:0;box-shadow:none;background:transparent;color:#f5f2fb;font-size:14px;padding:0 12px}
+#new-tab-overlay .new-tab-address-row input:focus{outline:none;box-shadow:none}
+#new-tab-overlay .new-tab-go{height:39px;margin-right:5px;padding:0 19px;border:1px solid rgba(232,220,255,.14);border-radius:8px;background:#a78bee;color:#1d1530;font-weight:750;cursor:pointer}
+#new-tab-overlay .new-tab-go:hover{background:#bda5ff}
+#new-tab-overlay .new-tab-section-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:27px;margin-bottom:11px}
+#new-tab-overlay .new-tab-section-head .new-tab-label{margin:0}
+#new-tab-overlay .new-tab-section-hint{color:#928b9e;font-size:11px}
+#new-tab-overlay .new-tab-shortcuts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:11px}
+#new-tab-overlay .new-tab-shortcuts button{display:flex;flex-direction:row;justify-content:flex-start;align-items:center;gap:12px;min-height:66px;padding:12px 15px;border:1px solid rgba(179,164,209,.17);border-radius:11px;background:linear-gradient(135deg,#27242f,#23212b);color:#e9e5f3;text-align:left;font-size:13px;font-weight:650;cursor:pointer;transition:background .14s,border-color .14s,transform .14s}
+#new-tab-overlay .new-tab-shortcuts button:hover{background:#342b46;border-color:#a98bdb;transform:translateY(-1px)}
+#new-tab-overlay .new-tab-shortcuts button:focus-visible{outline:2px solid #b99aff;outline-offset:2px}
+#new-tab-overlay .new-tab-site-icon{display:grid;place-items:center;width:35px;height:35px;flex-shrink:0;border-radius:9px;background:#3d3450;color:#c4a8ff;font-size:19px}
+#new-tab-overlay .new-tab-error{margin:12px 0 0;min-height:17px;color:#ffb3b3;font-size:12px}
+#new-tab-overlay .new-tab-footer{display:flex;justify-content:space-between;align-items:center;padding:14px 25px;border-top:1px solid rgba(180,160,212,.13);color:#9f97af;font-size:11px;background:#1a1821}
+@media(max-width:580px){#new-tab-overlay .new-tab-shortcuts{grid-template-columns:repeat(2,minmax(0,1fr))}#new-tab-overlay .new-tab-hero{padding:15px}#new-tab-overlay .new-tab-content{padding:18px}#new-tab-overlay .new-tab-footer{padding:12px 18px}}
