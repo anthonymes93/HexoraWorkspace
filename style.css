@@ -389,3 +389,8 @@ body.reordering-tabs,body.reordering-tabs *{cursor:grabbing!important;user-selec
 #tabs>.tab.active .tab-micro-title{color:#aaa5ba}
 #tabs>.tab.has-micro-title .tab-title-lines{gap:2px}
 #tabs>.tab .tab-favicon{flex-shrink:0}
+
+/* First-row favicon is the marquee hover target; scroll only the main title. */
+#tabs>.tab .tab-favicon{pointer-events:auto;cursor:default}
+#tabs>.tab .tab-title-lines>.name{scrollbar-width:none;scroll-behavior:auto;text-overflow:clip}
+#tabs>.tab .tab-title-lines>.name::-webkit-scrollbar{display:none}
