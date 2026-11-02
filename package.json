@@ -10,7 +10,15 @@
     "build:win": "npx --yes electron-builder@26.18.0 --win nsis --x64 --publish never",
     "build:store": "npx --yes electron-builder@26.18.0 --win appx --x64 --publish never",
     "demo:taskbar": "electron demo/taskbar",
-    "test:links": "node --test scripts/test-deep-links.cjs"
+    "test:links": "node --test scripts/test-deep-links.cjs",
+    "test:code-projects": "node --experimental-sqlite --test scripts/test-code-projects.cjs",
+    "test:code-session": "node --test scripts/test-code-session.cjs",
+    "test:code-bridge": "node --test scripts/test-code-bridge.cjs",
+    "test:code-auto-project": "node --test scripts/test-code-auto-project.cjs",
+    "test:code-project-sync": "node --test scripts/test-code-project-sync.cjs",
+    "test:project-picker": "node --test scripts/test-project-picker.cjs",
+    "test:project-picker-ui": "node --check project-picker.js && node --check toolbar.js && node --check main.js",
+    "test:taskbar": "node --test scripts/test-taskbar-identity.cjs"
   },
   "build": {
     "appId": "app.hexora.workspace",

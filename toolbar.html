@@ -1,11 +1,12 @@
 <!doctype html>
-<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' https: http: data:"><title>Hexora Workspace</title><link rel="stylesheet" href="style.css"><style>.hexora-apps{padding:3px 10px 13px}.hexora-apps button{display:flex;align-items:center;gap:11px;width:100%;border:1px solid #685b874d;background:#9e86dc16;color:inherit;border-radius:9px;padding:11px 12px;cursor:pointer;text-align:left;font-size:13px}.hexora-apps button:hover{background:#9e86dc32}.hexora-apps button span:nth-child(2){flex:1}</style></head>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' https: http: data:"><title>Hexora Workspace</title><link rel="stylesheet" href="style.css"><style>.hexora-apps{padding:3px 10px 13px}.hexora-apps button{display:flex;align-items:center;gap:11px;width:100%;border:1px solid #685b874d;background:#9e86dc16;color:inherit;border-radius:9px;padding:11px 12px;cursor:pointer;text-align:left;font-size:13px}.hexora-apps button:hover{background:#9e86dc32}.hexora-apps button span:nth-child(2){flex:1}</style><link rel="stylesheet" href="project-picker.css"></head>
 <body>
 <div class="rail">
   <div class="logo" title="Hexora">✦</div>
   <button id="toggle-sidebar" class="railbtn selected" title="Toggle workspaces">▦</button>
   <button id="search-rail" class="railbtn" title="Search open tabs">⌕</button>
   <button id="new-rail" class="railbtn" title="New ChatGPT tab">＋</button>
+  <button id="native-code-rail" class="railbtn" title="VS Code: choose project (Ctrl-click: blank fast tab; Shift-click: repair active VS Code)">⌘</button>
   <button id="notion-rail" class="railbtn" type="button" title="New Notion Action Center tab" aria-label="Open Notion Action Center in a new tab"><span class="notion-mark" aria-hidden="true">N</span></button>
   <button id="split-rail" class="railbtn" title="Split view — coming soon" disabled>◫</button>
   <button id="recovery-rail" class="railbtn" title="Encrypted backups">⛨</button>
@@ -93,6 +94,9 @@
  <button id="tab-menu-close-selected" class="tab-menu-close-selected hidden" role="menuitem">× &nbsp; Close selected tabs</button>
  <div class="tab-menu-heading">TAB ACTIONS</div>
  <button id="tab-menu-rename" role="menuitem" class="tab-menu-featured"><span class="menu-glyph">✎</span><span>Rename tab</span><span class="menu-shortcut">Edit</span></button>
+ <button id="tab-menu-detach" role="menuitem"><span class="menu-glyph">↗</span><span>Open in New Window</span></button>
+ <button id="tab-menu-code-project" role="menuitem" class="hidden"><span class="menu-glyph">⌘</span><span>Set VS Code project folder…</span></button>
+ <button id="tab-menu-code-clear" role="menuitem" class="hidden"><span class="menu-glyph">×</span><span>Clear saved project folder</span></button>
   <button id="tab-menu-copy-link" role="menuitem"><span class="menu-glyph">↗</span><span>Copy Link to Tab</span></button>
  <div class="tab-menu-separator"></div>
 
@@ -182,5 +186,42 @@
  <div class="accent-section"><div class="accent-section-header"><strong>Accent color</strong><span>Personalize highlights &amp; controls</span></div><div id="accent-options" class="accent-options" role="group" aria-label="Accent color choices"></div></div>
  <p id="appearance-status" class="hint" role="status"></p>
  </section></div>
+
+<div id="hexora-project-overlay" class="hpp-overlay hidden">
+ <section class="hpp-modal" role="dialog" aria-modal="true" aria-labelledby="hpp-title" aria-describedby="hpp-subtitle">
+  <header class="hpp-header">
+   <div class="hpp-logo" aria-hidden="true">✦</div>
+   <div><h2 id="hpp-title">Open project</h2><p id="hpp-subtitle">Choose a folder for this VS Code tab</p></div>
+   <button id="hpp-close" class="hpp-icon hpp-close" type="button" aria-label="Close project picker">×</button>
+  </header>
+  <section class="hpp-recents-section" aria-label="Recent projects">
+   <div class="hpp-section-label"><span>◷ &nbsp;Recent projects</span><button id="hpp-all-recents" type="button">View all ↗</button></div>
+   <div id="hpp-recents" class="hpp-recent-cards"></div>
+  </section>
+  <div class="hpp-browser">
+   <nav class="hpp-sidebar" aria-label="Folder shortcuts" id="hpp-sidebar"></nav>
+   <section class="hpp-files">
+    <div class="hpp-navline">
+     <button type="button" id="hpp-back" class="hpp-icon" aria-label="Back" title="Back">←</button>
+     <button type="button" id="hpp-forward" class="hpp-icon" aria-label="Forward" title="Forward">→</button>
+     <button type="button" id="hpp-up" class="hpp-icon" aria-label="Up one folder" title="Up one folder">↑</button>
+     <div id="hpp-breadcrumbs" class="hpp-crumbs" aria-label="Current location"></div>
+     <button id="hpp-edit-path" type="button" class="hpp-icon hpp-address" title="Type folder path" aria-label="Type folder path">✎</button>
+    </div>
+    <form id="hpp-path-form" class="hpp-path-form hidden"><label class="hpp-sr" for="hpp-path">Folder location</label><input id="hpp-path" type="text" autocomplete="off" spellcheck="false" placeholder="Enter a folder path"/><button type="submit">Go</button></form>
+    <div class="hpp-searchline"><div class="hpp-search"><span aria-hidden="true">⌕</span><label class="hpp-sr" for="hpp-search-input">Search folders here</label><input id="hpp-search-input" type="search" placeholder="Search folders and projects…" autocomplete="off"/></div><span id="hpp-count" aria-live="polite"></span></div>
+    <div class="hpp-folder-head"><span>Name</span><span>Modified</span><span>Favorite</span></div>
+    <div id="hpp-folders" class="hpp-folder-list" role="listbox" aria-label="Folders"></div>
+   </section>
+  </div>
+  <footer class="hpp-footer">
+   <div class="hpp-footnote"><span>ⓘ</span><span id="hpp-hint">Ctrl-click VS Code to open a blank tab</span></div>
+   <div class="hpp-actions"><button id="hpp-cancel" type="button" class="hpp-cancel">Cancel</button><button id="hpp-open" type="button" class="hpp-open">Open Project <span>↗</span></button></div>
+  </footer>
+  <div id="hpp-error" class="hpp-error hidden" role="alert"></div>
+ </section>
+</div>
+
+<script src="project-picker.js"></script>
 <script src="theme.js"></script>
 <script src="toolbar.js"></script></body></html>

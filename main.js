@@ -7,6 +7,71 @@ const {workspaceLink,tabLink,parseDeepLink}=require('./deep-links');
 const {PasswordVault}=require('./password-vault');
 const fs=require('node:fs');
 const os=require('node:os');
+const {spawn}=require('node:child_process');
+const {managedWorkspaceOrBlank,clearSession,codeSessionDirectory}=require('./code-session-workspace');
+const {syncCodeProjects}=require('./code-project-sync');
+const projectPicker=require('./code-project-picker');
+const {buildCompanionVsix,BRIDGE_VERSION}=require('./code-session-vsix');
+const {APP_ID,taskbarIdentity,applyTaskbarIdentity}=require('./taskbar-identity');
+if(process.platform==='win32')app.setAppUserModelId(APP_ID);
+// Cosmetic taskbar setup must never prevent Hexora, its tabs, or native VS Code from opening.
+function safeTaskbarIdentity(tabId=null){
+ try{return taskbarIdentity(app.getPath('userData'),tabId);}
+ catch(error){console.warn('[Hexora] Taskbar icon unavailable:',error.message);return null;}
+}
+function safeApplyTaskbar(window,identity){
+ try{if(identity)applyTaskbarIdentity(window,identity);}
+ catch(error){console.warn('[Hexora] Taskbar identity unavailable:',error.message);}
+}
+// Each native VS Code tab owns its own PowerShell host and reparented window.
+const nativeCodeHosts=new Map();
+const nativeCodeLaunchQueue=[];
+let nativeCodeLaunchingId=null;
+let tabStoreClosing=false;
+let nativeCodeBridgeInstallAttempted=false;
+let nativeCodeInstaller=null;
+const VSCODE_URL='hexora-native://vscode';
+const isCodeTab=t=>typeof t?.url==='string'&&/^hexora-native:\/\/vscode(?:\/[1-9]\d*)?$/.test(t.url);
+const codeTabUrl=id=>VSCODE_URL+'/'+id;
+const activeCodeEntry=()=>isCodeTab(store?.get(activeId))?nativeCodeHosts.get(activeId):null;
+function nativeCodeCommand(message,tabId=activeId){
+ const entry=nativeCodeHosts.get(tabId),proc=entry?.proc;
+ if(!proc||entry.stopped||proc.exitCode!==null||proc.killed||proc.stdin?.destroyed||!proc.stdin?.writable)return false;
+ try{proc.stdin.write(message+'\n',error=>{if(error&&error.code!=='EPIPE')console.error('[Native VS Code tab '+tabId+'] stdin:',error.message);});return true;}
+ catch(error){console.error('[Native VS Code tab '+tabId+'] command failed:',error.message);return false;}
+}
+function nativeCodeBounds(tabId=activeId){
+ if(!win||win.isDestroyed()||!nativeCodeHosts.get(tabId)?.ready)return;
+ const [w,h]=win.getContentSize();
+ nativeCodeCommand('RECT '+sidebarWidth+' '+TOP_HEIGHT+' '+Math.max(1,w-sidebarWidth)+' '+Math.max(1,h-TOP_HEIGHT),tabId);
+}
+let nativeCodeLifecycleTimer=null;
+function scheduleNativeCodeLifecycle(reason){
+ if(nativeCodeLifecycleTimer)clearTimeout(nativeCodeLifecycleTimer);
+ nativeCodeLifecycleTimer=setTimeout(()=>{
+  nativeCodeLifecycleTimer=null;
+  const entry=activeCodeEntry();if(!entry?.ready||!entry.visible||entry.detached||!win||win.isDestroyed()||win.isMinimized())return;
+  nativeCodeBounds();
+  const display=screen.getDisplayMatching(win.getBounds());
+  console.log('[Native VS Code] WINDOW_LIFECYCLE',reason,{displayId:display.id,scaleFactor:display.scaleFactor,windowBounds:win.getBounds(),contentSize:win.getContentSize()});
+  nativeCodeCommand('GEOMETRY '+reason);
+  nativeCodeCommand('RECOVER_Z');
+ },90);
+ nativeCodeLifecycleTimer.unref?.();
+}
+
+// Focus recovery is event-driven; avoid repeatedly stealing keyboard focus from VS Code.
+function restoreNativeWebView(){if(win&&!win.isDestroyed()&&mainViewport&&!isCodeTab(store?.get(activeId))){const view=live.get(activeId);if(view&&!modalVisible){mainViewport.addChildView(view);bounds();}}}
+function stopNativeCode(tabId){
+ const entry=nativeCodeHosts.get(tabId);if(!entry)return;
+ // QUIT restores the real VS Code window to the desktop, preserving unsaved files.
+ nativeCodeCommand('QUIT',tabId);
+ entry.stopped=true;entry.visible=false;nativeCodeHosts.delete(tabId);
+ if(entry.proc){const proc=entry.proc;setTimeout(()=>{if(proc.exitCode===null&&!proc.killed)proc.kill();},2500).unref?.();}
+ // Keep the launch lock until the terminated host actually exits, preventing HWND races.
+}
+function stopAllNativeCode(){for(const id of [...nativeCodeHosts.keys()])stopNativeCode(id);nativeCodeLaunchQueue.length=0;}
+
 const {snapshot,stageRestore,applyPending,verifyBackup}=require('./recovery');
 // Stable profile path for development, NSIS and packaged builds.
 // Keep this unchanged so installing an update never silently switches profiles.
@@ -224,6 +289,7 @@ const CHATGPT_DRAFT_GUARD=`(()=>{
 })();`;
 function originOf(url){try{return new URL(url).origin;}catch{return null;}}
 function rememberFavicon(tabId,pageUrl,iconUrl){
+ if(tabStoreClosing||quitting||!store)return;
  const origin=originOf(pageUrl);
  if(!origin||!/^https?:\/\//.test(origin)||!/^https?:\/\//.test(iconUrl))return;
  favicons.set(tabId,{url:iconUrl,origin});
@@ -236,14 +302,14 @@ function wire(t){const view=new WebContentsView({webPreferences:{partition:'pers
  if(chromeMode(t.id))wc.setUserAgent(chromeUserAgent(wc));
  view.setBackgroundColor('#111215');
  wc.on('did-fail-load',(_event,code,description,url,isMainFrame)=>{if(isMainFrame)console.error('[Hexora] Page load failed:',code,description,url);});
- const update=(title=false)=>{const row=store.get(t.id);if(!row)return;if(title)row.title=wc.getTitle()?.slice(0,100)||row.title;const url=wc.getURL();if(/^https?:/.test(url))row.url=url;store.save(toModel(row));emit();};
+ const update=(title=false)=>{if(tabStoreClosing||quitting)return;const row=store.get(t.id);if(!row)return;if(title)row.title=wc.getTitle()?.slice(0,100)||row.title;const url=wc.getURL();if(/^https?:/.test(url))row.url=url;store.save(toModel(row));emit();};
  wc.on('page-favicon-updated',(_event,icons)=>{
   const url=icons.find(candidate=>{try{const u=new URL(candidate);return ['https:','http:','data:'].includes(u.protocol);}catch{return false;}});
   if(url)rememberFavicon(t.id,wc.getURL(),url);
  });
- wc.on('page-title-updated',()=>{update(true);store.recordVisit(wc.getURL(),wc.getTitle(),t.id);});
- wc.on('did-navigate',()=>{if(favicons.get(t.id)?.origin!==originOf(wc.getURL()))favicons.delete(t.id);update();store.recordVisit(wc.getURL(),wc.getTitle(),t.id);});
- wc.on('did-navigate-in-page',()=>{update();store.recordVisit(wc.getURL(),wc.getTitle(),t.id);});
+ wc.on('page-title-updated',()=>{if(tabStoreClosing||quitting)return;update(true);store.recordVisit(wc.getURL(),wc.getTitle(),t.id);});
+ wc.on('did-navigate',()=>{if(tabStoreClosing||quitting)return;if(favicons.get(t.id)?.origin!==originOf(wc.getURL()))favicons.delete(t.id);update();store.recordVisit(wc.getURL(),wc.getTitle(),t.id);});
+ wc.on('did-navigate-in-page',()=>{if(tabStoreClosing||quitting)return;update();store.recordVisit(wc.getURL(),wc.getTitle(),t.id);});
  wc.on('did-start-loading',()=>{loading.set(t.id,true);emit();});
  wc.on('did-stop-loading',()=>{loading.delete(t.id);emit();});
  const draftKey='chatgptDraft:'+t.id;
@@ -267,7 +333,7 @@ function wire(t){const view=new WebContentsView({webPreferences:{partition:'pers
  wc.loadURL(safeUrl(t.url)).catch(err=>console.error('Tab load error',err));
  return view;
 }
-function toModel(r){return{id:r.id,url:safeUrl(r.url),title:r.title||'ChatGPT',workspace:r.workspace||'web',pinned:!!r.pinned,muted:!!r.muted,lastActive:r.last_active??r.lastActive??Date.now(),ordinal:r.ordinal||r.id};}
+function toModel(r){return{id:r.id,url:isCodeTab(r)?r.url:safeUrl(r.url),title:r.title||'ChatGPT',workspace:r.workspace||'web',pinned:!!r.pinned,muted:!!r.muted,lastActive:r.last_active??r.lastActive??Date.now(),ordinal:r.ordinal||r.id};}
 function discard(id){const view=live.get(id);if(!view)return;live.delete(id);const pop=detached.get(id);if(pop&&!pop.isDestroyed())pop.contentView.removeChildView(view);else if(mainViewport)mainViewport.removeChildView(view);loading.delete(id);view.webContents.close();}
 // Clip the native web view to the available viewport while keeping its internal layout stable.
 // The right edge stays anchored to the window; the left portion is revealed/hidden by the panel.
@@ -282,6 +348,7 @@ function bounds(){
   // or late correction when the workspace panel finishes moving.
   view.setBounds({x:0,y:0,width:visibleWidth,height:visibleHeight});
  }
+ nativeCodeBounds();
  win.webContents.send('sidebar:frame',sidebarWidth,sidebarTransitioning,sidebarTransitionTarget);
 }
 let sidebarAnimation=null,sidebarTransitioning=false,sidebarTransitionTarget=null;
@@ -308,27 +375,198 @@ function setSidebarWidth(collapsed){
  frame();
 }
 
-function pageRow(r){return{id:r.id,url:r.url,title:store.getMeta('tabCustomTitle:'+r.id)||r.title,workspace:r.workspace,pinned:!!r.pinned,muted:!!r.muted,lastActive:r.last_active,ordinal:r.ordinal,favicon:(favicons.get(r.id)?.origin===originOf(r.url)?favicons.get(r.id)?.url:null)||store.getMeta('favicon:'+originOf(r.url))||null,faviconFallback:(()=>{try{const u=new URL(r.url);return ['http:','https:'].includes(u.protocol)?u.origin+'/favicon.ico':null;}catch{return null;}})(),active:r.id===activeId,detached:detached.has(r.id),loading:!!loading.get(r.id),suspended:!live.has(r.id),chromeMode:chromeMode(r.id),panelMode:panelMode(r.id),panelPreference:panelPreference(r.id)};}
+function pageRow(r){const codeProject=isCodeTab(r)?store.getCodeProject(r.id)?.project_path||null:null;
+ return{id:r.id,url:r.url,nativeCode:isCodeTab(r),nativeCodeProject:codeProject,nativeCodeProjectMissing:!!codeProject&&!fs.existsSync(codeProject),title:store.getMeta('tabCustomTitle:'+r.id)||r.title,workspace:r.workspace,pinned:!!r.pinned,muted:!!r.muted,lastActive:r.last_active,ordinal:r.ordinal,favicon:(favicons.get(r.id)?.origin===originOf(r.url)?favicons.get(r.id)?.url:null)||store.getMeta('favicon:'+originOf(r.url))||null,faviconFallback:(()=>{try{const u=new URL(r.url);return ['http:','https:'].includes(u.protocol)?u.origin+'/favicon.ico':null;}catch{return null;}})(),active:r.id===activeId,detached:detached.has(r.id),loading:!!loading.get(r.id),suspended:isCodeTab(r)?false:!live.has(r.id),chromeMode:chromeMode(r.id),panelMode:panelMode(r.id),panelPreference:panelPreference(r.id)};}
 function state(workspace='web',offset=0){const active=activeId?store.get(activeId):null;return{activeId,total:store.total(),counts:store.counts(),tabs:store.page(workspace,offset,50).map(pageRow),active:active?.workspace===workspace?active:null,activePanelMode:activeId?panelMode(activeId):'wide',stackData:store.stacks(workspace),offset};}
 function emit(){if(!win||win.isDestroyed())return;clearTimeout(stateTimer);stateTimer=setTimeout(()=>{if(!win||win.isDestroyed())return;win.webContents.send('tabs:changed');},70);}
-function activate(id){const raw=store.get(Number(id));if(!raw)return false;
- if(detached.has(raw.id)){const popup=detached.get(raw.id);if(!popup.isDestroyed()){if(popup.isMinimized())popup.restore();popup.focus();return true;}}
- for(const [otherId,view] of live)if(otherId!==id&&!detached.has(otherId))mainViewport.removeChildView(view);
- activeId=raw.id;store.setMeta('workspaceActive:'+raw.workspace,String(activeId));const t=toModel(raw);t.lastActive=Date.now();store.save(t);store.setMeta('activeId',String(activeId));
- let view=live.get(id);if(!view){view=wire(t);live.set(id,view);}
- if(!modalVisible){mainViewport.addChildView(view);bounds();view.webContents.focus();}evict();emit();return true;
+function activate(id){
+ const row=store.get(Number(id));if(!row)return false;
+ if(detached.has(row.id)){const popup=detached.get(row.id);if(!popup.isDestroyed()){if(popup.isMinimized())popup.restore();popup.focus();return true;}}
+ if(isCodeTab(store.get(activeId))&&activeId!==row.id)hideNativeCode(activeId);
+ if(!isCodeTab(row))store.setMeta('nativeCodeLastWebId',String(row.id));
+ for(const [otherId,view] of live)if(otherId!==row.id&&!detached.has(otherId))mainViewport.removeChildView(view);
+ activeId=row.id;store.setMeta('workspaceActive:'+row.workspace,String(row.id));const t=toModel(row);t.lastActive=Date.now();store.save(t);store.setMeta('activeId',String(row.id));
+ if(isCodeTab(row)){if(!modalVisible)showNativeCode();else hideNativeCode();evict();emit();return true;}
+ let view=live.get(row.id);if(!view){view=wire(t);live.set(row.id,view);}
+ if(!modalVisible){mainViewport.addChildView(view);bounds();view.webContents.focus();}
+ evict();emit();return true;
+}
+
+async function openCodeTab(workspace='web',chooseProject=true,pickedProject=null){
+ if(process.platform!=='win32')throw Error('Native VS Code requires Windows.');
+ // The folder picker runs *before* opening the native window. Switching
+ // projects via VS Code's File menu can replace a reparented HWND, so provide
+ // a safe first-class path that doesn't detach or strand a Code window.
+ let selectedPath=pickedProject?projectPicker.validateFolder(pickedProject):null;
+ if(chooseProject&&!selectedPath){
+  const selection=await dialog.showOpenDialog(win,{
+   title:'Open project in a new VS Code tab (Cancel opens a blank tab)',
+   properties:['openDirectory'],defaultPath:app.getPath('home')
+  });
+  if(!selection.canceled&&selection.filePaths[0]){
+   const candidate=path.resolve(selection.filePaths[0]);
+   if(!fs.statSync(candidate).isDirectory())throw Error('Selected VS Code project is not a folder.');
+   selectedPath=candidate;
+  }
+ }
+ const id=store.nextId();
+ const count=store.search(VSCODE_URL,100).filter(isCodeTab).length+1;
+ const row={id,url:codeTabUrl(id),title:selectedPath?('VS Code · '+path.basename(selectedPath)).slice(0,100):count===1?'Visual Studio Code':'Visual Studio Code '+count,workspace:typeof workspace==='string'&&workspace.length<=80?workspace:'web',pinned:false,muted:false,lastActive:Date.now(),ordinal:id};
+ store.save(row);
+ if(selectedPath){store.setCodeProject(id,selectedPath);projectPicker.rememberProject(store,selectedPath);}
+ activate(id);
+ return {id,workspace:row.workspace,active:true};
+}
+function activateWebFallback(excludedId){
+ const previous=store.get(Number(store.getMeta('nativeCodeLastWebId'))),workspace=store.get(excludedId)?.workspace||'web';
+ const candidate=(previous&&!isCodeTab(previous)?previous:null)||store.page(workspace,0,50).find(t=>!isCodeTab(t))||store.page('web',0,50).find(t=>!isCodeTab(t));
+ if(candidate)activate(candidate.id);else newTab(workspace);
+}
+function hideNativeCode(tabId=activeId){
+ const entry=nativeCodeHosts.get(tabId);if(!entry)return;
+ entry.visible=false;if(entry.ready&&!entry.detached)nativeCodeCommand('HIDE',tabId);
+}
+function showNativeCode(tabId=activeId){
+ if(!isCodeTab(store?.get(tabId))||activeId!==tabId||modalVisible)return;
+ let entry=nativeCodeHosts.get(tabId);
+ if(!entry){queueNativeCodeLaunch(tabId);return;}
+ if(!entry.ready)return;
+ if(entry.detached){entry.detached=false;nativeCodeCommand('ATTACH',tabId);}
+ entry.visible=true;nativeCodeBounds(tabId);
+ nativeCodeCommand('SHOW',tabId);nativeCodeCommand('RECOVER_Z',tabId);
+ const current=entry;
+ const timer=setTimeout(()=>{if(nativeCodeHosts.get(tabId)===current&&current.visible&&!current.detached&&activeId===tabId)nativeCodeCommand('FOCUS',tabId);},180);
+ timer.unref?.();
+}
+function queueNativeCodeLaunch(tabId){
+ if(nativeCodeHosts.has(tabId)||!isCodeTab(store?.get(tabId)))return;
+ nativeCodeHosts.set(tabId,{tabId,proc:null,ready:false,visible:false,detached:false,stopped:false});
+ nativeCodeLaunchQueue.push(tabId);pumpNativeCodeLaunchQueue();
+}
+function pumpNativeCodeLaunchQueue(){
+ if(nativeCodeLaunchingId!==null||quitting||!win||win.isDestroyed())return;
+ while(nativeCodeLaunchQueue.length){
+  const tabId=nativeCodeLaunchQueue.shift(),entry=nativeCodeHosts.get(tabId);
+  if(!entry||entry.stopped||!isCodeTab(store?.get(tabId)))continue;
+  nativeCodeLaunchingId=tabId;startNativeCodeHost(tabId,entry);return;
+ }
+}
+// Apply project records at startup and while editors are running. A record
+// belongs to one Hexora tab and is ignored if its native host was superseded.
+function syncNativeCodeProjects(){
+ if(!store||tabStoreClosing||quitting)return;
+ syncCodeProjects({
+  userData:app.getPath('userData'),store,
+  eligible:id=>isCodeTab(store.get(id))&&!nativeCodeHosts.get(id)?.ignoreProjectSync,
+  onProject:(id,project)=>{
+   if(!store.getMeta('tabCustomTitle:'+id)){
+    const row=toModel(store.get(id));
+    row.title=('VS Code · '+path.basename(project)).slice(0,100);
+    store.save(row);
+   }
+   emit();
+   console.log('[Native VS Code tab '+id+'] Project automatically saved:',project);
+  }
+ });
+}
+// Install or upgrade the optional VS Code companion without delaying the
+// launch/capture of a native VS Code window. Failed installs can be retried on
+// the next Hexora run, not on every new editor tab.
+function installCodeBridgeInBackground(){
+ if(process.platform!=='win32'||quitting||tabStoreClosing||!store||
+  nativeCodeBridgeInstallAttempted||store.getMeta('nativeCodeBridgeInstalledVersion')===BRIDGE_VERSION)return;
+ nativeCodeBridgeInstallAttempted=true;
+ let vsix;
+ try{vsix=buildCompanionVsix(codeSessionDirectory(app.getPath('userData')));}
+ catch(error){console.warn('[Native VS Code] Could not package session companion:',error.message);return;}
+ const script=path.join(__dirname,'experiments','vscode-companion-install.ps1');
+ let proc;
+ try{proc=spawn('powershell.exe',['-NoProfile','-ExecutionPolicy','Bypass','-File',script,'-CompanionVsix',vsix],{
+  windowsHide:true,stdio:['ignore','pipe','pipe']
+ });}
+ catch(error){console.warn('[Native VS Code] Could not start companion installer:',error.message);return;}
+ nativeCodeInstaller=proc;
+ let log='',failed=false;
+ proc.stdout.on('data',data=>{log+=String(data);if(log.length>8000)log=log.slice(-8000);});
+ proc.stderr.on('data',data=>{failed=true;console.warn('[Native VS Code] Companion installation:',String(data).trim());});
+ proc.on('error',error=>{failed=true;console.warn('[Native VS Code] Companion installer error:',error.message);});
+ proc.on('exit',code=>{
+  nativeCodeInstaller=null;
+  if(!failed&&code===0&&log.includes('COMPANION_INSTALLED')&&!tabStoreClosing&&!quitting&&store){
+   store.setMeta('nativeCodeBridgeInstalledVersion',BRIDGE_VERSION);
+   console.log('[Native VS Code] Companion installed in background');
+  }else console.warn('[Native VS Code] Companion upgrade unavailable; Code launch was not blocked.');
+ });
+}
+function startNativeCodeHost(tabId,entry){
+ const script=path.join(__dirname,'experiments','vscode-hexora-host.ps1');
+ const hwnd=win.getNativeWindowHandle().readBigUInt64LE(0).toString();
+ // Each tab uses its own saved project path. Passing an argument vector to
+ // PowerShell (rather than interpolating into a command) avoids shell injection.
+ const configured=store.getCodeProject(tabId)?.project_path;
+ let projectPath=null;
+ if(configured){
+  try{
+   if(fs.statSync(configured).isDirectory()){
+    // Only saved projects need the companion-managed workspace and active-file
+    // restore. A new empty tab must open Code normally and promptly.
+    projectPath=managedWorkspaceOrBlank(app.getPath('userData'),tabId,configured);
+   }
+  }catch(error){console.warn('[Native VS Code tab '+tabId+'] Saved project unavailable:',error.message);}
+ }
+ if(projectPath)installCodeBridgeInBackground();
+ let proc;
+ try{proc=spawn('powershell.exe',['-NoProfile','-STA','-ExecutionPolicy','Bypass','-File',script,'-ParentHwnd',hwnd,...(projectPath?['-ProjectPath',projectPath]:[])],{stdio:['pipe','pipe','pipe'],windowsHide:true});}
+ catch(error){console.error('[Native VS Code tab '+tabId+'] spawn:',error.message);nativeCodeHosts.delete(tabId);nativeCodeLaunchingId=null;setImmediate(pumpNativeCodeLaunchQueue);return;}
+ entry.proc=proc;
+ let stdoutBuffer='',finished=false;
+ const release=()=>{if(nativeCodeLaunchingId===tabId){nativeCodeLaunchingId=null;setImmediate(pumpNativeCodeLaunchQueue);}};
+ const failed=()=>{
+  if(finished)return;finished=true;
+  if(nativeCodeHosts.get(tabId)===entry){nativeCodeHosts.delete(tabId);entry.stopped=true;if(!quitting)emit();}
+  release();
+  if(win&&!win.isDestroyed()&&activeId===tabId)win.webContents.send('native-code:stopped',{tabId});
+ };
+ proc.stdin.on('error',error=>console.error('[Native VS Code tab '+tabId+'] stdin pipe:',error.message));
+ proc.stdout.on('data',chunk=>{
+  stdoutBuffer+=String(chunk);if(stdoutBuffer.length>65536)stdoutBuffer=stdoutBuffer.slice(-32768);
+  let idx;
+  while((idx=stdoutBuffer.indexOf('\n'))!==-1){
+   const line=stdoutBuffer.slice(0,idx).trim();stdoutBuffer=stdoutBuffer.slice(idx+1);
+   if(!line)continue;
+   console.log('[Native VS Code tab '+tabId+']',line);
+   if(line==='READY'&&!entry.ready&&nativeCodeHosts.get(tabId)===entry){
+    entry.ready=true;release();
+    if(activeId===tabId&&!modalVisible&&!entry.detached)showNativeCode(tabId);
+    else nativeCodeCommand('HIDE',tabId);
+    emit();
+   }
+  }
+ });
+ proc.stderr.on('data',data=>console.error('[Native VS Code tab '+tabId+']',String(data).trim()));
+ proc.on('error',error=>{console.error('[Native VS Code tab '+tabId+'] host error:',error.message);failed();});
+ proc.on('exit',(exitCode,signal)=>{
+  console.error('[Native VS Code tab '+tabId+'] host exited:',{code:exitCode,signal});
+  if(stdoutBuffer.trim())console.log('[Native VS Code tab '+tabId+']',stdoutBuffer.trim());
+  failed();
+ });
 }
 function evict(){if(live.size<=MAX_LIVE)return;const candidates=Array.from(live.keys()).filter(id=>id!==activeId&&!detached.has(id)&&!store.get(id)?.pinned);
  candidates.sort((a,b)=>(store.get(a)?.last_active||0)-(store.get(b)?.last_active||0));
  while(live.size>MAX_LIVE&&candidates.length)discard(candidates.shift());}
 function newTab(workspace='web',url=HOME,afterId=null){const id=store.nextId(),t={id,title:'New tab',url:safeUrl(url),workspace:typeof workspace==='string'?workspace:'web',pinned:false,muted:false,lastActive:Date.now(),ordinal:id};if(afterId&&store.get(afterId)?.workspace===t.workspace)store.insertAfter(t,afterId);else store.save(t);activate(id);return id;}
 function closeTab(id){id=Number(id);favicons.delete(id);const closing=store.get(id);if(!closing)return;
+ if(isCodeTab(closing)){
+  stopNativeCode(id);
+  try{clearSession(app.getPath('userData'),id);}catch(error){console.warn('Could not clear VS Code session',id,error.message);}
+ }
  if(detached.has(id)){const popup=detached.get(id);setDetachedSaved(id,false);detached.delete(id);if(!popup.isDestroyed())popup.close();}
  discard(id);store.delete(id);if(activeId===id){activeId=null;const sameWorkspace=store.page(closing.workspace,0,50).find(t=>!detached.has(t.id));const target=sameWorkspace?.id||store.lastActiveId();if(target)activate(target);else newTab(closing.workspace);}emit();}
 function sweep(){const now=Date.now();for(const id of Array.from(live.keys())){if(id===activeId)continue;const t=store.get(id),v=live.get(id);if(!t){discard(id);continue;}if(detached.has(id)||t.pinned||now-t.last_active<IDLE_MS||v.webContents.isLoading()||v.webContents.isCurrentlyAudible?.())continue;discard(id);}emit();}
 function detachTab(id){
  id=Number(id);const row=store.get(id);
  if(!row||!win||win.isDestroyed())return false;
+ if(isCodeTab(row)){const entry=nativeCodeHosts.get(id);if(!entry?.ready)return false;if(!entry.detached){entry.detached=true;entry.visible=false;nativeCodeCommand('DETACH',id);}if(activeId===id)activateWebFallback(id);return true;}
  const existing=detached.get(id);
  if(existing&&!existing.isDestroyed()){existing.focus();return true;}
  let view=live.get(id);
@@ -344,8 +582,10 @@ function detachTab(id){
  const h=Math.max(400,Math.min(1100,valid?rectangle.height:800));
  const x=valid?Math.max(area.x,Math.min(rectangle.x,area.x+area.width-200)):area.x+60;
  const y=valid?Math.max(area.y,Math.min(rectangle.y,area.y+area.height-100)):area.y+60;
- const popup=new BrowserWindow({x,y,width:w,height:h,minWidth:400,minHeight:300,title:'Hexora · '+(row.title||'ChatGPT'),backgroundColor:'#111215',autoHideMenuBar:true,webPreferences:{preload:path.join(__dirname,'preload.js'),contextIsolation:true,sandbox:true,nodeIntegration:false}});
+ const taskbar=safeTaskbarIdentity(id);
+ const popup=new BrowserWindow({x,y,width:w,height:h,minWidth:400,minHeight:300,title:'Hexora · '+(row.title||'ChatGPT'),icon:taskbar?.iconPath,backgroundColor:'#111215',autoHideMenuBar:true,webPreferences:{preload:path.join(__dirname,'preload.js'),contextIsolation:true,sandbox:true,nodeIntegration:false}});
  popup.hexoraTabId=id;
+ safeApplyTaskbar(popup,taskbar);
  popup.loadFile('detached.html',{query:{tab:String(id)}});
  popup.webContents.on('did-finish-load',()=>popup.webContents.send('detached:owner',{id:popup.hexoraTabId,title:store.get(popup.hexoraTabId)?.title||'ChatGPT'}));
  detached.set(id,popup);
@@ -401,6 +641,7 @@ function swapDetached(source,target){
   detached.set(target,other);
   other.webContents.send('detached:owner',{id:target,title:store.get(target).title});
   other.setTitle('Hexora · '+store.get(target).title);
+  safeApplyTaskbar(other,safeTaskbarIdentity(target));
   const [ow,oh]=other.getContentSize();destView.setBounds({x:0,y:DETACHED_HEADER,width:ow,height:Math.max(0,oh-DETACHED_HEADER)});
  }else{
   detached.delete(target);setDetachedSaved(target,false);
@@ -410,6 +651,7 @@ function swapDetached(source,target){
  detached.set(source,dest);setDetachedSaved(source,true);
  dest.webContents.send('detached:owner',{id:source,title:store.get(source).title});
  dest.setTitle('Hexora · '+store.get(source).title);
+ safeApplyTaskbar(dest,safeTaskbarIdentity(source));
  const [dw,dh]=dest.getContentSize();sourceView.setBounds({x:0,y:DETACHED_HEADER,width:dw,height:Math.max(0,dh-DETACHED_HEADER)});
  if(!other||other.isDestroyed()){
   // The replaced tab returns to the main workspace; avoid destroying its live browser view.
@@ -464,11 +706,20 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
  restoreExtensions().catch(err=>console.error('Extension initialization failed:',err));
  store=new TabStore(dataDir);
  store.importLegacy(path.join(app.getPath('userData'),'hexora-tabs.json'));
+ // Apply any project saved by VS Code immediately before the prior shutdown,
+ // before activating its native tab and regenerating its workspace file.
+ syncNativeCodeProjects();
  sidebarWidth=Math.max(64,Math.min(560,Number(store.getMeta('sidebarCustomWidth'))||330));
- win=new BrowserWindow({width:1360,height:900,minWidth:700,minHeight:400,title:'Hexora Workspace',autoHideMenuBar:true,backgroundColor:'#111215',webPreferences:{preload:path.join(__dirname,'preload.js'),contextIsolation:true,sandbox:true,nodeIntegration:false}});
+ const mainTaskbar=safeTaskbarIdentity();
+ win=new BrowserWindow({width:1360,height:900,minWidth:700,minHeight:400,title:'Hexora Workspace',icon:mainTaskbar?.iconPath,autoHideMenuBar:true,backgroundColor:'#111215',webPreferences:{preload:path.join(__dirname,'preload.js'),contextIsolation:true,sandbox:true,nodeIntegration:false}});
+ safeApplyTaskbar(win,mainTaskbar);
  mainViewport=new View();win.contentView.addChildView(mainViewport);
- win.loadFile('toolbar.html');
- require('./email-app').register(win);win.on('resize',bounds);win.webContents.on('did-finish-load',emit);
+ require('./email-app').register(win);
+ win.on('focus',()=>{const entry=activeCodeEntry();if(entry?.ready&&entry.visible&&!entry.detached){nativeCodeCommand('TRACE HEXORA_FOCUS_BEFORE');nativeCodeCommand('RESTORE');nativeCodeCommand('RECOVER_Z');nativeCodeCommand('WATCH_MOUSE');}});win.on('blur',()=>{const entry=activeCodeEntry();if(entry?.ready&&entry.visible&&!entry.detached)nativeCodeCommand('DIAG HEXORA_BLUR');});win.on('resize',bounds);
+ for(const lifecycleEvent of ['restore','maximize','unmaximize','moved','resized']){
+  win.on(lifecycleEvent,()=>scheduleNativeCodeLifecycle(lifecycleEvent));
+ }
+ win.webContents.on('did-finish-load',emit);
   win.webContents.on('did-start-loading',()=>{deepLinkReady=false;});
   ipcMain.handle('deep-link:ready',event=>{
    if(event.sender!==win.webContents)throw Error('Invalid deep-link caller.');
@@ -687,6 +938,71 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
   menu.popup({window:win,x:Math.round(Math.max(0,Number(data?.x)||0)),y:Math.round(Math.max(0,Number(data?.y)||0))});
   return true;
  });
+ // Read-only, non-recursive folder browser for the branded VS Code project modal.
+ // All filesystem access stays in the main process. No arbitrary file reads.
+ ipcMain.handle('code-picker:locations',event=>{
+  if(event.sender!==win.webContents)throw Error('Invalid caller');
+  return projectPicker.locations(store);
+ });
+ ipcMain.handle('code-picker:list',(event,folder)=>{
+  if(event.sender!==win.webContents)throw Error('Invalid caller');
+  return projectPicker.listFolders(folder,projectPicker.readPaths(store,projectPicker.FAVORITES_KEY,100));
+ });
+ ipcMain.handle('code-picker:favorite',(event,folder)=>{
+  if(event.sender!==win.webContents)throw Error('Invalid caller');
+  return projectPicker.toggleFavorite(store,folder);
+ });
+ ipcMain.handle('native-code:choose-project',async(event,id)=>{
+  if(event.sender!==win.webContents)throw new Error('Invalid caller');
+  const tabId=Number(id),row=store.get(tabId);
+  if(!Number.isSafeInteger(tabId)||!row||!isCodeTab(row))throw new Error('VS Code tab no longer exists.');
+  const previous=store.getCodeProject(tabId)?.project_path;
+  const selected=await dialog.showOpenDialog(win,{
+   title:'Choose project folder for this VS Code tab',
+   defaultPath:previous&&fs.existsSync(previous)?previous:app.getPath('home'),
+   properties:['openDirectory']
+  });
+  if(selected.canceled||!selected.filePaths[0])return {cancelled:true};
+  // A user-picked directory, not arbitrary renderer-provided filesystem input.
+  const selectedPath=path.resolve(selected.filePaths[0]);
+  if(!fs.statSync(selectedPath).isDirectory())throw new Error('Selected project is not a folder.');
+  // The tab may have been closed while the native directory picker was open.
+  if(!isCodeTab(store.get(tabId)))throw new Error('VS Code tab was closed.');
+  if(previous&&path.normalize(previous).toLowerCase()!==path.normalize(selectedPath).toLowerCase()){
+   try{clearSession(app.getPath('userData'),tabId);}catch(error){console.warn('Could not clear previous VS Code editor state:',error.message);}
+  }
+  if(nativeCodeHosts.has(tabId))nativeCodeHosts.get(tabId).ignoreProjectSync=true;
+  store.setCodeProject(tabId,selectedPath);
+  if(!store.getMeta('tabCustomTitle:'+tabId)){
+   const updated=toModel(store.get(tabId));
+   updated.title=('VS Code · '+path.basename(selectedPath)).slice(0,100);
+   store.save(updated);
+  }
+  emit();
+  return {cancelled:false,projectPath:selectedPath,appliesOnNextLaunch:nativeCodeHosts.has(tabId)};
+ });
+ ipcMain.handle('native-code:clear-project',async(event,id)=>{
+  if(event.sender!==win.webContents)throw new Error('Invalid caller');
+  const tabId=Number(id),row=store.get(tabId);
+  if(!Number.isSafeInteger(tabId)||!isCodeTab(row))throw new Error('VS Code tab no longer exists.');
+  if(nativeCodeHosts.has(tabId))nativeCodeHosts.get(tabId).ignoreProjectSync=true;
+  store.clearCodeProject(tabId);
+  try{clearSession(app.getPath('userData'),tabId);}catch(error){console.warn('Could not clear VS Code editor state:',error.message);}
+  if(!store.getMeta('tabCustomTitle:'+tabId)){const updated=toModel(row);updated.title='Visual Studio Code';store.save(updated);}
+  emit();return {cleared:true,appliesOnNextLaunch:nativeCodeHosts.has(tabId)};
+ });
+ ipcMain.handle('native-code:repair',async event=>{
+  if(event.sender!==win.webContents)throw Error('Invalid caller');
+  const tabId=activeId,entry=activeCodeEntry();
+  if(!entry?.ready||!entry.visible||entry.detached)return {repaired:false};
+  nativeCodeCommand('TRACE BEFORE_REPAIR',tabId);nativeCodeCommand('DIAG BEFORE_REPAIR',tabId);nativeCodeCommand('DETACH',tabId);
+  await new Promise(resolve=>setTimeout(resolve,300));
+  if(nativeCodeHosts.get(tabId)!==entry||activeId!==tabId||!entry.visible)return {repaired:false};
+  nativeCodeCommand('ATTACH',tabId);nativeCodeBounds(tabId);nativeCodeCommand('RECOVER_Z',tabId);
+  return {repaired:true};
+ });
+ ipcMain.handle('native-code:detach',async event=>{if(event.sender!==win.webContents)throw Error('Invalid caller');if(!isCodeTab(store.get(activeId)))return {detached:false};const entry=activeCodeEntry();if(!entry?.ready)return {detached:false};nativeCodeCommand('TRACE BEFORE_DETACH');nativeCodeCommand('DIAG BEFORE_DETACH');return {detached:detachTab(activeId)};});
+ ipcMain.handle('native-code:toggle',async event=>{if(event.sender!==win.webContents)throw Error('Invalid caller');return openCodeTab(store.get(activeId)?.workspace||'web');});
  ipcMain.handle('tabs:page',(_e,arg)=>sendPage(arg));
  ipcMain.handle('tabs:search',(_e,term)=>store.search(term,50).map(pageRow));
  ipcMain.handle('tabs:lookup',(_e,id)=>{const row=store.get(Number(id));return row?pageRow(row):null;});
@@ -706,6 +1022,10 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
    const url=userWebsiteUrl(arg?.url);
    newTab(typeof arg?.workspace==='string'?arg.workspace:'web',url);
    return true;
+  }
+  if(action==='open-native-code'){
+   const workspace=typeof arg==='string'?arg:typeof arg?.workspace==='string'?arg.workspace:'web';
+   return openCodeTab(workspace,arg?.skipPicker!==true,arg?.projectPath||null);
   }
   if(action==='new'){const workspace=typeof arg==='string'?arg:'web';const anchor=store.get(activeId);newTab(workspace,HOME,anchor?.workspace===workspace?activeId:null);}
   else if(action==='activate')activate(Number(arg));
@@ -746,6 +1066,10 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
    const title=typeof arg?.title==='string'&&arg.title.trim()?arg.title.trim().slice(0,100):new URL(url).hostname;
    const id=arg?.newTab?newTab(typeof arg.workspace==='string'?arg.workspace:'web',url):Number(arg?.id);
    const row=store.get(id);if(!row)throw new Error('Tab no longer exists.');
+   if(isCodeTab(row)){
+    stopNativeCode(id);store.clearCodeProject(id);
+    try{clearSession(app.getPath('userData'),id);}catch(error){console.warn('Could not clear old VS Code session:',error.message);}
+   }
    const t=toModel(row);t.url=url;t.title=title;store.save(t);
    const view=live.get(id);
    if(view){view.webContents.loadURL(url).catch(err=>console.error('Could not open website',err));}
@@ -783,11 +1107,12 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
   }
   else if(action==='close')closeTab(arg);
   else if(action==='reload'){
-   if(wc){const view=live.get(activeId);mainViewport.removeChildView(view);mainViewport.addChildView(view);bounds();wc.reloadIgnoringCache();}
+   if(isCodeTab(current)){if(!nativeCodeHosts.has(activeId))queueNativeCodeLaunch(activeId);else{nativeCodeCommand('RECOVER_Z');nativeCodeCommand('FOCUS');}}
+   else if(wc){const view=live.get(activeId);mainViewport.removeChildView(view);mainViewport.addChildView(view);bounds();wc.reloadIgnoringCache();}
   }
   else if(action==='back'&&wc?.navigationHistory.canGoBack())wc.navigationHistory.goBack();
   else if(action==='forward'&&wc?.navigationHistory.canGoForward())wc.navigationHistory.goForward();
-  else if(action==='open-external')shell.openExternal(current?.url||HOME);
+  else if(action==='open-external'){if(!isCodeTab(current))shell.openExternal(current?.url||HOME);}
   else if(action==='sidebar-resize'){
    if(sidebarAnimation){clearInterval(sidebarAnimation);sidebarAnimation=null;}
    sidebarTransitioning=false;sidebarTransitionTarget=null;
@@ -808,6 +1133,7 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
   else if(action==='detached-info'){return {title:store.get(Number(arg))?.title||'ChatGPT'};}
   else if(action==='modal'){
    modalVisible=!!arg;
+   if(isCodeTab(store.get(activeId))){if(modalVisible){hideNativeCode();win.webContents.focus();}else showNativeCode();return true;}
    const view=live.get(activeId);
    if(view){
     if(modalVisible){mainViewport.removeChildView(view);win.webContents.focus();}
@@ -822,6 +1148,10 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
   emit();return true;
  });
  setInterval(sweep,60*1000).unref();
- win.on('closed',()=>{quitting=true;for(const folder of [...extensionPopups.keys()])closeExtensionPopup(folder);if(sidebarAnimation)clearInterval(sidebarAnimation);for(const popup of detached.values())if(!popup.isDestroyed())popup.close();detached.clear();clearInterval(recoveryTimer);recoveryPassword=null;clearTimeout(stateTimer);win=null;for(const id of Array.from(live.keys()))discard(id);vault?.lock();store.close();});
+ syncNativeCodeProjects();
+ setInterval(syncNativeCodeProjects,1000).unref();
+ win.on('closed',()=>{if(nativeCodeLifecycleTimer){clearTimeout(nativeCodeLifecycleTimer);nativeCodeLifecycleTimer=null;}quitting=true;if(nativeCodeInstaller&&nativeCodeInstaller.exitCode===null)nativeCodeInstaller.kill();stopAllNativeCode();for(const folder of [...extensionPopups.keys()])closeExtensionPopup(folder);if(sidebarAnimation)clearInterval(sidebarAnimation);for(const popup of detached.values())if(!popup.isDestroyed())popup.close();detached.clear();clearInterval(recoveryTimer);recoveryPassword=null;clearTimeout(stateTimer);win=null;for(const id of Array.from(live.keys()))discard(id);vault?.lock();tabStoreClosing=true;store.close();});
+ // Register every IPC handler before the renderer can issue actions.
+ win.loadFile('toolbar.html').catch(err=>console.error('[Hexora] Toolbar load failed:',err));
 });
 app.on('window-all-closed',()=>{if(process.platform!=='darwin')app.quit();});
