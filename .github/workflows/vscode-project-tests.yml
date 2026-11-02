@@ -68,3 +68,5 @@ jobs:
         run: npm run test:project-picker
       - name: Check project picker and toolbar JavaScript syntax
         run: npm run test:project-picker-ui
+      - name: Verify distinct installed and development taskbar identities
+        run: npm run test:taskbar
