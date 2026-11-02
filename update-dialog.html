@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Hexora update ready</title>
+<style>
+:root{color-scheme:dark;font-family:Inter,"Segoe UI",Arial,sans-serif}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at 80% 0%,#273354 0%,#151923 46%,#101218 100%);color:#f4f6fc}
+main{padding:29px 32px 24px}.brand{display:flex;align-items:center;gap:10px;color:#aeb8d0;font-size:12px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase}
+.mark{display:grid;place-items:center;width:32px;height:32px;border:1px solid #7d8fca;border-radius:10px;background:#252f50;color:#e4eaff;font-size:19px}
+.eyebrow{margin:27px 0 9px;color:#9eafe0;font-size:12px;font-weight:600;letter-spacing:1.2px;text-transform:uppercase}
+h1{font-size:26px;letter-spacing:-.8px;margin:0 0 10px;font-weight:650}p{color:#b5bed0;font-size:13px;line-height:1.65;margin:0}
+.version{color:#fff}footer{display:flex;justify-content:flex-end;gap:10px;margin-top:27px}
+button{cursor:pointer;border-radius:10px;padding:11px 17px;font:600 13px "Segoe UI",sans-serif}
+.secondary{background:#252b38;border:1px solid #424b5e;color:#e0e6f5}.primary{background:#b3c4ff;border:1px solid #d0daff;color:#10172b}
+button:hover{filter:brightness(1.12)}button:focus-visible{outline:2px solid #fff;outline-offset:3px}
+</style></head>
+<body><main>
+<div class="brand"><div class="mark">✦</div> HEXORA <span style="font-weight:400;color:#69738b">/ STABLE</span></div>
+<div class="eyebrow">Update downloaded</div>
+<h1>Ready for what's next.</h1>
+<p>Hexora <strong class="version" id="version"></strong> is ready to install. Save your open work, then restart to update. Your workspaces and settings will be kept.</p>
+<footer><button class="secondary" id="later">Later</button><button class="primary" id="install">Update &amp; Restart</button></footer>
+</main>
+<script>
+const version=new URLSearchParams(location.search).get('version')||'';
+document.getElementById('version').textContent=version;
+document.getElementById('later').addEventListener('click',()=>window.hexoraUpdate.choose('later'));
+document.getElementById('install').addEventListener('click',()=>window.hexoraUpdate.choose('install'));
+</script></body></html>
