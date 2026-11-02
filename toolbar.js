@@ -172,12 +172,12 @@ function render(p){
  renderStackTree(conversations,p);
  for(const item of p.tabs){
   const el=document.createElement('button');el.className='chat-row'+(item.active?' active':'');
-  const symbol=document.createElement('span');symbol.className='symbol';symbol.textContent=item.suspended?'☾':'▤';
+  const symbol=document.createElement('span');symbol.className='symbol';symbol.textContent=item.nativeCodeProjectMissing?'⚠':item.nativeCode?'⌘':item.suspended?'☾':'▤';
   const name=document.createElement('span');name.className='label';name.textContent=item.title||'New tab';
   const mute=document.createElement('span');mute.className='quick-pin';mute.title=item.muted?'Unmute':'Mute';mute.textContent=item.muted?'◉':'♫';mute.onclick=e=>{e.stopPropagation();action('mute',item.id);};
   const detach=document.createElement('span');detach.className='quick-pin';detach.title='Detach into another window';detach.textContent='↗';detach.onclick=e=>{e.stopPropagation();action('detach',item.id);};
   const pin=document.createElement('span');pin.className='quick-pin';pin.title=item.pinned?'Unpin':'Pin';pin.textContent=item.pinned?'◆':'◇';pin.onclick=e=>{e.stopPropagation();action('pin',item.id);};
-  el.append(symbol,name,mute,pin,detach);el.onclick=()=>action('activate',item.id);el.addEventListener('contextmenu',e=>{e.preventDefault();e.stopPropagation();showTabMenu(e.clientX,e.clientY,item);});enableSidebarDrag(el,item.id,sidebarConversationOrderPrefix+activeWorkspace);conversations.append(el);
+  if(item.nativeCode)el.append(symbol,name,pin,detach);else el.append(symbol,name,mute,pin,detach);el.onclick=()=>action('activate',item.id);el.addEventListener('contextmenu',e=>{e.preventDefault();e.stopPropagation();showTabMenu(e.clientX,e.clientY,item);});enableSidebarDrag(el,item.id,sidebarConversationOrderPrefix+activeWorkspace);conversations.append(el);
  }
  const nav=document.createElement('div');nav.className='page-controls';
  const prev=document.createElement('button');prev.textContent='‹ Previous';prev.disabled=offset===0;prev.onclick=()=>{offset=Math.max(0,offset-50);refresh();};
@@ -188,6 +188,7 @@ function render(p){
  renderSecondTabRow(p);
  renderTabRow($('tabs'),p,null);
  $('tabs').classList.toggle('compact-titles', $('tabs').querySelectorAll(':scope > .tab').length>=11);
+  $('native-code-rail').classList.toggle('selected',!!p.active&&/^hexora-native:\/\/vscode(?:\/\d+)?$/.test(p.active.url));
 }
 // Sidebar grip: one serialized resize stream, without competing layout updates.
 const sidebarGrip=$('sidebar-resize-handle');
@@ -491,6 +492,16 @@ $('notion-rail').onclick=async()=>{
   window.alert('Could not open Notion: '+error.message);
  }
 };
+// Open Notion's Action Center as a separate saved web tab in this workspace.
+const NOTION_ACTION_CENTER_URL='https://app.notion.com/p/anthonymeszaros/Action-Center-348a372875a78084a961fd11848b2880';
+$('notion-rail').onclick=async()=>{
+ try{
+  await action('open-website',{url:NOTION_ACTION_CENTER_URL,title:'Notion · Action Center',newTab:true,workspace:activeWorkspace});
+ }catch(error){
+  console.error('Could not open the Notion tab',error);
+  window.alert('Could not open Notion: '+error.message);
+ }
+};
 for(const id of ['back','forward','reload'])$(id).onclick=()=>action(id);
 for(const id of ['external','settings-rail'])$(id).onclick=()=>action('open-external');
 const toggleSidebar=()=>{sidebarOpen=!sidebarOpen;updateSidebar();};
@@ -622,6 +633,13 @@ function attachFaviconMarquee(img,tab){
  tab.addEventListener('pointerleave',stop);
 }
 function updateTabFavicon(el,tab){
+ if(tab.nativeCode){
+  el.querySelector('.tab-favicon')?.remove();
+  let badge=el.querySelector('.native-code-tab-icon');
+  if(!badge){badge=document.createElement('span');badge.className='native-code-tab-icon';badge.textContent='⌘';badge.setAttribute('aria-hidden','true');el.insertBefore(badge,el.querySelector('.tab-title-lines')||el.querySelector('.name')||el.firstChild);}
+  return;
+ }
+ el.querySelector('.native-code-tab-icon')?.remove();
  const preferred=tab.favicon||tab.faviconFallback;
  let img=el.querySelector('.tab-favicon');
  if(!preferred){img?.remove();return;}
@@ -1048,10 +1066,17 @@ function showTabMenu(x,y,item){
  $('tab-menu-close-selected').classList.toggle('hidden',!multi);
  $('tab-menu-close-selected').textContent='×  Close '+selectedTabIds.size+' selected tabs';
  $('tab-menu-current-title').textContent=item.title||'Untitled tab';
- $('tab-menu-url').value=item.url||'';
+ $('tab-menu-url').value=item.nativeCode?'':item.url||'';
  $('tab-menu-url-error').textContent='';
  action('modal',true);
  $('tab-menu-chrome').textContent=item.chromeMode?'✓ Disable Chrome compatibility':'◉ Enable Chrome compatibility';
+  $('tab-menu-chrome').disabled=!!item.nativeCode;
+ const projectName=item.nativeCodeProject?.split(/[\\/]/).filter(Boolean).pop();
+ $('tab-menu-code-project').classList.toggle('hidden',!item.nativeCode);
+ $('tab-menu-code-clear').classList.toggle('hidden',!item.nativeCodeProject);
+ $('tab-menu-code-project').querySelector('span:last-child').textContent=
+  item.nativeCodeProjectMissing?'⚠ Saved project missing — choose folder…':
+  projectName?'Change VS Code project: '+projectName:'Choose VS Code project folder…';
  const pref=item.panelPreference||{mode:item.panelMode,source:'default'};
  $('tab-menu-panel-wide').textContent=(pref.tabOverride==='wide'?'✓ ':'')+'This tab: Wide';
  $('tab-menu-panel-thin').textContent=(pref.tabOverride==='thin'?'✓ ':'')+'This tab: Thin';
@@ -1066,6 +1091,13 @@ function showTabMenu(x,y,item){
  menu.style.left=Math.max(8,Math.min(x,innerWidth-menu.offsetWidth-8))+'px';
  menu.style.top=Math.max(8,Math.min(y,innerHeight-menu.offsetHeight-8))+'px';
 }
+$('tab-menu-detach').onclick=async()=>{
+ if(!contextTab)return;
+ const id=contextTab.id;
+ hideTabMenu();
+ try{await action('detach',id);refresh();}
+ catch(error){alert('Could not open a new window: '+error.message);}
+};
 $('tab-menu-copy-link').onclick=async()=>{
  const tab=contextTab;if(!tab)return;
  hideTabMenu();
@@ -1120,6 +1152,24 @@ $('tab-menu-rename').onclick=()=>{
   catch(err){error.textContent=err.message;save.disabled=false;}
  };
  requestAnimationFrame(()=>{input.focus();input.select();});
+};
+$('tab-menu-code-project').onclick=async()=>{
+ const tab=contextTab;if(!tab?.nativeCode)return;
+ hideTabMenu(false);
+ let result;
+ try{result=await window.hexora.nativeCode.chooseProject(tab.id);}
+ catch(error){alert('VS Code project: '+error.message);}
+ finally{await action('modal',false);await refresh();}
+ if(result&&!result.cancelled&&result.appliesOnNextLaunch)alert('Project saved for this VS Code tab. It will load when Hexora next launches this editor (for example, after restarting Hexora). The current editor window is unchanged to protect unsaved work.');
+};
+$('tab-menu-code-clear').onclick=async()=>{
+ const tab=contextTab;if(!tab?.nativeCode)return;
+ hideTabMenu(false);
+ try{
+  const result=await window.hexora.nativeCode.clearProject(tab.id);
+  if(result.appliesOnNextLaunch)alert('Saved project cleared. The change takes effect next time Hexora launches this editor.');
+ }catch(error){alert('VS Code project: '+error.message);}
+ finally{await action('modal',false);await refresh();}
 };
 $('tab-menu-url-form').onsubmit=async e=>{
  e.preventDefault();
@@ -1596,6 +1646,28 @@ v('vault-entry-form').onsubmit=async e=>{
 };
 v('vault-delete').onclick=async()=>{if(!vaultSelected||!confirm('Delete this saved login permanently?'))return;await window.hexora.vault.delete(vaultSelected);vaultClearEditor();v('vault-entry-form').classList.add('hidden');await vaultLoad();};
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&vaultOpen)vaultClose();});
+
+// One click opens the Hexora project browser; Ctrl-click preserves the fast
+// native blank Code path, and Shift-click still repairs a hosted editor.
+ $('native-code-rail').addEventListener('click',async event=>{
+  try{
+   if(event.shiftKey){await window.hexora.nativeCode.repair();return;}
+   const project=event.ctrlKey?null:await window.hexoraProjectPicker.open();
+   if(!event.ctrlKey&&!project)return; // Cancel never creates a VS Code tab.
+   const tab=await action('open-native-code',{workspace:activeWorkspace,skipPicker:true,...(project?{projectPath:project}:{})});
+   if(tab.workspace!==activeWorkspace){activeWorkspace=tab.workspace;offset=0;save();}
+   await refresh();
+   if(document.activeElement instanceof HTMLElement)document.activeElement.blur();
+  }catch(error){alert('VS Code project: '+error.message);}
+ });
+ $('native-code-rail').addEventListener('contextmenu',async event=>{
+  event.preventDefault();
+  try{
+   const state=await window.hexora.nativeCode.detach();
+   if(state.detached){$('native-code-rail').title='VS Code detached — click its tab to reattach';await refresh();}
+  }catch(error){alert('Detach VS Code: '+error.message);}
+ });
+ window.hexora.nativeCode.onStopped(()=>{refresh();});
 
 // Workspace header micro-favorites: local-only, capped at ten links.
 (function initHeaderFavorites(){
