@@ -65,7 +65,8 @@
         "releaseType": "release"
       }
     ],
-    "generateUpdatesFilesForAllChannels": false
+    "generateUpdatesFilesForAllChannels": false,
+    "electronVersion": "38.8.6"
   },
   "devDependencies": {
     "electron": "^38.0.0"
