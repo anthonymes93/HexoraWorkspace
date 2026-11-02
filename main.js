@@ -5,6 +5,7 @@ const {screen}=require('electron');
 const {TabStore}=require('./tab-store');
 const {workspaceLink,tabLink,parseDeepLink}=require('./deep-links');
 const {PasswordVault}=require('./password-vault');
+const {startStableUpdater}=require('./stable-updater');
 const fs=require('node:fs');
 const os=require('node:os');
 const {snapshot,stageRestore,applyPending,verifyBackup}=require('./recovery');
@@ -824,4 +825,5 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
  setInterval(sweep,60*1000).unref();
  win.on('closed',()=>{quitting=true;for(const folder of [...extensionPopups.keys()])closeExtensionPopup(folder);if(sidebarAnimation)clearInterval(sidebarAnimation);for(const popup of detached.values())if(!popup.isDestroyed())popup.close();detached.clear();clearInterval(recoveryTimer);recoveryPassword=null;clearTimeout(stateTimer);win=null;for(const id of Array.from(live.keys()))discard(id);vault?.lock();store.close();});
 });
+app.whenReady().then(startStableUpdater);
 app.on('window-all-closed',()=>{if(process.platform!=='darwin')app.quit();});
