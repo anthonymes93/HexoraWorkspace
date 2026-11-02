@@ -56,9 +56,21 @@
           "hexora"
         ]
       }
-    ]
+    ],
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "anthonymes93",
+        "repo": "HexoraWorkspace",
+        "releaseType": "release"
+      }
+    ],
+    "generateUpdatesFilesForAllChannels": false
   },
   "devDependencies": {
     "electron": "^38.0.0"
+  },
+  "dependencies": {
+    "electron-updater": "^6.6.2"
   }
 }
