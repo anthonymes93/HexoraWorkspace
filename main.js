@@ -12,11 +12,12 @@ const {managedWorkspaceOrBlank,clearSession,codeSessionDirectory}=require('./cod
 const {syncCodeProjects}=require('./code-project-sync');
 const projectPicker=require('./code-project-picker');
 const {buildCompanionVsix,BRIDGE_VERSION}=require('./code-session-vsix');
-const {APP_ID,taskbarIdentity,applyTaskbarIdentity}=require('./taskbar-identity');
-if(process.platform==='win32')app.setAppUserModelId(APP_ID);
+const {APP_ID,DEV_APP_ID,taskbarIdentity,applyTaskbarIdentity}=require('./taskbar-identity');
+const isDevelopment=!app.isPackaged;
+if(process.platform==='win32')app.setAppUserModelId(isDevelopment?DEV_APP_ID:APP_ID);
 // Cosmetic taskbar setup must never prevent Hexora, its tabs, or native VS Code from opening.
 function safeTaskbarIdentity(tabId=null){
- try{return taskbarIdentity(app.getPath('userData'),tabId);}
+ try{return taskbarIdentity(app.getPath('userData'),tabId,process.platform,isDevelopment?DEV_APP_ID:APP_ID);}
  catch(error){console.warn('[Hexora] Taskbar icon unavailable:',error.message);return null;}
 }
 function safeApplyTaskbar(window,identity){
@@ -75,7 +76,6 @@ function stopAllNativeCode(){for(const id of [...nativeCodeHosts.keys()])stopNat
 const {snapshot,stageRestore,applyPending,verifyBackup}=require('./recovery');
 // Development must not share Chromium storage or the single-instance lock with an
 // installed Hexora release. Preserve the installed profile path for existing users.
-const isDevelopment=!app.isPackaged;
 const profileName=isDevelopment?'hexora-workspace-dev':'hexora-workspace';
 app.setPath('userData',path.join(app.getPath('appData'),profileName));
 // Register deep links for both packaged installs and Electron development on Windows.
