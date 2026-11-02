@@ -1,0 +1,70 @@
+name: VS Code project session tests
+on:
+  push:
+    branches:
+      - 'feature/vscode-project-session-restore'
+      - 'feature/vscode-active-file-session'
+      - 'feature/vscode-auto-project-detection'
+      - 'experiment/vscode-no-flash'
+      - 'feature/hexora-project-picker'
+  pull_request:
+    paths:
+      - 'tab-store.js'
+      - 'main.js'
+      - 'code-session-vsix.js'
+      - 'code-session-workspace.js'
+      - 'code-project-sync.js'
+      - 'scripts/test-code-project-sync.cjs'
+      - 'integrations/vscode-session-bridge/**'
+      - 'scripts/test-code-session.cjs'
+      - 'scripts/test-code-bridge.cjs'
+      - 'scripts/test-code-auto-project.cjs'
+      - 'experiments/vscode-hexora-host.ps1'
+      - 'experiments/vscode-companion-install.ps1'
+      - 'scripts/test-code-projects.cjs'
+      - 'package.json'
+      - 'code-project-picker.js'
+      - 'project-picker.js'
+      - 'project-picker.css'
+      - 'toolbar.html'
+      - 'toolbar.js'
+      - 'preload.js'
+      - 'scripts/test-project-picker.cjs'
+      - '.github/workflows/vscode-project-tests.yml'
+jobs:
+  project-persistence:
+    strategy:
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify persistent VS Code project associations
+        run: npm run test:code-projects
+      - name: Verify VS Code active-file session bundle and isolation
+        run: npm run test:code-session
+      - name: Verify VS Code active-editor capture and restoration
+        run: npm run test:code-bridge
+      - name: Validate native Windows PowerShell host syntax
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $errors = $null
+          foreach ($script in @('experiments/vscode-hexora-host.ps1','experiments/vscode-companion-install.ps1')) {
+            $tokens = $null
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $PWD $script), [ref]$tokens, [ref]$errors) | Out-Null
+            if ($errors.Count -gt 0) { $errors | Format-List; exit 1 }
+          }
+      - name: Verify automatic VS Code project discovery
+        run: npm run test:code-auto-project
+      - name: Verify fenced auto-detected project records
+        run: npm run test:code-project-sync
+      - name: Verify real project browsing and saved favorites
+        run: npm run test:project-picker
+      - name: Check project picker and toolbar JavaScript syntax
+        run: npm run test:project-picker-ui
