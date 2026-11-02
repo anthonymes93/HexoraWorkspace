@@ -473,6 +473,24 @@ $('new-tab-save-shortcut').onclick=()=>{
  try{localStorage.setItem(newTabCustomKey,JSON.stringify(items));newTabError.textContent='Shortcut saved.';renderNewTabCustomLinks();}catch{newTabError.textContent='Could not save shortcut.';}
 };
 for(const id of ['new','new-rail','new-sidebar','add-tab'])$(id).onclick=openNewTabLauncher;
+// Native VS Code support is integrated incrementally. Keep the rail visible,
+// but do not route a native editor URL through the normal web-tab launcher.
+$('native-code-rail').addEventListener('click',async event=>{
+  const native=window.hexora?.nativeCode;
+  const picker=window.hexoraProjectPicker;
+  if(!native||!picker){
+    alert('VS Code integration is not connected on this build yet. Use the VS Code development branch until the native host is ported.');
+    return;
+  }
+  try{
+    if(event.shiftKey){await native.repair();return;}
+    const project=event.ctrlKey?null:await picker.open();
+    if(!event.ctrlKey&&!project)return;
+    await action('open-native-code',{workspace:activeWorkspace,skipPicker:true,...(project?{projectPath:project}:{})});
+    await refresh();
+  }catch(error){alert('VS Code: '+error.message);}
+});
+
 $('new-tab-close').onclick=closeNewTabLauncher;
 newTabOverlay.onclick=e=>{if(e.target===newTabOverlay)closeNewTabLauncher();};
 $('new-tab-form').onsubmit=e=>{e.preventDefault();smartSubmitSelection();};
