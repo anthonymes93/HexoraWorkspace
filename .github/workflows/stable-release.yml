@@ -27,7 +27,7 @@ jobs:
           git merge-base --is-ancestor HEAD origin/main || { echo 'Release commit is not on main'; exit 1; }
           EXPECTED="v$(node -p "require('./package.json').version")"
           test "$GITHUB_REF_NAME" = "$EXPECTED" || { echo "Tag must equal $EXPECTED"; exit 1; }
-      - run: npm install --no-audit --no-fund
+      - run: npm ci
       - name: Check JavaScript syntax
         shell: pwsh
         run: |
