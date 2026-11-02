@@ -67,9 +67,20 @@
     ],
     "asarUnpack": [
       "experiments/*.ps1"
+    ],
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "anthonymes93",
+        "repo": "HexoraWorkspace",
+        "releaseType": "release"
+      }
     ]
   },
   "devDependencies": {
     "electron": "^38.0.0"
+  },
+  "dependencies": {
+    "electron-updater": "^6.6.2"
   }
 }
