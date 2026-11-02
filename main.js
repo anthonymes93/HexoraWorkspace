@@ -13,6 +13,7 @@ const {syncCodeProjects}=require('./code-project-sync');
 const projectPicker=require('./code-project-picker');
 const {buildCompanionVsix,BRIDGE_VERSION}=require('./code-session-vsix');
 const {APP_ID,DEV_APP_ID,taskbarIdentity,applyTaskbarIdentity}=require('./taskbar-identity');
+const {startStableUpdater}=require('./stable-updater');
 const isDevelopment=!app.isPackaged;
 if(process.platform==='win32')app.setAppUserModelId(isDevelopment?DEV_APP_ID:APP_ID);
 // Cosmetic taskbar setup must never prevent Hexora, its tabs, or native VS Code from opening.
@@ -1170,4 +1171,5 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
  // Register every IPC handler before the renderer can issue actions.
  win.loadFile('toolbar.html',{query:isDevelopment?{hexoraDev:'1'}:{}}).catch(err=>console.error('[Hexora] Toolbar load failed:',err));
 });
+app.whenReady().then(startStableUpdater).catch(error=>console.error('[updates] startup:',error));
 app.on('window-all-closed',()=>{if(process.platform!=='darwin')app.quit();});

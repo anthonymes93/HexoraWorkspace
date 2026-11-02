@@ -1,0 +1,44 @@
+name: Publish approved Hexora stable release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Verify approved tag and version
+        shell: bash
+        run: |
+          git fetch origin main
+          git merge-base --is-ancestor HEAD origin/main || { echo 'Release commit is not on main'; exit 1; }
+          EXPECTED="v$(node -p "require('./package.json').version")"
+          test "$GITHUB_REF_NAME" = "$EXPECTED" || { echo "Tag must equal $EXPECTED"; exit 1; }
+      - run: npm ci
+      - name: Check JavaScript syntax
+        shell: pwsh
+        run: |
+          node --check main.js
+          node --check email-app.js
+          node --check preload.js
+          node --check toolbar.js
+      - run: npm run test:links
+      - run: npm run test:taskbar
+      - run: npm run test:code-session
+      - name: Publish NSIS installer and update metadata
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npx --yes electron-builder@26.18.0 --win nsis --x64 --publish always
