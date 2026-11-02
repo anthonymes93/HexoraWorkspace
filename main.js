@@ -5,6 +5,7 @@ const {screen}=require('electron');
 const {TabStore}=require('./tab-store');
 const {workspaceLink,tabLink,parseDeepLink}=require('./deep-links');
 const {PasswordVault}=require('./password-vault');
+const {startStableUpdater}=require('./stable-updater');
 const fs=require('node:fs');
 const os=require('node:os');
 const {spawn}=require('node:child_process');
@@ -73,9 +74,9 @@ function stopNativeCode(tabId){
 function stopAllNativeCode(){for(const id of [...nativeCodeHosts.keys()])stopNativeCode(id);nativeCodeLaunchQueue.length=0;}
 
 const {snapshot,stageRestore,applyPending,verifyBackup}=require('./recovery');
-// Stable profile path for development, NSIS and packaged builds.
-// Keep this unchanged so installing an update never silently switches profiles.
-app.setPath('userData', path.join(app.getPath('appData'), 'hexora-workspace'));
+// Installed releases and npm-start development must never share browser sessions or databases.
+const profileName=app.isPackaged?'hexora-workspace':'hexora-workspace-dev';
+app.setPath('userData',path.join(app.getPath('appData'),profileName));
 // Register deep links for both packaged installs and Electron development on Windows.
 if(process.platform==='win32'){
  if(process.defaultApp&&process.argv[1])app.setAsDefaultProtocolClient('hexora',process.execPath,[path.resolve(process.argv[1])]);
@@ -1154,4 +1155,5 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
  // Register every IPC handler before the renderer can issue actions.
  win.loadFile('toolbar.html').catch(err=>console.error('[Hexora] Toolbar load failed:',err));
 });
+app.whenReady().then(startStableUpdater);
 app.on('window-all-closed',()=>{if(process.platform!=='darwin')app.quit();});

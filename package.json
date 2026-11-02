@@ -39,7 +39,8 @@
     ],
     "win": {
       "target": "nsis",
-      "artifactName": "Hexora-Setup-${version}-${arch}.${ext}"
+      "artifactName": "Hexora-Setup-${version}-${arch}.${ext}",
+      "icon": "assets/hexora.ico"
     },
     "nsis": {
       "oneClick": false,
@@ -47,7 +48,9 @@
       "perMachine": false,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "Hexora Workspace"
+      "shortcutName": "Hexora Workspace",
+      "installerIcon": "assets/hexora.ico",
+      "uninstallerIcon": "assets/hexora.ico"
     },
     "appx": {
       "applicationId": "HexoraWorkspace",
@@ -64,9 +67,22 @@
           "hexora"
         ]
       }
-    ]
+    ],
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "anthonymes93",
+        "repo": "HexoraWorkspace",
+        "releaseType": "release"
+      }
+    ],
+    "generateUpdatesFilesForAllChannels": false,
+    "electronVersion": "38.8.6"
   },
   "devDependencies": {
     "electron": "^38.0.0"
+  },
+  "dependencies": {
+    "electron-updater": "^6.6.2"
   }
 }
