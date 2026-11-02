@@ -8,9 +8,9 @@ const {PasswordVault}=require('./password-vault');
 const fs=require('node:fs');
 const os=require('node:os');
 const {snapshot,stageRestore,applyPending,verifyBackup}=require('./recovery');
-// Stable profile path for development, NSIS and packaged builds.
-// Keep this unchanged so installing an update never silently switches profiles.
-app.setPath('userData', path.join(app.getPath('appData'), 'hexora-workspace'));
+// Installed releases and npm-start development must never share browser sessions or databases.
+const profileName=app.isPackaged?'hexora-workspace':'hexora-workspace-dev';
+app.setPath('userData',path.join(app.getPath('appData'),profileName));
 // Register deep links for both packaged installs and Electron development on Windows.
 if(process.platform==='win32'){
  if(process.defaultApp&&process.argv[1])app.setAsDefaultProtocolClient('hexora',process.execPath,[path.resolve(process.argv[1])]);
