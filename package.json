@@ -31,7 +31,8 @@
     ],
     "win": {
       "target": "nsis",
-      "artifactName": "Hexora-Setup-${version}-${arch}.${ext}"
+      "artifactName": "Hexora-Setup-${version}-${arch}.${ext}",
+      "icon": "assets/hexora.ico"
     },
     "nsis": {
       "oneClick": false,
@@ -39,7 +40,9 @@
       "perMachine": false,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "Hexora Workspace"
+      "shortcutName": "Hexora Workspace",
+      "installerIcon": "assets/hexora.ico",
+      "uninstallerIcon": "assets/hexora.ico"
     },
     "appx": {
       "applicationId": "HexoraWorkspace",
