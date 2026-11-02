@@ -73,9 +73,11 @@ function stopNativeCode(tabId){
 function stopAllNativeCode(){for(const id of [...nativeCodeHosts.keys()])stopNativeCode(id);nativeCodeLaunchQueue.length=0;}
 
 const {snapshot,stageRestore,applyPending,verifyBackup}=require('./recovery');
-// Stable profile path for development, NSIS and packaged builds.
-// Keep this unchanged so installing an update never silently switches profiles.
-app.setPath('userData', path.join(app.getPath('appData'), 'hexora-workspace'));
+// Development must not share Chromium storage or the single-instance lock with an
+// installed Hexora release. Preserve the installed profile path for existing users.
+const isDevelopment=!app.isPackaged;
+const profileName=isDevelopment?'hexora-workspace-dev':'hexora-workspace';
+app.setPath('userData',path.join(app.getPath('appData'),profileName));
 // Register deep links for both packaged installs and Electron development on Windows.
 if(process.platform==='win32'){
  if(process.defaultApp&&process.argv[1])app.setAsDefaultProtocolClient('hexora',process.execPath,[path.resolve(process.argv[1])]);
@@ -711,7 +713,7 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
  syncNativeCodeProjects();
  sidebarWidth=Math.max(64,Math.min(560,Number(store.getMeta('sidebarCustomWidth'))||330));
  const mainTaskbar=safeTaskbarIdentity();
- win=new BrowserWindow({width:1360,height:900,minWidth:700,minHeight:400,title:'Hexora Workspace',icon:mainTaskbar?.iconPath,autoHideMenuBar:true,backgroundColor:'#111215',webPreferences:{preload:path.join(__dirname,'preload.js'),contextIsolation:true,sandbox:true,nodeIntegration:false}});
+ win=new BrowserWindow({width:1360,height:900,minWidth:700,minHeight:400,title:isDevelopment?'Hexora Workspace [DEV]':'Hexora Workspace',icon:mainTaskbar?.iconPath,autoHideMenuBar:true,backgroundColor:'#111215',webPreferences:{preload:path.join(__dirname,'preload.js'),contextIsolation:true,sandbox:true,nodeIntegration:false}});
  safeApplyTaskbar(win,mainTaskbar);
  mainViewport=new View();win.contentView.addChildView(mainViewport);
  require('./email-app').register(win);
