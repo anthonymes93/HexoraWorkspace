@@ -492,16 +492,6 @@ $('notion-rail').onclick=async()=>{
   window.alert('Could not open Notion: '+error.message);
  }
 };
-// Open Notion's Action Center as a separate saved web tab in this workspace.
-const NOTION_ACTION_CENTER_URL='https://app.notion.com/p/anthonymeszaros/Action-Center-348a372875a78084a961fd11848b2880';
-$('notion-rail').onclick=async()=>{
- try{
-  await action('open-website',{url:NOTION_ACTION_CENTER_URL,title:'Notion · Action Center',newTab:true,workspace:activeWorkspace});
- }catch(error){
-  console.error('Could not open the Notion tab',error);
-  window.alert('Could not open Notion: '+error.message);
- }
-};
 for(const id of ['back','forward','reload'])$(id).onclick=()=>action(id);
 for(const id of ['external','settings-rail'])$(id).onclick=()=>action('open-external');
 const toggleSidebar=()=>{sidebarOpen=!sidebarOpen;updateSidebar();};
