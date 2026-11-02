@@ -64,6 +64,9 @@
           "hexora"
         ]
       }
+    ],
+    "asarUnpack": [
+      "experiments/*.ps1"
     ]
   },
   "devDependencies": {
