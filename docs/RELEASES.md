@@ -16,8 +16,10 @@ Run `npm ci`, then `npm run build:win` on Windows. The NSIS installer is written
 
 Do not publish a release tag for every push. A tag is the explicit approval gate.
 
-## Remaining work before unattended updates
-- Integrate a tested updater in the packaged application (for example electron-updater), with an updated dependency lockfile, startup check, downloaded-update notification, and install-on-restart.
+## Updater status
+- A packaged-only `electron-updater` integration checks GitHub stable releases after startup and every six hours, downloads updates and installs on app quit. It has **not** been tested on Windows.
+- **Blocking before merge:** synchronize `package-lock.json` with `package.json` using `npm install` on a networked machine and commit the result. CI temporarily uses `npm install` rather than `npm ci`; restore `npm ci` in both workflows after lock synchronization.
+- Verify installed build actually receives `latest.yml` and updates to the next version. Avoid tagging the current untested version.
 - Test signed versus unsigned installer behavior, Windows SmartScreen, rollback, persistence and migration.
 - Confirm GitHub Actions workflow can publish in repository settings (Actions workflow permissions).
 - Microsoft Store requires Partner Center identity and signing; the current AppX settings are preview placeholders.
