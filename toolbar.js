@@ -1,4 +1,11 @@
 const $=id=>document.getElementById(id);
+// The development marker is driven by the Electron main process, not local storage.
+// Initialize before the rest of the toolbar so startup is unambiguous.
+if(new URLSearchParams(window.location.search).get('hexoraDev')==='1'){
+ document.title='Hexora Workspace [DEV]';
+ const indicator=$('hexora-dev-indicator');
+ if(indicator)indicator.hidden=false;
+}
 const workspaces=[{id:'web',name:'Web Development',emoji:'◈'},{id:'business',name:'Business',emoji:'▤'},{id:'personal',name:'Personal',emoji:'☼'},{id:'ideas',name:'Ideas Lab',emoji:'✦'}];
 const conversationsCollapsedKey='hexora-conversations-collapsed';
 function setConversationsCollapsed(collapsed){
