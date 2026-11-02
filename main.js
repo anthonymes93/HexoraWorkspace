@@ -481,7 +481,7 @@ function installCodeBridgeInBackground(){
  let vsix;
  try{vsix=buildCompanionVsix(codeSessionDirectory(app.getPath('userData')));}
  catch(error){console.warn('[Native VS Code] Could not package session companion:',error.message);return;}
- const script=path.join(__dirname,'experiments','vscode-companion-install.ps1');
+ const script=nativeCodeHostScript('vscode-companion-install.ps1');
  let proc;
  try{proc=spawn('powershell.exe',['-NoProfile','-ExecutionPolicy','Bypass','-File',script,'-CompanionVsix',vsix],{
   windowsHide:true,stdio:['ignore','pipe','pipe']
@@ -500,8 +500,13 @@ function installCodeBridgeInBackground(){
   }else console.warn('[Native VS Code] Companion upgrade unavailable; Code launch was not blocked.');
  });
 }
+// PowerShell cannot execute scripts from inside Electron's app.asar archive.
+function nativeCodeHostScript(name){
+ const root=app.isPackaged?path.join(process.resourcesPath,'app.asar.unpacked'):__dirname;
+ return path.join(root,'experiments',name);
+}
 function startNativeCodeHost(tabId,entry){
- const script=path.join(__dirname,'experiments','vscode-hexora-host.ps1');
+ const script=nativeCodeHostScript('vscode-hexora-host.ps1');
  const hwnd=win.getNativeWindowHandle().readBigUInt64LE(0).toString();
  // Each tab uses its own saved project path. Passing an argument vector to
  // PowerShell (rather than interpolating into a command) avoids shell injection.
