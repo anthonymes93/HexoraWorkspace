@@ -715,6 +715,15 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
  const mainTaskbar=safeTaskbarIdentity();
  win=new BrowserWindow({width:1360,height:900,minWidth:700,minHeight:400,title:isDevelopment?'Hexora Workspace [DEV]':'Hexora Workspace',icon:mainTaskbar?.iconPath,autoHideMenuBar:true,backgroundColor:'#111215',webPreferences:{preload:path.join(__dirname,'preload.js'),contextIsolation:true,sandbox:true,nodeIntegration:false}});
  safeApplyTaskbar(win,mainTaskbar);
+ if(isDevelopment){
+  // A loaded HTML title may overwrite BrowserWindow.title; keep the native
+  // window distinguishable from the installed Hexora application.
+  win.webContents.on('page-title-updated',event=>{
+   event.preventDefault();
+   win.setTitle('Hexora Workspace [DEV]');
+  });
+  console.info('[Hexora DEV] Electron development build; app:',app.getAppPath(),'; profile:',app.getPath('userData'));
+ }
  mainViewport=new View();win.contentView.addChildView(mainViewport);
  require('./email-app').register(win);
  win.on('focus',()=>{const entry=activeCodeEntry();if(entry?.ready&&entry.visible&&!entry.detached){nativeCodeCommand('TRACE HEXORA_FOCUS_BEFORE');nativeCodeCommand('RESTORE');nativeCodeCommand('RECOVER_Z');nativeCodeCommand('WATCH_MOUSE');}});win.on('blur',()=>{const entry=activeCodeEntry();if(entry?.ready&&entry.visible&&!entry.detached)nativeCodeCommand('DIAG HEXORA_BLUR');});win.on('resize',bounds);
@@ -1154,6 +1163,6 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
  setInterval(syncNativeCodeProjects,1000).unref();
  win.on('closed',()=>{if(nativeCodeLifecycleTimer){clearTimeout(nativeCodeLifecycleTimer);nativeCodeLifecycleTimer=null;}quitting=true;if(nativeCodeInstaller&&nativeCodeInstaller.exitCode===null)nativeCodeInstaller.kill();stopAllNativeCode();for(const folder of [...extensionPopups.keys()])closeExtensionPopup(folder);if(sidebarAnimation)clearInterval(sidebarAnimation);for(const popup of detached.values())if(!popup.isDestroyed())popup.close();detached.clear();clearInterval(recoveryTimer);recoveryPassword=null;clearTimeout(stateTimer);win=null;for(const id of Array.from(live.keys()))discard(id);vault?.lock();tabStoreClosing=true;store.close();});
  // Register every IPC handler before the renderer can issue actions.
- win.loadFile('toolbar.html').catch(err=>console.error('[Hexora] Toolbar load failed:',err));
+ win.loadFile('toolbar.html',{query:isDevelopment?{hexoraDev:'1'}:{}}).catch(err=>console.error('[Hexora] Toolbar load failed:',err));
 });
 app.on('window-all-closed',()=>{if(process.platform!=='darwin')app.quit();});
