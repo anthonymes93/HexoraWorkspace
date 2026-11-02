@@ -1,7 +1,37 @@
 'use strict';
-const {app,dialog, BrowserWindow}=require('electron');
+const path=require('node:path');
+const {app,BrowserWindow,ipcMain}=require('electron');
 
-// Updates are opt-in at restart, never during active work. No updater in npm start.
+function showUpdateDialog(version,onInstall){
+ return new Promise(resolve=>{
+  const window=new BrowserWindow({
+   width:480,height:330,minWidth:480,minHeight:330,resizable:false,
+   minimizable:false,maximizable:false,autoHideMenuBar:true,
+   title:'Hexora · Update ready',backgroundColor:'#11151d',
+   webPreferences:{
+    preload:path.join(__dirname,'update-dialog-preload.js'),
+    nodeIntegration:false,contextIsolation:true,sandbox:false
+   }
+  });
+  let decided=false;
+  const finish=choice=>{
+   if(decided)return;
+   decided=true;
+   ipcMain.removeListener('hexora-update-choice',receive);
+   if(!window.isDestroyed())window.close();
+   resolve(choice);
+  };
+  const receive=(event,choice)=>{
+   if(event.sender!==window.webContents)return;
+   finish(choice==='install'?'install':'later');
+  };
+  ipcMain.on('hexora-update-choice',receive);
+  window.on('closed',()=>finish('later'));
+  window.loadFile(path.join(__dirname,'update-dialog.html'),{query:{version:String(version)}})
+   .catch(error=>{console.error('[updates] dialog load:',error);finish('later');});
+ }).then(choice=>{if(choice==='install')onInstall();});
+}
+
 function startStableUpdater(){
  if(!app.isPackaged||process.platform!=='win32'||process.windowsStore)return;
  let autoUpdater;
@@ -13,19 +43,10 @@ function startStableUpdater(){
  autoUpdater.allowPrerelease=false;
  autoUpdater.on('error',error=>console.error('[updates] error:',error));
  autoUpdater.on('update-available',info=>console.info('[updates] available:',info.version));
- autoUpdater.on('update-downloaded',async info=>{
+ autoUpdater.on('update-downloaded',info=>{
   console.info('[updates] downloaded:',info.version);
-  try{
-   const window=BrowserWindow.getAllWindows().find(w=>!w.isDestroyed())||undefined;
-   const options={
-    type:'info',title:'Hexora update ready',
-    message:'Hexora '+info.version+' is ready to install',
-    detail:'Save any open work before updating. You can install now or keep working and update later.',
-    buttons:['Later','Update & Restart'],defaultId:0,cancelId:0,noLink:true
-   };
-   const result=window?await dialog.showMessageBox(window,options):await dialog.showMessageBox(options);
-   if(result.response===1)autoUpdater.quitAndInstall(false,true);
-  }catch(error){console.error('[updates] update prompt:',error);}
+  showUpdateDialog(info.version,()=>autoUpdater.quitAndInstall(false,true))
+   .catch(error=>console.error('[updates] update prompt:',error));
  });
  const check=()=>autoUpdater.checkForUpdates().catch(error=>console.error('[updates] check:',error));
  const startup=setTimeout(check,15000);startup.unref?.();
