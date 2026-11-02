@@ -23,7 +23,7 @@ jobs:
         with:
           node-version: '22'
           cache: npm
-      - run: npm ci
+      - run: npm install --no-audit --no-fund
       - name: Verify source syntax
         run: |
           node --check main.js
@@ -49,7 +49,7 @@ jobs:
         with:
           node-version: '22'
           cache: npm
-      - run: npm ci
+      - run: npm install --no-audit --no-fund
       - name: Package Hexora for Store preview
         run: npm run build:store
       - name: Upload Store preview package
