@@ -7,6 +7,7 @@ const path = require('node:path');
 const zlib = require('node:zlib');
 
 const APP_ID = 'app.hexora.workspace';
+const DEV_APP_ID = APP_ID + '.dev';
 const PALETTE = [
   [9, 153, 166],   // Teal
   [54, 105, 232],  // Blue
@@ -114,13 +115,13 @@ function iconFile(userData, kind, id) {
   if (!fs.existsSync(target)) fs.writeFileSync(target, icoBytes(pngBytes(kind, id)));
   return target;
 }
-function taskbarIdentity(userData, tabId = null, platform = process.platform) {
+function taskbarIdentity(userData, tabId = null, platform = process.platform, appIdBase = APP_ID) {
   if (platform !== 'win32') return null;
   const kind = tabId === null ? 'main' : 'tab';
   const id = kind === 'main' ? 0 : Number(tabId);
   if (kind === 'tab' && (!Number.isSafeInteger(id) || id < 1)) throw Error('Invalid taskbar window tab');
   return {
-    appId: kind === 'main' ? APP_ID : APP_ID + '.tab.' + id,
+    appId: kind === 'main' ? appIdBase : appIdBase + '.tab.' + id,
     iconPath: iconFile(userData, kind, id)
   };
 }
@@ -131,4 +132,4 @@ function applyTaskbarIdentity(window, identity, platform = process.platform) {
   // Explicitly update the live HWND's small/large icon too.
   window.setIcon(identity.iconPath);
 }
-module.exports = { APP_ID, taskbarIdentity, applyTaskbarIdentity };
+module.exports = { APP_ID, DEV_APP_ID, taskbarIdentity, applyTaskbarIdentity };
