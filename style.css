@@ -975,3 +975,44 @@ body::before{content:"";position:absolute;top:16px;left:58px;width:18px;height:1
 #new-tab-overlay .new-tab-confirm p{color:#b9c8e5}
 #new-tab-overlay .new-tab-confirm button{background:#293a60;border-color:#4566a6;color:#edf2ff}
 #new-tab-overlay .new-tab-confirm button:last-child{background:#3659b3}
+
+/* Omega: current blue-frame design, with ten saturated frame palettes. */
+:root[data-hexora-theme="omega"]{--hexora-frame-blue:#1c347f;--hexora-frame-blue-light:#405a9b}
+:root[data-hexora-theme="omega"][data-hexora-omega-color="blue"]{--hexora-frame-blue:#1c347f;--hexora-frame-blue-light:#405a9b}
+:root[data-hexora-theme="omega"][data-hexora-omega-color="red"]{--hexora-frame-blue:#8d233b;--hexora-frame-blue-light:#b3475f}
+:root[data-hexora-theme="omega"][data-hexora-omega-color="orange"]{--hexora-frame-blue:#a94c1e;--hexora-frame-blue-light:#ce6c35}
+:root[data-hexora-theme="omega"][data-hexora-omega-color="amber"]{--hexora-frame-blue:#936019;--hexora-frame-blue-light:#bd8734}
+:root[data-hexora-theme="omega"][data-hexora-omega-color="green"]{--hexora-frame-blue:#176b4c;--hexora-frame-blue-light:#2e956f}
+:root[data-hexora-theme="omega"][data-hexora-omega-color="teal"]{--hexora-frame-blue:#116c75;--hexora-frame-blue-light:#2b929a}
+:root[data-hexora-theme="omega"][data-hexora-omega-color="cyan"]{--hexora-frame-blue:#176185;--hexora-frame-blue-light:#327fa5}
+:root[data-hexora-theme="omega"][data-hexora-omega-color="purple"]{--hexora-frame-blue:#57348c;--hexora-frame-blue-light:#7955b2}
+:root[data-hexora-theme="omega"][data-hexora-omega-color="pink"]{--hexora-frame-blue:#8d326e;--hexora-frame-blue-light:#b45690}
+:root[data-hexora-theme="omega"][data-hexora-omega-color="indigo"]{--hexora-frame-blue:#343c98;--hexora-frame-blue-light:#555fc1}
+
+:root[data-hexora-theme="omega"] .main-titlebar-drag{background:var(--hexora-frame-blue)!important}
+:root[data-hexora-theme="omega"] #new-tab-overlay .new-tab-hero{background:linear-gradient(110deg,var(--hexora-frame-blue-light),var(--hexora-frame-blue))}
+:root[data-hexora-theme="omega"] #new-tab-overlay .new-tab-go,
+:root[data-hexora-theme="omega"] #new-tab-overlay .new-tab-confirm button:last-child{background:var(--hexora-frame-blue-light)}
+:root[data-hexora-theme="omega"] #new-tab-overlay .new-tab-site-icon{background:var(--hexora-frame-blue)}
+:root[data-hexora-theme="omega"] #new-tab-overlay .new-tab-shortcuts button:hover{border-color:var(--hexora-frame-blue-light)}
+.theme-preview-omega{background:#17181c}
+.theme-preview-omega i{background:#405a9b}
+.theme-preview-omega i:first-child{background:#1c347f}
+.omega-color-section{margin:16px 0;border-top:1px solid #ffffff24;padding-top:15px}
+.omega-color-section[hidden]{display:none!important}
+.omega-color-options{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin-top:12px}
+.omega-color-choice{display:flex;align-items:center;flex-direction:column;gap:6px;padding:8px 4px;border-radius:9px;background:#20242d;border:1px solid #3b4353;color:#dce4f5;font-size:10px;cursor:pointer}
+.omega-color-choice:hover{border-color:#91a8d7}
+.omega-color-choice.selected{border-color:#a8bdea;box-shadow:0 0 0 1px #a8bdea55}
+.omega-color-swatch{width:30px;height:30px;border-radius:9px;border:1px solid #ffffff3b;display:block}
+.omega-color-swatch-blue{background:linear-gradient(135deg,#405a9b,#1c347f)}
+.omega-color-swatch-red{background:linear-gradient(135deg,#b3475f,#8d233b)}
+.omega-color-swatch-orange{background:linear-gradient(135deg,#ce6c35,#a94c1e)}
+.omega-color-swatch-amber{background:linear-gradient(135deg,#bd8734,#936019)}
+.omega-color-swatch-green{background:linear-gradient(135deg,#2e956f,#176b4c)}
+.omega-color-swatch-teal{background:linear-gradient(135deg,#2b929a,#116c75)}
+.omega-color-swatch-cyan{background:linear-gradient(135deg,#327fa5,#176185)}
+.omega-color-swatch-purple{background:linear-gradient(135deg,#7955b2,#57348c)}
+.omega-color-swatch-pink{background:linear-gradient(135deg,#b45690,#8d326e)}
+.omega-color-swatch-indigo{background:linear-gradient(135deg,#555fc1,#343c98)}
+@media(max-width:450px){.omega-color-options{grid-template-columns:repeat(3,minmax(0,1fr))}}
