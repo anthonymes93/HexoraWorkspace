@@ -3,6 +3,7 @@
   const key='hexora-appearance-theme';
   const themes=new Set(['classic','obsidian','white','omega']);
   const safe=value=>themes.has(value)?value:'classic';
+  const syncScrollbar=()=>window.hexora?.action('scrollbar-theme',{theme:document.documentElement.dataset.hexoraTheme,color:document.documentElement.dataset.hexoraOmegaColor}).catch(()=>{});
   const apply=value=>{
     const theme=safe(value);
     document.documentElement.dataset.hexoraTheme=theme;
@@ -16,6 +17,7 @@
     if(status)status.textContent='Active theme: '+({classic:'Classic',obsidian:'Obsidian',white:'White',omega:'Omega'}[theme]);
     const omegaSection=document.getElementById('omega-color-section');
     if(omegaSection)omegaSection.hidden=theme!=='omega';
+    syncScrollbar();
   };
   const omegaKey='hexora-omega-color';
   const omegaColors=[["blue","Blue"],["red","Red"],["orange","Orange"],["amber","Amber"],["green","Green"],["teal","Teal"],["cyan","Cyan"],["purple","Purple"],["pink","Pink"],["indigo","Indigo"]];
@@ -23,6 +25,7 @@
   const applyOmega=value=>{
     const color=omegaSafe(value);
     document.documentElement.dataset.hexoraOmegaColor=color;
+    syncScrollbar();
     try{localStorage.setItem(omegaKey,color);}catch{}
     document.querySelectorAll('[data-omega-choice]').forEach(button=>{
       const selected=button.dataset.omegaChoice===color;
