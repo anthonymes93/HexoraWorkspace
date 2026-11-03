@@ -1792,7 +1792,7 @@ $('open-email-app')?.addEventListener('click',()=>window.hexora.email.open().cat
   for(const n of quick){
    if(!n.important||n.themeFlipped||n.delivered||now<n.due-120000)continue;
    n.themeFlipped=true;changed=true;
-   window.dispatchEvent(new Event('hexora:important-reminder'));
+   window.dispatchEvent(new CustomEvent('hexora:important-reminder',{detail:{due:n.due}}));
   }
   if(changed)saveQuick();
  };
