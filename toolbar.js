@@ -1749,12 +1749,48 @@ $('open-email-app')?.addEventListener('click',()=>window.hexora.email.open().cat
  const saveQuick=()=>{try{localStorage.setItem(quickKey,JSON.stringify(quick));}catch{}};
  const prettyDue=timestamp=>new Date(timestamp).toLocaleString(undefined,{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
  const updateBell=()=>{const count=quick.filter(n=>n.delivered&&!n.read).length;const dot=$('notifications-dot');if(dot)dot.hidden=!count;bell.setAttribute('aria-label',count?'Notifications, '+count+' unread':'Notifications');};
+ const toastHost=$('hexora-toast-host');
+ let toastTimer=null,toastId=null;
+ const hideToast=()=>{
+  if(toastTimer){clearTimeout(toastTimer);toastTimer=null;}
+  toastId=null;toastHost?.classList.remove('is-visible');
+  window.hexora?.action('quick-toast-visible',false).catch(()=>{});
+  setTimeout(()=>{if(!toastId)toastHost?.replaceChildren();},280);
+ };
+ const showToast=n=>{
+  if(!toastHost)return;
+  if(toastTimer)clearTimeout(toastTimer);
+  toastId=n.id;toastHost.replaceChildren();
+  const card=document.createElement('div');card.className='hexora-toast-card';
+  const heading=document.createElement('div');heading.className='hexora-toast-heading';
+  const icon=document.createElement('span');icon.className='hexora-toast-icon';icon.textContent='◈';
+  const label=document.createElement('div');label.className='hexora-toast-label';
+  const title=document.createElement('strong');title.textContent='Quick reminder';
+  const subtitle=document.createElement('span');subtitle.textContent='HEXORA · JUST NOW';
+  label.append(title,subtitle);
+  const dismiss=document.createElement('button');dismiss.type='button';dismiss.className='hexora-toast-close';dismiss.textContent='×';dismiss.setAttribute('aria-label','Dismiss reminder');
+  heading.append(icon,label,dismiss);
+  const body=document.createElement('p');body.textContent=n.message;
+  const actions=document.createElement('div');actions.className='hexora-toast-actions';
+  const snooze=document.createElement('button');snooze.type='button';snooze.textContent='◷ Snooze 5 min';
+  const done=document.createElement('button');done.type='button';done.textContent='✓ Dismiss';
+  const markDone=()=>{n.read=true;saveQuick();render();updateBell();hideToast();};
+  dismiss.addEventListener('click',markDone);done.addEventListener('click',markDone);
+  snooze.addEventListener('click',()=>{n.due=Date.now()+300000;n.delivered=false;n.read=false;saveQuick();render();updateBell();hideToast();});
+  actions.append(snooze,done);card.append(heading,body,actions);toastHost.append(card);
+  window.hexora?.action('quick-toast-visible',true).catch(()=>{});
+  requestAnimationFrame(()=>requestAnimationFrame(()=>toastHost.classList.add('is-visible')));
+  toastTimer=setTimeout(hideToast,14000);
+ };
+ const alertDue=n=>{
+  window.hexora?.action('quick-notification-alert',{message:n.message}).then(mode=>{
+   if(mode==='in-app')showToast(n);
+  }).catch(()=>showToast(n));
+ };
  const checkDue=()=>{
   const now=Date.now();let changed=false;
   for(const n of quick)if(!n.delivered&&n.due<=now){n.delivered=true;n.read=false;changed=true;
-   if(typeof Notification!=='undefined'&&Notification.permission==='granted'){
-    try{new Notification('Hexora · Quick notification',{body:n.message,tag:'hexora-quick-'+n.id});}catch{}
-   }
+   alertDue(n);
   }
   if(changed){saveQuick();render();}
   updateBell();

@@ -1,5 +1,5 @@
 'use strict';
-const {app,BrowserWindow,WebContentsView,View,session,ipcMain,shell,dialog,clipboard,safeStorage,Menu}=require('electron');
+const {app,BrowserWindow,WebContentsView,View,session,ipcMain,shell,dialog,clipboard,safeStorage,Menu,Notification}=require('electron');
 // Experimental Chromium fallback for sites whose Google Identity Services FedCM
 // token retrieval fails inside Electron. Chromium flags are process-wide, so
 // this is opt-in and must be set before Electron creates any sessions.
@@ -114,7 +114,7 @@ const LAYOUT_KEY='detachedWindowIds';
 function savedDetachedIds(){try{const values=JSON.parse(store.getMeta(LAYOUT_KEY)||'[]');return Array.isArray(values)?values.filter(x=>Number.isSafeInteger(x)&&x>0).slice(0,32):[];}catch{return [];}}
 function setDetachedSaved(id,present){const ids=new Set(savedDetachedIds());if(present)ids.add(id);else ids.delete(id);store.setMeta(LAYOUT_KEY,JSON.stringify([...ids]));}
 let dualPopupHandler=null;
-let mainViewport=null,win,store,activeId=null,sidebarWidth=324,live=new Map(),favicons=new Map(),loading=new Map(),stateTimer=null,modalVisible=false,notificationsOpen=false,recoveryPassword=null,recoveryDir=null,recoveryTimer=null,recoveryBusy=false,lastBackup=null;
+let mainViewport=null,win,store,activeId=null,sidebarWidth=324,live=new Map(),favicons=new Map(),loading=new Map(),stateTimer=null,modalVisible=false,notificationsOpen=false,quickToastOpen=false,recoveryPassword=null,recoveryDir=null,recoveryTimer=null,recoveryBusy=false,lastBackup=null;
 const extensionPartition='persist:hexora-chatgpt';
 let deepLinkReady=false;
 const pendingDeepLinks=[];
@@ -444,7 +444,7 @@ function discard(id){const view=live.get(id);if(!view)return;live.delete(id);con
 function bounds(){
  if(!win||win.isDestroyed()||!mainViewport)return;
  const [w,h]=win.getContentSize();
- const visibleWidth=Math.max(0,w-sidebarWidth-(notificationsOpen?412:0)),visibleHeight=Math.max(0,h-TOP_HEIGHT-MAIN_TITLEBAR_HEIGHT);
+ const visibleWidth=Math.max(0,w-sidebarWidth-((notificationsOpen||quickToastOpen)?412:0)),visibleHeight=Math.max(0,h-TOP_HEIGHT-MAIN_TITLEBAR_HEIGHT);
  mainViewport.setBounds({x:sidebarWidth,y:TOP_HEIGHT+MAIN_TITLEBAR_HEIGHT,width:visibleWidth,height:visibleHeight});
  const view=live.get(activeId);
  if(view){
@@ -1152,7 +1152,7 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
  ipcMain.handle('tabs:page',(_e,arg)=>sendPage(arg));
  ipcMain.handle('tabs:search',(_e,term)=>store.search(term,50).map(pageRow));
  ipcMain.handle('tabs:lookup',(_e,id)=>{const row=store.get(Number(id));return row?pageRow(row):null;});
- ipcMain.handle('tabs:action',(_e,action,arg)=>{
+ ipcMain.handle('tabs:action',(event,action,arg)=>{
   const current=store.get(activeId);const wc=live.get(activeId)?.webContents;
   if(action==='dual-mirror')return openDualMirror();
   if(action==='dual-pair-get'){
@@ -1316,6 +1316,21 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
    for(const view of live.values())applyHexoraWebsiteScrollbars(view.webContents);
    return true;
   }
+  else if(action==='quick-notification-alert'){
+   if(event.sender!==win.webContents)throw Error('Invalid notification caller');
+   const body=String(arg?.message||'').slice(0,500);
+   if(!body)return 'ignored';
+   if(win.isFocused()&&!win.isMinimized()&&win.isVisible())return 'in-app';
+   if(Notification.isSupported()){
+    try{
+     const notification=new Notification({title:'Hexora · Reminder',body,silent:false});
+     notification.on('click',()=>{if(win.isMinimized())win.restore();win.show();win.focus();});
+     notification.show();return 'native';
+    }catch(error){console.warn('[Hexora] Native reminder unavailable:',error.message);}
+   }
+   return 'in-app';
+  }
+  else if(action==='quick-toast-visible'){quickToastOpen=!!arg;bounds();return true;}
   else if(action==='notifications-drawer'){notificationsOpen=!!arg;bounds();return true;}
   else if(action==='modal'){
    modalVisible=!!arg;
