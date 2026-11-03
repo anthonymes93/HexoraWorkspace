@@ -14,22 +14,37 @@ function setCompactFrame(next){
   document.body.classList.toggle('hexora-compact-frame',frameCompact);
  });
 }
-let lastFramePointer=null,frameFlickArmed=false,frameFlickAt=0;
+let lastFramePointer=null,frameFlickCooldownUntil=0;
+let frameFlickDistance=0,frameFlickStartedAt=0;
 document.addEventListener('pointermove',event=>{
  if(event.pointerType==='touch')return;
  const now=performance.now();
  const previous=lastFramePointer;
  lastFramePointer={x:event.clientX,y:event.clientY,time:now};
- if(frameCompact||!previous)return;
+ if(frameCompact||now<frameFlickCooldownUntil||!previous)return;
  const dt=now-previous.time;
- // Require a distinct, fast upward move near the top, not idle hovering.
- if(dt>0&&dt<160&&previous.y>=64&&event.clientY<=38&&
-    previous.y-event.clientY>=10&&(previous.y-event.clientY)/dt>=0.22){
-  frameFlickArmed=true;frameFlickAt=now;
+ if(dt<=0||dt>180){
+  frameFlickDistance=0;
+  frameFlickStartedAt=0;
+  return;
  }
- if(frameFlickArmed&&now-frameFlickAt>220)frameFlickArmed=false;
- if(frameFlickArmed&&event.clientY<=35){
-  frameFlickArmed=false;
+ const dy=previous.y-event.clientY;
+ // Accumulate an intentional upward gesture rather than requiring one
+ // unusually large pointer event (which varies with mouse polling rate).
+ if(dy>0&&event.clientY<150&&Math.abs(event.clientX-previous.x)<85){
+  if(!frameFlickStartedAt)frameFlickStartedAt=now;
+  frameFlickDistance+=dy;
+ }else if(dy< -3||event.clientY>=150){
+  frameFlickDistance=0;
+  frameFlickStartedAt=0;
+ }
+ const duration=now-frameFlickStartedAt;
+ const velocity=duration>0?frameFlickDistance/duration:0;
+ if(event.clientY<=35&&frameFlickDistance>=34&&duration<=280&&
+    (velocity>=0.18||frameFlickDistance>=65)){
+  frameFlickDistance=0;
+  frameFlickStartedAt=0;
+  frameFlickCooldownUntil=now+900;
   setCompactFrame(true);
  }
 },{passive:true});
