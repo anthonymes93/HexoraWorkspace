@@ -1,8 +1,9 @@
 'use strict';
-const {BrowserWindow,WebContentsView,session}=require('electron');
+const {app,BrowserWindow,WebContentsView,session}=require('electron');
 const path=require('node:path');
 function createDualMirror({getActiveId,getTab,getView,isCodeTab,getMirrorUrl,getChatgptSource}){
- let state=null,opening=null;
+ let state=null,opening=null,quitting=false;
+ app.once('before-quit',()=>{quitting=true;});
  const pending=new Map();
  const read='(()=>{const e=document.scrollingElement||document.documentElement;return {x:e.scrollLeft,y:e.scrollTop,mx:Math.max(0,e.scrollWidth-e.clientWidth),my:Math.max(0,e.scrollHeight-e.clientHeight)};})()';
  const scroll=p=>'(()=>{const e=document.scrollingElement||document.documentElement;const x='+p.rx+'*Math.max(0,e.scrollWidth-e.clientWidth),y='+p.ry+'*Math.max(0,e.scrollHeight-e.clientHeight);const old=e.style.scrollBehavior;e.style.scrollBehavior="auto";e.scrollTo({left:x,top:y,behavior:"instant"});e.style.scrollBehavior=old;})()';
@@ -139,8 +140,7 @@ function createDualMirror({getActiveId,getTab,getView,isCodeTab,getMirrorUrl,get
    // A full Hexora quit still destroys the window and releases the cached views.
    window.on('close',event=>{
     if(g.closed||window.isDestroyed())return;
-    const {app}=require('electron');
-    if(app.isQuitting||app.isQuiting)return;
+    if(quitting)return;
     event.preventDefault();window.hide();
    });
    window.on('closed',()=>stop(g));
