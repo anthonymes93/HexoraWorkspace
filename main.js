@@ -1345,9 +1345,15 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
   else if(action==='compact-frame'){
    compactFrame=!!arg;
    // Keep the narrow blue rail; restore the user's normal sidebar width on exit.
-   if(compactFrame){compactFramePreviousSidebarWidth=sidebarWidth;setSidebarWidth(true);}
-   else if(compactFramePreviousSidebarWidth!==null){
-    setSidebarWidth(compactFramePreviousSidebarWidth<220);
+   // Focus mode is visual only: never change the saved sidebar mode,
+   // start its 792ms animation, or overwrite its preferred width.
+   if(sidebarAnimation){clearInterval(sidebarAnimation);sidebarAnimation=null;}
+   sidebarTransitioning=false;sidebarTransitionTarget=null;
+   if(compactFrame){
+    compactFramePreviousSidebarWidth=sidebarWidth;
+    sidebarWidth=58;
+   }else if(compactFramePreviousSidebarWidth!==null){
+    sidebarWidth=compactFramePreviousSidebarWidth;
     compactFramePreviousSidebarWidth=null;
    }
    bounds();return true;
