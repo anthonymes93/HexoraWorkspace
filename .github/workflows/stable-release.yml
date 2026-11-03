@@ -48,4 +48,6 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: pwsh
-        run: gh release upload $env:GITHUB_REF_NAME "dist/Hexora-Install-$(node -p \"require('./package.json').version\")-x64.exe" --clobber
+        run: |
+          $version = node -p "require('./package.json').version"
+          gh release upload $env:GITHUB_REF_NAME "dist/Hexora-Install-${version}-x64.exe" --clobber
