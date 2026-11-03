@@ -36,7 +36,7 @@ function createDualMirror({getActiveId,getTab,getView,isCodeTab,getMirrorUrl,get
   return {action:'allow',outlivesOpener:true,createWindow:options=>{
    const view=new WebContentsView({webPreferences:{...options.webPreferences,session:opener.session,
     sandbox:true,contextIsolation:true,nodeIntegration:false,webSecurity:true,backgroundThrottling:false}});
-   view.setBackgroundColor('#111215');
+   view.setBackgroundColor('#ffffff');
    request.resolve(view);
    return view.webContents;
   }};
@@ -67,7 +67,7 @@ function createDualMirror({getActiveId,getTab,getView,isCodeTab,getMirrorUrl,get
    view=new WebContentsView({webPreferences:{session:session.fromPartition('persist:hexora-chatgpt'),
     preload:path.join(__dirname,'site-vault-preload.js'),sandbox:true,contextIsolation:true,
     nodeIntegration:false,webSecurity:true,javascript:true,backgroundThrottling:false}});
-   view.setBackgroundColor('#111215');
+   view.setBackgroundColor('#ffffff');
    if(opener&&!opener.isDestroyed()&&new URL(url).hostname==='chatgpt.com')
     view.webContents.setUserAgent(opener.getUserAgent());
   }
