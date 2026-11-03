@@ -1,236 +1,150 @@
 'use strict';
 const {BrowserWindow,WebContentsView,session}=require('electron');
-const path=require('path');
-
-// One user-input leader at a time: programmatic scrolling cannot echo back.
+const path=require('node:path');
 function createDualMirror({getActiveId,getTab,getView,isCodeTab,getMirrorUrl,getChatgptSource}){
- let opening=null;
- // Use the browser's native opener relationship so the paired page inherits
- // origin-specific sessionStorage without Hexora reading or copying auth data.
- function openViaChatgpt(opener,url,id){
-  return new Promise(resolve=>{
-   let finished=false;
-   const finish=popup=>{
-    if(finished)return;
-    finished=true;
-    clearTimeout(timer);
-    opener.removeListener('did-create-window',onWindow);
-    resolve(popup);
-   };
-   const onWindow=(popup,details)=>{
-    if(details.url===url){
-     // A paired popup must not appear as a second visible Dual window
-     // while the existing active pair is still on screen.
-     popup.hide();
-     finish(popup);
-    }
-   };
-   opener.on('did-create-window',onWindow);
-   const timer=setTimeout(()=>finish(null),5000);
-   // Inherited popup settings and session are provided by the existing
-   // setWindowOpenHandler on regular Hexora web tabs.
-   void opener.executeJavaScript('window.open('+JSON.stringify(url)+','+JSON.stringify('hexora-dual-pair-'+id)+');true',true).catch(()=>finish(null));
-  });
- }
- let state=null;
+ let state=null,opening=null;
+ const pending=new Map();
  const read='(()=>{const e=document.scrollingElement||document.documentElement;return {x:e.scrollLeft,y:e.scrollTop,mx:Math.max(0,e.scrollWidth-e.clientWidth),my:Math.max(0,e.scrollHeight-e.clientHeight)};})()';
- const scroll=position=>`(()=>{const e=document.scrollingElement||document.documentElement;const x=${position.rx}*Math.max(0,e.scrollWidth-e.clientWidth),y=${position.ry}*Math.max(0,e.scrollHeight-e.clientHeight);const previous=e.style.scrollBehavior;e.style.scrollBehavior='auto';e.scrollTo({left:x,top:y,behavior:'instant'});e.style.scrollBehavior=previous;})()`;
-
- // Keep a distinct browser instance for every paired tab. Navigating one
- // shared WebContents on tab changes destroys ChatGPT UI and scroll state.
- function stopGroup(group){
-  if(group.closed)return;
-  group.closed=true;
-  clearInterval(group.timer);
-  detach(group);
-  for(const entry of group.entries.values()){
-   entry.discarded=true;
-   if(!entry.popup.isDestroyed())entry.popup.close();
-  }
-  group.entries.clear();
-  if(state===group)state=null;
- }
- function detach(group){
-  for(const [wc,event,handler] of group.handlers)
-   if(!wc.isDestroyed())wc.removeListener(event,handler);
-  group.handlers=[];
- }
- function watch(group,wc,side){
-  const lead=()=>{
-   group.leader=side;
-   group.leaderUntil=Date.now()+900;
-   group.last=null;
-  };
-  const mouse=(_event,input)=>{if(['mouseWheel','mouseDown','touchStart','touchMove'].includes(input?.type))lead();};
-  const keyboard=(_event,input)=>{if(['keyDown','rawKeyDown'].includes(input?.type)&&['ArrowDown','ArrowUp','PageDown','PageUp','Home','End','Space'].includes(input.key))lead();};
-  wc.on('input-event',mouse);
-  wc.on('before-input-event',keyboard);
-  group.handlers.push([wc,'input-event',mouse],[wc,'before-input-event',keyboard]);
- }
- async function createEntry(group,id,pairedUrl){
-  let popup=null,view=null;
-  const opener=getChatgptSource?.();
-  if(opener&&!opener.isDestroyed()&&/^https:\/\/chatgpt\.com\//.test(pairedUrl)){
-   popup=await openViaChatgpt(opener,pairedUrl,id);
-   if(popup)console.info('[Dual Mirror] Reusing authenticated browser opener for paired tab',id);
-   else console.warn('[Dual Mirror] Authenticated popup unavailable; using regular webview for paired tab',id);
-  }
-  if(!popup){
-   const sharedSession=session.fromPartition('persist:hexora-chatgpt');
-   popup=new BrowserWindow({
-    width:960,height:720,minWidth:420,minHeight:320,
-    title:'Hexora · Dual Workspace (Paired)',
-    backgroundColor:'#111215',autoHideMenuBar:true,
-    webPreferences:{sandbox:true,contextIsolation:true,nodeIntegration:false,webSecurity:true,backgroundThrottling:false}
-   });
-   view=new WebContentsView({webPreferences:{
-    session:sharedSession,preload:path.join(__dirname,'site-vault-preload.js'),
-    sandbox:true,contextIsolation:true,nodeIntegration:false,webSecurity:true,javascript:true,backgroundThrottling:false
-   }});
+ const scroll=p=>'(()=>{const e=document.scrollingElement||document.documentElement;const x='+p.rx+'*Math.max(0,e.scrollWidth-e.clientWidth),y='+p.ry+'*Math.max(0,e.scrollHeight-e.clientHeight);const old=e.style.scrollBehavior;e.style.scrollBehavior="auto";e.scrollTo({left:x,top:y,behavior:"instant"});e.style.scrollBehavior=old;})()';
+ const detach=g=>{for(const [wc,name,fn] of g.handlers)if(!wc.isDestroyed())wc.removeListener(name,fn);g.handlers=[];};
+ const watch=(g,wc,side)=>{
+  const lead=()=>{g.leader=side;g.leaderUntil=Date.now()+900;g.last=null;};
+  const mouse=(_e,input)=>{if(['mouseWheel','mouseDown','touchStart','touchMove'].includes(input?.type))lead();};
+  const key=(_e,input)=>{if(['keyDown','rawKeyDown'].includes(input?.type)&&['ArrowDown','ArrowUp','PageDown','PageUp','Home','End','Space'].includes(input.key))lead();};
+  wc.on('input-event',mouse);wc.on('before-input-event',key);
+  g.handlers.push([wc,'input-event',mouse],[wc,'before-input-event',key]);
+ };
+ const resize=g=>{if(g.window.isDestroyed()||!g.active)return;const [width,height]=g.window.getContentSize();g.active.view.setBounds({x:0,y:0,width,height});};
+ const dispose=(g,entry)=>{
+  g.entries.delete(entry.id);
+  if(g.active===entry){g.active=null;g.source=null;detach(g);}
+  try{g.window.contentView.removeChildView(entry.view);}catch{}
+  if(!entry.view.webContents.isDestroyed())entry.view.webContents.close();
+ };
+ const stop=g=>{
+  if(g.closed)return;g.closed=true;clearInterval(g.timer);detach(g);
+  for(const request of pending.values()){clearTimeout(request.timer);request.resolve(null);}
+  pending.clear();
+  for(const entry of [...g.entries.values()])dispose(g,entry);
+  if(state===g)state=null;
+ };
+ // Chromium calls createWindow synchronously. Returning WebContentsView's
+ // webContents means no second native BrowserWindow is ever created.
+ function handlePopup({opener,url,frameName}){
+  const request=pending.get(frameName);
+  if(!request||request.opener!==opener||request.url!==url||!state||state.closed)return {action:'deny'};
+  return {action:'allow',outlivesOpener:true,createWindow:options=>{
+   const view=new WebContentsView({webPreferences:{...options.webPreferences,session:opener.session,
+    sandbox:true,contextIsolation:true,nodeIntegration:false,webSecurity:true,backgroundThrottling:false}});
    view.setBackgroundColor('#111215');
-   popup.contentView.addChildView(view);
-   const resize=()=>{
-    if(popup.isDestroyed())return;
-    const [width,height]=popup.getContentSize();
-    view.setBounds({x:0,y:0,width,height});
+   request.resolve(view);
+   return view.webContents;
+  }};
+ }
+ async function authenticatedView(id,url,opener){
+  const frameName='hexora-dual-pair-'+id+'-'+Date.now();
+  return new Promise(resolve=>{
+   let done=false;
+   const finish=view=>{
+    if(done){if(view&&!view.webContents.isDestroyed())view.webContents.close();return;}
+    done=true;clearTimeout(request.timer);pending.delete(frameName);resolve(view);
    };
-   popup.on('resize',resize);
-   resize();
-   const wc=view.webContents;
-   const currentOpener=getChatgptSource?.();
-   if(currentOpener&&!currentOpener.isDestroyed()&&new URL(pairedUrl).hostname==='chatgpt.com')
-    wc.setUserAgent(currentOpener.getUserAgent());
-   try{await wc.loadURL(pairedUrl);}
-   catch(error){console.warn('[Dual Mirror] Paired page navigation failed:',error.message);}
+   const request={opener,url,resolve:finish,timer:setTimeout(()=>finish(null),5000)};
+   pending.set(frameName,request);
+   void opener.executeJavaScript('window.open('+JSON.stringify(url)+','+JSON.stringify(frameName)+');true',true)
+    .catch(error=>{console.warn('[Dual] Popup opener failed:',error.message);finish(null);});
+  });
+ }
+ async function createEntry(g,id,url){
+  const opener=getChatgptSource?.();
+  let view=null,fromPopup=false;
+  if(opener&&!opener.isDestroyed()&&/^https:\/\/chatgpt\.com\//.test(url)){
+   view=await authenticatedView(id,url,opener);
+   fromPopup=!!view;
   }
-  if(group.closed){if(!popup.isDestroyed())popup.close();return null;}
-  // The new pair is parked until select() makes it the sole visible one.
-  popup.hide();
-  popup.setTitle('Hexora · Dual Workspace (Paired)');
-  popup.setMinimumSize(420,320);
-  popup.setSize(960,720);
-  const target=view?view.webContents:popup.webContents;
-  const entry={id,url:pairedUrl,popup,view,target,discarded:false};
-  target.on('render-process-gone',(_event,details)=>{
-   console.error('[Dual Mirror] Paired renderer exited:',id,details.reason);
+  if(g.closed){if(view&&!view.webContents.isDestroyed())view.webContents.close();return null;}
+  if(!view){
+   view=new WebContentsView({webPreferences:{session:session.fromPartition('persist:hexora-chatgpt'),
+    preload:path.join(__dirname,'site-vault-preload.js'),sandbox:true,contextIsolation:true,
+    nodeIntegration:false,webSecurity:true,javascript:true,backgroundThrottling:false}});
+   view.setBackgroundColor('#111215');
+   if(opener&&!opener.isDestroyed()&&new URL(url).hostname==='chatgpt.com')
+    view.webContents.setUserAgent(opener.getUserAgent());
+  }
+  const entry={id,url,view};
+  g.entries.set(id,entry);
+  view.webContents.on('did-fail-load',(_event,code,description,failedUrl,isMainFrame)=>{
+   if(isMainFrame)console.error('[Dual] Load failed:',code,description,failedUrl);
   });
-  target.on('did-fail-load',(_event,code,description,url,isMainFrame)=>{
-   if(isMainFrame)console.error('[Dual Mirror] Load failed:',code,description,url);
-  });
-  popup.on('closed',()=>{
-   if(group.entries.get(id)===entry)group.entries.delete(id);
-   if(!entry.discarded)stopGroup(group);
-   if(view&&!target.isDestroyed())target.close();
-  });
-  group.entries.set(id,entry);
+  view.webContents.on('render-process-gone',(_event,details)=>console.error('[Dual] Renderer exited:',details.reason));
+  if(!fromPopup)void view.webContents.loadURL(url).catch(error=>console.warn('[Dual] Navigation failed:',error.message));
   return entry;
  }
- async function select(group){
-  if(group.closed)return;
-  const id=getActiveId(),row=getTab(id);
-  if(!row||row.workspace!=='dual'||isCodeTab(row))return;
-  const source=getView(id)?.webContents,url=source?.getURL();
-  if(!source||source.isDestroyed()||!/^https?:\/\//.test(url))return;
-  const pairedUrl=getMirrorUrl(id)||url;
-  let entry=group.entries.get(id);
-  if(entry&&(entry.url!==pairedUrl||entry.popup.isDestroyed())){
-   group.entries.delete(id);
-   entry.discarded=true;
-   if(group.active===entry){
-    group.bounds=entry.popup.isDestroyed()?group.bounds:entry.popup.getBounds();
-    group.active=null;
-    detach(group);
-   }
-   if(!entry.popup.isDestroyed())entry.popup.close();
-   entry=null;
-  }
-  if(!entry){
-   entry=await createEntry(group,id,pairedUrl);
-   if(!entry||group.closed)return;
-  }
-  if(group.closed||entry.popup.isDestroyed())return;
-  // Ignore stale asynchronous popup completions if a different main tab
-  // became active while ChatGPT was opening this one.
-  if(getActiveId()!==id){
-   // A pending popup can complete after the user switches tabs.
-   // Keep it cached, but never expose another Dual window.
-   entry.popup.hide();
-   return;
-  }
-  if(group.active===entry&&group.source===source)return;
-  const previous=group.active;
-  const wasVisible=previous
-   ?(!previous.popup.isDestroyed()&&previous.popup.isVisible()&&!previous.popup.isMinimized())
-   :true;
-  if(previous&&previous!==entry&&!previous.popup.isDestroyed()){
-   group.bounds=previous.popup.getBounds();
-   group.maximized=previous.popup.isMaximized();
-   previous.popup.hide();
-  }
-  if(group.bounds){
-   if(!group.maximized&&entry.popup.isMaximized())entry.popup.unmaximize();
-   if(!group.maximized)entry.popup.setBounds(group.bounds);
-  }
-  if(group.maximized&&!entry.popup.isMaximized())entry.popup.maximize();
-  if(previous!==entry&&wasVisible)entry.popup.showInactive();
-  group.active=entry;
-  group.source=source;
-  group.leader=null;
-  group.leaderUntil=0;
-  group.last=null;
-  detach(group);
-  watch(group,source,'source');
-  watch(group,entry.target,'target');
+ async function select(g){
+  if(g.closed||g.window.isDestroyed())return;
+  const id=getActiveId(),tab=getTab(id);
+  if(!tab||tab.workspace!=='dual'||isCodeTab(tab))return;
+  const source=getView(id)?.webContents;
+  if(!source||source.isDestroyed()||!/^https?:\/\//.test(source.getURL()))return;
+  const url=getMirrorUrl(id)||source.getURL();
+  let entry=g.entries.get(id);
+  if(entry&&(entry.url!==url||entry.view.webContents.isDestroyed())){dispose(g,entry);entry=null;}
+  if(!entry)entry=await createEntry(g,id,url);
+  if(!entry||g.closed||g.window.isDestroyed()||getActiveId()!==id)return;
+  if(g.active===entry&&g.source===source)return;
+  if(g.active&&g.active!==entry)g.window.contentView.removeChildView(g.active.view);
+  if(g.active!==entry)g.window.contentView.addChildView(entry.view);
+  g.active=entry;g.source=source;g.leader=null;g.leaderUntil=0;g.last=null;
+  detach(g);watch(g,source,'source');watch(g,entry.view.webContents,'target');resize(g);
  }
- async function sync(group){
-  if(group.busy||group.closed)return;
-  group.busy=true;
+ async function sync(g){
+  if(g.busy||g.closed)return;g.busy=true;
   try{
-   await select(group);
-   const entry=group.active,source=group.source;
-   if(!entry||!source||source.isDestroyed()||entry.target.isDestroyed()||
-      source.isLoading()||entry.target.isLoading()||Date.now()>group.leaderUntil)return;
-   const leader=group.leader==='source'?source:group.leader==='target'?entry.target:null;
+   await select(g);
+   const source=g.source,target=g.active?.view.webContents;
+   if(!source||!target||source.isDestroyed()||target.isDestroyed()||
+      source.isLoading()||target.isLoading()||Date.now()>g.leaderUntil)return;
+   const leader=g.leader==='source'?source:g.leader==='target'?target:null;
    if(!leader)return;
-   const follower=leader===source?entry.target:source;
+   const follower=leader===source?target:source;
    const p=await leader.executeJavaScript(read);
    if(!p||!Number.isFinite(p.x)||!Number.isFinite(p.y))return;
    const rx=p.mx?Math.max(0,Math.min(1,p.x/p.mx)):0;
    const ry=p.my?Math.max(0,Math.min(1,p.y/p.my)):0;
-   const last=group.last;
-   if(last&&last.leader===group.leader&&Math.abs(last.x-p.x)<1&&Math.abs(last.y-p.y)<1)return;
-   group.last={leader:group.leader,x:p.x,y:p.y};
+   const last=g.last;
+   if(last&&last.leader===g.leader&&Math.abs(last.x-p.x)<1&&Math.abs(last.y-p.y)<1)return;
+   g.last={leader:g.leader,x:p.x,y:p.y};
    await follower.executeJavaScript(scroll({rx,ry}));
-  }catch(error){console.warn('[Dual Mirror] Sync skipped:',error.message);}
-  finally{group.busy=false;}
+  }catch(error){console.warn('[Dual] Sync skipped:',error.message);}
+  finally{g.busy=false;}
  }
- return async function open(){
-  const id=getActiveId(),row=getTab(id);
-  if(!row||row.workspace!=='dual'||isCodeTab(row))return false;
+ async function open(){
+  const id=getActiveId(),tab=getTab(id);
+  if(!tab||tab.workspace!=='dual'||isCodeTab(tab))return false;
   if(state&&!state.closed){
    await select(state);
-   if(state.active&&!state.active.popup.isDestroyed()){
-    if(state.active.popup.isMinimized())state.active.popup.restore();
-    state.active.popup.show();
-    state.active.popup.focus();
-   }
+   if(!state.window.isDestroyed()){if(state.window.isMinimized())state.window.restore();state.window.show();state.window.focus();}
    return true;
   }
   if(opening)return opening;
   const task=(async()=>{
-   const group={
-    entries:new Map(),active:null,source:null,handlers:[],
-    leader:null,leaderUntil:0,last:null,busy:false,
-    closed:false,timer:null,bounds:null,maximized:false
-   };
-   state=group;
-   await select(group);
-   if(group.closed)return false;
-   group.timer=setInterval(()=>{void sync(group);},33);
+   const window=new BrowserWindow({width:960,height:720,minWidth:420,minHeight:320,
+    title:'Hexora · Dual Workspace',backgroundColor:'#111215',autoHideMenuBar:true,
+    webPreferences:{sandbox:true,contextIsolation:true,nodeIntegration:false,webSecurity:true}});
+   const g={window,entries:new Map(),active:null,source:null,handlers:[],
+    leader:null,leaderUntil:0,last:null,busy:false,closed:false,timer:null};
+   state=g;
+   window.on('resize',()=>resize(g));
+   window.on('closed',()=>stop(g));
+   await select(g);
+   if(g.closed)return false;
+   g.timer=setInterval(()=>{void sync(g);},33);
    return true;
   })();
   opening=task.finally(()=>{opening=null;});
   return opening;
- };
+ }
+ open.handlePopup=handlePopup;
+ return open;
 }
 module.exports={createDualMirror};
