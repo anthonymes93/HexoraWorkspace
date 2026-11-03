@@ -1065,7 +1065,7 @@ function ensureDualPairMenu(){
  if(button)return button;
  button=document.createElement('button');button.id='hexora-dual-pair-menu';button.type='button';
  button.textContent='◫  Set paired window URL…';
- button.style.cssText='display:block;width:100%;padding:10px 14px;text-align:left;background:transparent;color:inherit;border:0;cursor:pointer';
+ button.style.cssText='width:100%;padding:10px 14px;text-align:left;background:transparent;color:inherit;border:0;cursor:pointer';
  button.onclick=async()=>{
   const tab=contextTab;if(!tab)return;
   hideTabMenu();
