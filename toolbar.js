@@ -495,6 +495,14 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!newTabOverlay.clas
 
 
 // Open an independent, persisted browser tab in the selected workspace on every click.
+const pushwardAlarmButton=$('pushward-alarm-rail');
+if(pushwardAlarmButton)pushwardAlarmButton.addEventListener('click',async()=>{
+ if(pushwardAlarmButton.disabled)return;
+ pushwardAlarmButton.disabled=true;
+ try{await window.hexora.startPushwardAlarm();pushwardAlarmButton.title='30-second iPhone alarm started';}
+ catch(error){alert('Pushward alarm: '+error.message);}
+ finally{pushwardAlarmButton.disabled=false;}
+});
 const NOTION_ACTION_CENTER_URL='https://app.notion.com/p/anthonymeszaros/Action-Center-348a372875a78084a961fd11848b2880';
 $('notion-rail').onclick=async()=>{
  try{
