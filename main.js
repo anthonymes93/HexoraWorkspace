@@ -114,7 +114,7 @@ const LAYOUT_KEY='detachedWindowIds';
 function savedDetachedIds(){try{const values=JSON.parse(store.getMeta(LAYOUT_KEY)||'[]');return Array.isArray(values)?values.filter(x=>Number.isSafeInteger(x)&&x>0).slice(0,32):[];}catch{return [];}}
 function setDetachedSaved(id,present){const ids=new Set(savedDetachedIds());if(present)ids.add(id);else ids.delete(id);store.setMeta(LAYOUT_KEY,JSON.stringify([...ids]));}
 let dualPopupHandler=null;
-let mainViewport=null,win,store,activeId=null,sidebarWidth=330,live=new Map(),favicons=new Map(),loading=new Map(),stateTimer=null,modalVisible=false,recoveryPassword=null,recoveryDir=null,recoveryTimer=null,recoveryBusy=false,lastBackup=null;
+let mainViewport=null,win,store,activeId=null,sidebarWidth=324,live=new Map(),favicons=new Map(),loading=new Map(),stateTimer=null,modalVisible=false,recoveryPassword=null,recoveryDir=null,recoveryTimer=null,recoveryBusy=false,lastBackup=null;
 const extensionPartition='persist:hexora-chatgpt';
 let deepLinkReady=false;
 const pendingDeepLinks=[];
@@ -416,8 +416,8 @@ function bounds(){
 }
 let sidebarAnimation=null,sidebarTransitioning=false,sidebarTransitionTarget=null;
 function setSidebarWidth(collapsed){
- const saved=Math.max(220,Math.min(560,Number(store?.getMeta('sidebarLastExpandedWidth'))||Number(store?.getMeta('sidebarCustomWidth'))||330));
- const start=sidebarWidth,target=collapsed?64:saved;
+ const saved=Math.max(220,Math.min(560,Number(store?.getMeta('sidebarLastExpandedWidth'))||Number(store?.getMeta('sidebarCustomWidth'))||324));
+ const start=sidebarWidth,target=collapsed?58:saved;
  if(sidebarAnimation){clearInterval(sidebarAnimation);sidebarAnimation=null;}
  sidebarTransitioning=start!==target;
  sidebarTransitionTarget=sidebarTransitioning?target:null;
@@ -792,7 +792,7 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
  // Apply any project saved by VS Code immediately before the prior shutdown,
  // before activating its native tab and regenerating its workspace file.
  syncNativeCodeProjects();
- sidebarWidth=Math.max(64,Math.min(560,Number(store.getMeta('sidebarCustomWidth'))||330));
+ sidebarWidth=Math.max(58,Math.min(560,Number(store.getMeta('sidebarCustomWidth'))||324));
  const mainTaskbar=safeTaskbarIdentity();
  win=new BrowserWindow({width:1360,height:900,minWidth:700,minHeight:400,title:isDevelopment?'Hexora Workspace [DEV]':'Hexora Workspace',icon:mainTaskbar?.iconPath,autoHideMenuBar:true,...(process.platform==='win32'?{frame:false}: {}),backgroundColor:'#111215',webPreferences:{preload:path.join(__dirname,'preload.js'),contextIsolation:true,sandbox:true,nodeIntegration:false}});
  if(process.platform==='win32'){
@@ -1253,8 +1253,8 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
   else if(action==='sidebar-resize'){
    if(sidebarAnimation){clearInterval(sidebarAnimation);sidebarAnimation=null;}
    sidebarTransitioning=false;sidebarTransitionTarget=null;
-   const max=Math.min(560,Math.max(64,win.getContentSize()[0]-420));
-   sidebarWidth=Math.round(Math.max(64,Math.min(max,Number(arg?.width)??330)));
+   const max=Math.min(560,Math.max(58,win.getContentSize()[0]-420));
+   sidebarWidth=Math.round(Math.max(58,Math.min(max,Number(arg?.width)??324)));
    bounds();return sidebarWidth;
   }
   else if(action==='sidebar-resize-save'){
