@@ -448,7 +448,22 @@ function activate(id){
  activeId=row.id;store.setMeta('workspaceActive:'+row.workspace,String(row.id));const t=toModel(row);t.lastActive=Date.now();store.save(t);store.setMeta('activeId',String(row.id));
  if(isCodeTab(row)){if(!modalVisible)showNativeCode();else hideNativeCode();evict();emit();return true;}
  let view=live.get(row.id);if(!view){view=wire(t);live.set(row.id,view);}
- if(!modalVisible){mainViewport.addChildView(view);bounds();view.webContents.focus();}
+ if(!modalVisible){
+  mainViewport.addChildView(view);
+  bounds();
+  view.webContents.focus();
+  // Chromium can retain stale compositor tiles when a cached WebContentsView
+  // is reattached after switching tabs. Invalidate only the newly active view;
+  // never reload it (which would discard scroll, forms and in-page state).
+  const shownId=row.id,shownView=view;
+  const repaint=()=>{
+   if(activeId!==shownId||live.get(shownId)!==shownView||modalVisible||shownView.webContents.isDestroyed())return;
+   shownView.webContents.invalidate();
+  };
+  repaint();
+  setTimeout(repaint,40);
+  setTimeout(repaint,160);
+ }
  evict();emit();return true;
 }
 
