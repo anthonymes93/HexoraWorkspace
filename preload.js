@@ -11,6 +11,7 @@ contextBridge.exposeInMainWorld('hexora',{
  readyForDeepLinks:()=>ipcRenderer.invoke('deep-link:ready'),
  onDeepLink:callback=>ipcRenderer.on('deep-link:navigate',(_event,target)=>callback(target)),
  onDeepLinkCopied:callback=>ipcRenderer.on('deep-link:copied',(_event,message)=>callback(message)),
+ onDualVisit:callback=>ipcRenderer.on('dual:visited-test-url',(_event,data)=>callback(data)),
  workspaceMenu:data=>ipcRenderer.invoke('workspace:context-menu',data),
  workspaceTooltip:{show:data=>ipcRenderer.invoke('workspace:tooltip-show',data),hide:()=>ipcRenderer.invoke('workspace:tooltip-hide')},
  onWorkspaceMenuAction:callback=>ipcRenderer.on('workspace:menu-action',(_event,data)=>callback(data)),
