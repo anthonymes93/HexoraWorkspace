@@ -1811,6 +1811,7 @@ $('open-email-app')?.addEventListener('click',()=>window.hexora.email.open().cat
   checkImportantTheme();
   const now=Date.now();let changed=false;
   for(const n of quick)if(!n.delivered&&n.due<=now){n.delivered=true;n.read=false;changed=true;
+   if(n.deepLink)window.hexora?.action('fire-quick-link',{id:n.id,link:n.deepLink}).catch(error=>console.warn('Could not open scheduled tab',error));
    alertDue(n);
   }
   if(changed){saveQuick();render();syncQuickLinks();}
