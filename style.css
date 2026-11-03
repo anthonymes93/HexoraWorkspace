@@ -1086,3 +1086,25 @@ body.notifications-drawer-open .top-main{background:var(--hexora-frame-blue,#1c3
 :where(.sidebar,.theme-modal,.theme-options,.notifications-feed,.modal-body,.tab-list,.workspace-list,.search-results)::-webkit-scrollbar-track{background:var(--hx-scroll-track)!important}
 :where(.sidebar,.theme-modal,.theme-options,.notifications-feed,.modal-body,.tab-list,.workspace-list,.search-results)::-webkit-scrollbar-thumb{background:var(--hx-scroll-thumb)!important;border-color:var(--hx-scroll-track)!important}
 :where(.sidebar,.theme-modal,.theme-options,.notifications-feed,.modal-body,.tab-list,.workspace-list,.search-results)::-webkit-scrollbar-thumb:hover{background:var(--hx-scroll-hover)!important}
+
+/* Quick notification composer and scheduled entries. */
+.notifications-add{width:29px;height:29px;display:grid;place-items:center;border:1px solid #7396d666;border-radius:9px;background:#ffffff12;color:#e2edff;font-size:20px;line-height:1;cursor:pointer}
+.notifications-add:hover{background:#527ad4;color:#fff}
+.notifications-quick-form{padding:16px 18px;border-bottom:1px solid #ffffff24;background:linear-gradient(145deg,#263c68,#18243c);display:flex;flex-direction:column;gap:10px}
+.notifications-quick-form[hidden]{display:none!important}
+.notifications-form-title{font-weight:700;font-size:13px;color:#f0f5ff}
+.notifications-quick-form label{display:flex;flex-direction:column;gap:6px;font-size:10px;color:#b9cae8}
+.notifications-quick-form textarea,.notifications-quick-form input{box-sizing:border-box;width:100%;border:1px solid #5b729e;border-radius:8px;padding:9px 10px;background:#121a2b;color:#f4f7ff;font:inherit;font-size:12px;color-scheme:dark}
+.notifications-quick-form textarea:focus,.notifications-quick-form input:focus{outline:2px solid #779ee8;outline-offset:1px}
+.notifications-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.notifications-form-actions{display:flex;justify-content:flex-end;gap:8px}
+.notifications-form-actions button{padding:9px 11px;border-radius:8px;border:1px solid #5c75ab;background:#263d68;color:#f2f5ff;font-size:11px;cursor:pointer}
+.notifications-form-actions button[type="submit"]{background:#547bce;border-color:#7396e2}
+.notifications-form-actions button:hover{filter:brightness(1.18)}
+.notifications-form-error{color:#ffb8b8;font-size:11px;margin:0}
+.notifications-scheduled-heading{padding:12px 18px 0;font-size:9px;letter-spacing:1px;color:#a9c2f1}
+.notifications-scheduled-heading[hidden]{display:none!important}
+.notification-quick{border-color:#6486c155;background:#243656aa}
+.notification-quick-actions{display:flex;gap:12px;margin-top:9px}
+.notification-quick-actions button{border:0;padding:0;background:transparent;color:#b3ccff;font-size:10px;cursor:pointer}
+.notification-quick-actions button:hover{text-decoration:underline}
