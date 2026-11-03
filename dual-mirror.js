@@ -104,6 +104,9 @@ function createDualMirror({getActiveId,getTab,getView,isCodeTab,getMirrorUrl,get
   popup.setSize(960,720);
   const target=view?view.webContents:popup.webContents;
   const entry={id,url:pairedUrl,popup,view,target,discarded:false};
+  target.on('render-process-gone',(_event,details)=>{
+   console.error('[Dual Mirror] Paired renderer exited:',id,details.reason);
+  });
   target.on('did-fail-load',(_event,code,description,url,isMainFrame)=>{
    if(isMainFrame)console.error('[Dual Mirror] Load failed:',code,description,url);
   });
@@ -141,7 +144,13 @@ function createDualMirror({getActiveId,getTab,getView,isCodeTab,getMirrorUrl,get
   if(group.closed||entry.popup.isDestroyed())return;
   // Ignore stale asynchronous popup completions if a different main tab
   // became active while ChatGPT was opening this one.
-  if(getActiveId()!==id)return;
+  if(getActiveId()!==id){
+   // A pending popup can complete after the user switches tabs.
+   // Park it without hiding/suspending Chromium's authenticated renderer.
+   entry.popup.setIgnoreMouseEvents(true);
+   entry.popup.setOpacity(0);
+   return;
+  }
   if(group.active===entry&&group.source===source)return;
   const previous=group.active;
   const wasVisible=previous
@@ -150,18 +159,21 @@ function createDualMirror({getActiveId,getTab,getView,isCodeTab,getMirrorUrl,get
   if(previous&&previous!==entry&&!previous.popup.isDestroyed()){
    group.bounds=previous.popup.getBounds();
    group.maximized=previous.popup.isMaximized();
-   previous.popup.hide();
-   previous.popup.setSkipTaskbar(true);
+   // Electron's hide() sends a hidden page-visibility event to Chromium.
+   // Keep each authenticated page alive and painting, but make the inactive
+   // native window transparent and mouse-pass-through instead of hiding it.
+   // Avoid setSkipTaskbar changes, which mutate Windows native window styles.
+   previous.popup.setIgnoreMouseEvents(true);
+   previous.popup.setOpacity(0);
   }
-  if(group.bounds&&!entry.popup.isMaximized()){
-   if(entry.popup.isMaximized())entry.popup.unmaximize();
-   entry.popup.setBounds(group.bounds);
+  if(group.bounds){
+   if(!group.maximized&&entry.popup.isMaximized())entry.popup.unmaximize();
+   if(!group.maximized)entry.popup.setBounds(group.bounds);
   }
   if(group.maximized&&!entry.popup.isMaximized())entry.popup.maximize();
-  if(previous!==entry&&wasVisible){
-   entry.popup.setSkipTaskbar(false);
-   entry.popup.showInactive();
-  }
+  entry.popup.setOpacity(1);
+  entry.popup.setIgnoreMouseEvents(false);
+  if(previous!==entry&&wasVisible)entry.popup.showInactive();
   group.active=entry;
   group.source=source;
   group.leader=null;
