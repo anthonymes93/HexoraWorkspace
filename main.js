@@ -106,7 +106,7 @@ if(!hasSingleInstanceLock){
 const HOME='https://chatgpt.com/';
 const DETACHED_HEADER=44;
 const MAIN_TITLEBAR_HEIGHT=process.platform==='win32'?16:0;
-let compactFrame=false;
+let compactFrame=false,compactFramePreviousSidebarWidth=null;
 let TOP_HEIGHT=95;const IDLE_MS=24*60*60*1000,MAX_LIVE=8;
 let recoveryWindow=null,vault=null;
 const detached=new Map();
@@ -1345,8 +1345,11 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
   else if(action==='compact-frame'){
    compactFrame=!!arg;
    // Keep the narrow blue rail; restore the user's normal sidebar width on exit.
-   if(compactFrame)setSidebarWidth(true);
-   else setSidebarWidth(false);
+   if(compactFrame){compactFramePreviousSidebarWidth=sidebarWidth;setSidebarWidth(true);}
+   else if(compactFramePreviousSidebarWidth!==null){
+    setSidebarWidth(compactFramePreviousSidebarWidth<220);
+    compactFramePreviousSidebarWidth=null;
+   }
    bounds();return true;
   }
   else if(action==='sidebar'){setSidebarWidth(!!arg);}
