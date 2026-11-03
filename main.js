@@ -333,7 +333,47 @@ function wire(t){const view=new WebContentsView({webPreferences:{partition:'pers
   wc.executeJavaScript(CHATGPT_DRAFT_GUARD.replace('__HEXORA_SAVED_DRAFT__',initial)).catch(err=>console.warn('Draft restore unavailable:',err.message));
  });
  wc.on('render-process-gone',()=>{loading.delete(t.id);emit();});
+ // Targeted Pinterest OAuth diagnostics. No credentials, query strings, form
+ // values, cookie data, or full URLs are written to the terminal.
+ const pinterestPage=()=>{try{return /(^|\\.)pinterest\\.com$/i.test(new URL(wc.getURL()).hostname);}catch{return false;}};
+ const pinterestLog=(kind,detail)=>{if(pinterestPage())console.info('[Pinterest OAuth]',kind,detail||'');};
+ wc.on('console-message',(_event,detailsOrLevel,message)=>{
+  if(!pinterestPage())return;
+  const details=typeof detailsOrLevel==='object'?detailsOrLevel:{level:detailsOrLevel,message};
+  const level=details.level;
+  if(level!=='error'&&level!=='warning'&&level!==2&&level!==3)return;
+  const raw=String(details.message||message||'');
+  // Report error category only; third-party scripts may include sensitive URLs.
+  const category=/content.security.policy|csp/i.test(raw)?'CSP':
+   /cross.origin|cors/i.test(raw)?'CORS':
+   /fedcm|identity.credential/i.test(raw)?'FedCM':
+   /popup|window.open/i.test(raw)?'popup':
+   /blocked|denied|refused/i.test(raw)?'blocked':
+   /uncaught|typeerror|referenceerror/i.test(raw)?'JavaScript exception':'other';
+  pinterestLog('console '+String(level),category);
+ });
+ wc.on('did-create-window',(popup,details)=>{
+  pinterestLog('popup created',(()=>{try{return new URL(details.url).hostname;}catch{return 'unknown';}})());
+ });
+ wc.on('did-finish-load',()=>{
+  if(!pinterestPage())return;
+  pinterestLog('page loaded','diagnostics active');
+  // Capture only clicks on Google sign-in controls, never form inputs.
+  void wc.executeJavaScript(`(()=>{
+   if(window.__hexoraPinterestOAuthProbe)return;
+   window.__hexoraPinterestOAuthProbe=true;
+   document.addEventListener('click',event=>{
+    const element=event.target?.closest?.('button,a,[role="button"]');
+    if(!element)return;
+    const label=(element.innerText||element.getAttribute('aria-label')||'').trim().slice(0,100);
+    if(!/continue with google|sign in with google|log in with google/i.test(label))return;
+    console.info('[Hexora Pinterest OAuth] Google sign-in control clicked');
+   },true);
+  })()`,true).catch(()=>{});
+ });
  wc.setWindowOpenHandler(({url,frameName})=>{
+  if(pinterestPage())pinterestLog('window.open requested',(()=>{try{return new URL(url).hostname;}catch{return 'unknown';}})());
+
   if(!/^https:\/\//.test(url))return {action:'deny'};
   if(/^hexora-dual-pair-/.test(frameName||'')){
    return dualPopupHandler?.({opener:wc,url,frameName})||{action:'deny'};
