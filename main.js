@@ -122,6 +122,29 @@ function deliverDeepLinks(){
  if(!deepLinkReady||!win||win.isDestroyed())return;
  while(pendingDeepLinks.length)win.webContents.send('deep-link:navigate',pendingDeepLinks.shift());
 }
+// Quick-notification tab jumps are scheduled in Electron's main process so
+// renderer throttling does not introduce the normal 15-second polling delay.
+const scheduledQuickLinks=new Map();
+const firedQuickLinks=new Set();
+function fireQuickLink(id,link){
+ if(firedQuickLinks.has(id)||!parseDeepLink(link))return false;
+ firedQuickLinks.add(id);
+ if(firedQuickLinks.size>500)firedQuickLinks.delete(firedQuickLinks.values().next().value);
+ return receiveDeepLink(link);
+}
+let quickLinkTimer=null;
+function runScheduledQuickLinks(){
+ if(quickLinkTimer){clearTimeout(quickLinkTimer);quickLinkTimer=null;}
+ const now=Date.now();
+ for(const [id,entry] of scheduledQuickLinks){
+  if(entry.due>now)continue;
+  scheduledQuickLinks.delete(id);
+  fireQuickLink(id,entry.link);
+ }
+ let next=Infinity;
+ for(const entry of scheduledQuickLinks.values())next=Math.min(next,entry.due);
+ if(Number.isFinite(next))quickLinkTimer=setTimeout(runScheduledQuickLinks,Math.max(1,Math.min(2147483647,next-Date.now())));
+}
 function receiveDeepLink(value){
  const target=parseDeepLink(value);
  if(!target)return false;
@@ -1316,6 +1339,32 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
    websiteScrollbarTheme={theme,color,thumb:validHex(arg?.thumb),hover:validHex(arg?.hover)};
    for(const view of live.values())applyHexoraWebsiteScrollbars(view.webContents);
    return true;
+  }
+  else if(action==='fire-quick-link'){
+   if(event.sender!==win.webContents)throw Error('Invalid quick link caller');
+   const id=String(arg?.id||'');
+   const link=String(arg?.link||'');
+   if(!id||id.length>100||!parseDeepLink(link))return false;
+   const scheduled=scheduledQuickLinks.get(id);
+   if(scheduled&&scheduled.link!==link)return false;
+   scheduledQuickLinks.delete(id);
+   return fireQuickLink(id,link);
+  }
+  else if(action==='schedule-quick-links'){
+   if(event.sender!==win.webContents)throw Error('Invalid quick link scheduler caller');
+   if(!Array.isArray(arg)||arg.length>100)throw Error('Invalid quick link schedule');
+   const next=new Map();
+   for(const item of arg){
+    const id=String(item?.id||'');
+    const due=Number(item?.due);
+    const target=parseDeepLink(item?.link);
+    if(!id||id.length>100||!Number.isFinite(due)||!target||due<=Date.now())continue;
+    next.set(id,{due,link:item.link});
+   }
+   scheduledQuickLinks.clear();
+   for(const [id,entry] of next)scheduledQuickLinks.set(id,entry);
+   runScheduledQuickLinks();
+   return scheduledQuickLinks.size;
   }
   else if(action==='quick-notification-alert'){
    if(event.sender!==win.webContents)throw Error('Invalid notification caller');
