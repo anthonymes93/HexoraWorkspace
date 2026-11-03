@@ -1127,3 +1127,10 @@ body.notifications-drawer-open .top-main{background:var(--hexora-frame-blue,#1c3
 .hexora-toast-actions button:last-child{background:var(--hexora-frame-blue,#1c347f);border-color:var(--hexora-frame-blue-light,#405a9b);color:#fff}
 .hexora-toast-actions button:hover{filter:brightness(1.25)}
 @media(prefers-reduced-motion:reduce){.hexora-toast-host{transition:none!important;transform:none!important}}
+
+/* Important quick reminder: compact checkbox and 2-minute cue. */
+.notifications-quick-form .quick-notification-important{display:flex;align-items:center;flex-direction:row;gap:10px;padding:10px 12px;border:1px solid #e4a85155;border-radius:10px;background:#d69b3015;cursor:pointer}
+.notifications-quick-form .quick-notification-important input{width:16px;height:16px;flex:0 0 16px;margin:0;accent-color:#e5a54d}
+.quick-notification-important span{display:flex;flex-direction:column;gap:4px}
+.quick-notification-important strong{font-size:12px;color:#ffe4ad}
+.quick-notification-important small{font-size:10px;color:#c7b38e}
