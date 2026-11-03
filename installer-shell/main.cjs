@@ -30,7 +30,10 @@ ipcMain.handle('install:launch',async()=>{
  const exe=path.join(process.env.LOCALAPPDATA||path.join(app.getPath('home'),'AppData','Local'),'Programs','Hexora Workspace','Hexora Workspace.exe');
  if(!fs.existsSync(exe))return {ok:false,message:'Launch Hexora from the Start menu.'};
  const error=await shell.openPath(exe);
- return error?{ok:false,message:error}:{ok:true};
+ if(error)return {ok:false,message:error};
+ // The app was handed to Windows successfully; the setup shell is no longer needed.
+ app.quit();
+ return {ok:true};
 });
 ipcMain.handle('install:close',()=>{if(!installing)app.quit();});
 app.on('window-all-closed',()=>app.quit());
