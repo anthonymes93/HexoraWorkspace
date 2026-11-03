@@ -1,5 +1,5 @@
 'use strict';
-const {BrowserWindow}=require('electron');
+const {BrowserWindow,session}=require('electron');
 
 // One user-input leader at a time: programmatic scrolling cannot echo back.
 function createDualMirror({getActiveId,getTab,getView,isCodeTab,getMirrorUrl}){
@@ -10,7 +10,8 @@ function createDualMirror({getActiveId,getTab,getView,isCodeTab,getMirrorUrl}){
   const id=getActiveId(),tab=getTab(id);
   if(!tab||tab.workspace!=='dual'||isCodeTab(tab))return false;
   if(state&&!state.popup.isDestroyed()){state.popup.focus();return true;}
-  const popup=new BrowserWindow({width:960,height:720,minWidth:420,minHeight:320,title:'Hexora · Dual Workspace (Mirror Test)',backgroundColor:'#111215',autoHideMenuBar:true,webPreferences:{partition:'persist:hexora-chatgpt',sandbox:true,contextIsolation:true,nodeIntegration:false,webSecurity:true}});
+  const sharedSession=session.fromPartition('persist:hexora-chatgpt');
+  const popup=new BrowserWindow({width:960,height:720,minWidth:420,minHeight:320,title:'Hexora · Dual Workspace (Mirror Test)',backgroundColor:'#111215',autoHideMenuBar:true,webPreferences:{session:sharedSession,sandbox:true,contextIsolation:true,nodeIntegration:false,webSecurity:true}});
   const target=popup.webContents;
   const current={popup,id:null,url:null,source:null,leader:null,leaderUntil:0,last:null,busy:false,loading:false,handlers:[]};state=current;
   const detach=()=>{for(const [wc,event,handler] of current.handlers)if(!wc.isDestroyed())wc.removeListener(event,handler);current.handlers=[];};
@@ -31,6 +32,14 @@ function createDualMirror({getActiveId,getTab,getView,isCodeTab,getMirrorUrl}){
    current.id=active;current.url=pairedUrl;current.source=source;current.leader=null;current.last=null;
    detach();watch(source,'source');watch(target,'target');
    current.loading=true;
+   // ChatGPT's login/session checks can reject Electron's default UA even
+   // when its cookies are available. Use the same Chromium identity as the
+   // Chrome-compatible embedded tabs, without creating a new session.
+   if(new URL(pairedUrl).hostname==='chatgpt.com'){
+    const sourceUA=source.getUserAgent();
+    const chromeUA=sourceUA.replace(/\\s+(?:Electron|hexora-workspace)\\/[^\\s]+/gi,'').replace(/\\s{2,}/g,' ').trim();
+    target.setUserAgent(chromeUA);
+   }else target.setUserAgent(source.getUserAgent());
    try{await target.loadURL(pairedUrl);}catch(error){console.warn('[Dual Mirror] Navigation failed:',error.message);}finally{current.loading=false;}
   };
   const sync=async()=>{
