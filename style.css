@@ -1134,3 +1134,8 @@ body.notifications-drawer-open .top-main{background:var(--hexora-frame-blue,#1c3
 .quick-notification-important span{display:flex;flex-direction:column;gap:4px}
 .quick-notification-important strong{font-size:12px;color:#ffe4ad}
 .quick-notification-important small{font-size:10px;color:#c7b38e}
+
+/* Optional scheduled tab deep link in quick notification composer. */
+.notifications-quick-form .quick-link-optional{font-weight:400;color:#8fa4cb}
+.notifications-quick-form #quick-notification-deep-link{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:11px}
+.notification-quick-link{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;color:#a9c5ff!important;font-size:10px!important;overflow-wrap:anywhere}
