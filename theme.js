@@ -141,8 +141,9 @@
   for(const selector of ['.main-titlebar-drag','.top','.rail']){
     document.querySelector(selector)?.addEventListener('click',event=>{
       if(event.detail!==3||event.target.closest('button,a,input,textarea,select,[contenteditable="true"]'))return;
+      const isRed=document.documentElement.dataset.hexoraTheme==='omega'&&document.documentElement.dataset.hexoraOmegaColor==='red';
       clearTransition();
-      applyOmega('red');
+      applyOmega(isRed?'blue':'red');
       apply('omega');
     });
   }
