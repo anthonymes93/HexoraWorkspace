@@ -1149,4 +1149,4 @@ body.hexora-compact-frame .top-main{top:0;left:58px}
 body.hexora-compact-frame .rail .logo{cursor:pointer}
 
 /* Only the literal screen-edge strip receives flick events; the rest of the blue frame stays draggable. */
-.main-titlebar-drag::before{content:"";position:absolute;top:0;left:0;right:132px;height:3px;-webkit-app-region:no-drag;pointer-events:auto}
+.frame-top-edge{position:absolute;top:0;left:0;right:132px;height:3px;-webkit-app-region:no-drag;pointer-events:auto;z-index:2}
