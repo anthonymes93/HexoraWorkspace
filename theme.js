@@ -136,15 +136,25 @@
     document.getElementById('appearance-overlay')?.classList.add('hidden');
     window.hexora?.action('modal',false);
   };
-  // Triple-click empty frame chrome to switch directly to Omega Red.
-  // Ignore interactive controls so their own triple-click behavior is preserved.
+  // Wait briefly after a double-click so a third click can toggle Omega
+  // without also opening a tab. Only noninteractive frame surfaces qualify.
+  let frameDoubleClickTimer=null;
   for(const selector of ['.main-titlebar-drag','.top','.rail']){
     document.querySelector(selector)?.addEventListener('click',event=>{
-      if(event.detail!==3||event.target.closest('button,a,input,textarea,select,[contenteditable="true"]'))return;
-      const isRed=document.documentElement.dataset.hexoraTheme==='omega'&&document.documentElement.dataset.hexoraOmegaColor==='red';
-      clearTransition();
-      applyOmega(isRed?'blue':'red');
-      apply('omega');
+      if(event.target.closest('button,a,input,textarea,select,[contenteditable="true"]'))return;
+      if(event.detail===2){
+        clearTimeout(frameDoubleClickTimer);
+        frameDoubleClickTimer=setTimeout(()=>{
+          frameDoubleClickTimer=null;
+          window.dispatchEvent(new Event('hexora:frame-new-chatgpt'));
+        },300);
+      }else if(event.detail===3){
+        clearTimeout(frameDoubleClickTimer);frameDoubleClickTimer=null;
+        const isRed=document.documentElement.dataset.hexoraTheme==='omega'&&document.documentElement.dataset.hexoraOmegaColor==='red';
+        clearTransition();
+        applyOmega(isRed?'blue':'red');
+        apply('omega');
+      }
     });
   }
   document.getElementById('theme-rail')?.addEventListener('click',open);
