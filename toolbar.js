@@ -490,6 +490,7 @@ $('new-tab-close').onclick=closeNewTabLauncher;
 newTabOverlay.onclick=e=>{if(e.target===newTabOverlay)closeNewTabLauncher();};
 $('new-tab-form').onsubmit=e=>{e.preventDefault();smartSubmitSelection();};
 $('new-tab-chatgpt').onclick=()=>action('new',activeWorkspace).then(closeNewTabLauncher).catch(e=>newTabError.textContent=e.message);
+window.addEventListener('hexora:frame-new-chatgpt',()=>action('new',activeWorkspace).catch(error=>console.warn('[Hexora] Frame new ChatGPT tab:',error)));
 for(const el of document.querySelectorAll('[data-new-tab-url]'))el.addEventListener('click',()=>launchNewTab(el.dataset.newTabUrl,el.dataset.newTabTitle));
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!newTabOverlay.classList.contains('hidden'))closeNewTabLauncher();});
 
