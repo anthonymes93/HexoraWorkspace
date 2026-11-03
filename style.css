@@ -871,3 +871,15 @@ body.sidebar-trim-workspace-details:not(.sidebar-icons-only) .workspace{gap:6px}
 .tabsbar .tabs .tab:hover{background:#ffffff1e}
 .tabsbar .tabs .tab.active,.tabsbar .tabs .tab.selected{background:var(--hexora-frame-blue-light);border-color:#ffffff24;color:#fff}
 .tabsbar button{color:#e1e8ff}
+
+/* Complete the Email-inspired frame: no charcoal gap between blue title and tabs. */
+.top-main>.top{
+ background:var(--hexora-frame-blue);
+ border-bottom:1px solid #ffffff1b;
+ color:#fff;
+}
+.top-main>.top .subtitle{color:#c1cff2}
+.top-main>.top .pill{background:#ffffff14;border-color:#ffffff2b;color:#f3f6ff}
+.top-main>.top .pill:hover:not(:disabled){background:#ffffff2b}
+.top-main>.top .pill.primary{background:#d6ddf0;border-color:#d6ddf0;color:#162b65}
+.top-main>.top .pill.primary:hover:not(:disabled){background:#f1f4ff}
