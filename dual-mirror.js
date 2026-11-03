@@ -1,5 +1,6 @@
 'use strict';
 const {BrowserWindow,session}=require('electron');
+const path=require('path');
 
 // One user-input leader at a time: programmatic scrolling cannot echo back.
 function createDualMirror({getActiveId,getTab,getView,isCodeTab,getMirrorUrl}){
@@ -11,7 +12,7 @@ function createDualMirror({getActiveId,getTab,getView,isCodeTab,getMirrorUrl}){
   if(!tab||tab.workspace!=='dual'||isCodeTab(tab))return false;
   if(state&&!state.popup.isDestroyed()){state.popup.focus();return true;}
   const sharedSession=session.fromPartition('persist:hexora-chatgpt');
-  const popup=new BrowserWindow({width:960,height:720,minWidth:420,minHeight:320,title:'Hexora · Dual Workspace (Mirror Test)',backgroundColor:'#111215',autoHideMenuBar:true,webPreferences:{session:sharedSession,sandbox:true,contextIsolation:true,nodeIntegration:false,webSecurity:true}});
+  const popup=new BrowserWindow({width:960,height:720,minWidth:420,minHeight:320,title:'Hexora · Dual Workspace (Mirror Test)',backgroundColor:'#111215',autoHideMenuBar:true,webPreferences:{session:sharedSession,preload:path.join(__dirname,'site-vault-preload.js'),sandbox:true,contextIsolation:true,nodeIntegration:false,webSecurity:true}});
   const target=popup.webContents;
   const current={popup,id:null,url:null,source:null,leader:null,leaderUntil:0,last:null,busy:false,loading:false,handlers:[]};state=current;
   const detach=()=>{for(const [wc,event,handler] of current.handlers)if(!wc.isDestroyed())wc.removeListener(event,handler);current.handlers=[];};
@@ -36,6 +37,11 @@ function createDualMirror({getActiveId,getTab,getView,isCodeTab,getMirrorUrl}){
    // when its cookies are available. Use the same Chromium identity as the
    // Chrome-compatible embedded tabs, without creating a new session.
    if(new URL(pairedUrl).hostname==='chatgpt.com'){
+    const sourceSession=source.session;
+    const sameSession=sourceSession===target.session;
+    const counts=await Promise.all([sourceSession.cookies.get({url:'https://chatgpt.com'}),target.session.cookies.get({url:'https://chatgpt.com'})]);
+    console.info('[Dual Mirror Auth]',{sameSession,sourceCookieCount:counts[0].length,targetCookieCount:counts[1].length,sourceUA:source.getUserAgent(),targetUA:target.getUserAgent()});
+
     const sourceUA=source.getUserAgent();
     const chromeUA=sourceUA.replace(/\s+(?:Electron|hexora-workspace)\/[^\s]+/gi,'').replace(/\s{2,}/g,' ').trim();
     target.setUserAgent(chromeUA);
