@@ -1780,7 +1780,7 @@ $('open-email-app')?.addEventListener('click',()=>window.hexora.email.open().cat
    else closeTimer=setTimeout(finish,270);
   }
  };
- bell.addEventListener('click',()=>setOpen(panel.hidden));
+ bell.addEventListener('click',()=>setOpen(bell.getAttribute('aria-expanded')!=='true'));
  close?.addEventListener('click',()=>{setOpen(false);bell.focus();});
  document.addEventListener('pointerdown',event=>{if(!panel.hidden&&!wrapper.contains(event.target))setOpen(false);});
  document.addEventListener('keydown',event=>{if(event.key==='Escape'&&!panel.hidden){event.preventDefault();setOpen(false);bell.focus();}});
