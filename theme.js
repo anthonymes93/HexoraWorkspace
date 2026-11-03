@@ -1,7 +1,7 @@
 'use strict';
 (() => {
   const key='hexora-appearance-theme';
-  const themes=new Set(['classic','obsidian','white']);
+  const themes=new Set(['classic','obsidian','white','omega']);
   const safe=value=>themes.has(value)?value:'classic';
   const apply=value=>{
     const theme=safe(value);
@@ -13,9 +13,36 @@
       button.setAttribute('aria-pressed',String(selected));
     }
     const status=document.getElementById('appearance-status');
-    if(status)status.textContent='Active theme: '+({classic:'Classic',obsidian:'Obsidian',white:'White'}[theme]);
+    if(status)status.textContent='Active theme: '+({classic:'Classic',obsidian:'Obsidian',white:'White',omega:'Omega'}[theme]);
+    const omegaSection=document.getElementById('omega-color-section');
+    if(omegaSection)omegaSection.hidden=theme!=='omega';
   };
-  const accentKey='hexora-appearance-accent';
+  const omegaKey='hexora-omega-color';
+  const omegaColors=[["blue","Blue"],["red","Red"],["orange","Orange"],["amber","Amber"],["green","Green"],["teal","Teal"],["cyan","Cyan"],["purple","Purple"],["pink","Pink"],["indigo","Indigo"]];
+  const omegaSafe=value=>omegaColors.some(([id])=>id===value)?value:'blue';
+  const applyOmega=value=>{
+    const color=omegaSafe(value);
+    document.documentElement.dataset.hexoraOmegaColor=color;
+    try{localStorage.setItem(omegaKey,color);}catch{}
+    document.querySelectorAll('[data-omega-choice]').forEach(button=>{
+      const selected=button.dataset.omegaChoice===color;
+      button.classList.toggle('selected',selected);
+      button.setAttribute('aria-pressed',String(selected));
+    });
+  };
+  const omegaHost=document.getElementById('omega-color-options');
+  if(omegaHost)for(const [id,name] of omegaColors){
+    const button=document.createElement('button');button.type='button';button.className='omega-color-choice';
+    button.dataset.omegaChoice=id;button.setAttribute('aria-label',name);button.title=name;
+    const swatch=document.createElement('span');swatch.className='omega-color-swatch omega-color-swatch-'+id;
+    const label=document.createElement('span');label.textContent=name;
+    button.append(swatch,label);button.addEventListener('click',()=>applyOmega(id));omegaHost.append(button);
+  }
+  let savedOmega='blue';try{savedOmega=omegaSafe(localStorage.getItem(omegaKey));}catch{}
+  applyOmega(savedOmega);
+  const updateOmegaVisibility=()=>{const section=document.getElementById('omega-color-section');if(section)section.hidden=document.documentElement.dataset.hexoraTheme!=='omega';};
+  updateOmegaVisibility();
+
   const accents=[
     ['purple','Purple','#ad95ff','#ad95ff'],
     ['teal','Teal','#34c7b1','#34c7b1'],
@@ -65,6 +92,6 @@
     if(event.target.id==='appearance-overlay')close();
   });
   for(const button of document.querySelectorAll('[data-theme-choice]'))button.addEventListener('click',()=>apply(button.dataset.themeChoice));
-  window.addEventListener('storage',event=>{if(event.key===key)apply(event.newValue);if(event.key===accentKey)applyAccent(event.newValue);});
+  window.addEventListener('storage',event=>{if(event.key===key)apply(event.newValue);if(event.key===accentKey)applyAccent(event.newValue);if(event.key===omegaKey)applyOmega(event.newValue);if(event.key===key)updateOmegaVisibility();});
   document.addEventListener('keydown',event=>{if(event.key==='Escape'&&!document.getElementById('appearance-overlay')?.classList.contains('hidden'))close();});
 })();
