@@ -1061,3 +1061,13 @@ body::before{content:"";position:absolute;top:16px;left:58px;width:18px;height:1
 .notifications-panel-footer button{border:0;background:transparent;color:#b8d0ff;font-size:11px;cursor:pointer}
 .notifications-panel-footer button:hover{color:#fff}
 body.notifications-drawer-open .top-main{background:var(--hexora-frame-blue,#1c347f)}
+
+/* Notification center: responsive 280ms slide + fade, with a vivid Omega scrollbar. */
+.notifications-panel{opacity:0;transform:translateX(24px) scale(.985);transform-origin:top right;pointer-events:none;transition:transform 280ms cubic-bezier(.2,.8,.2,1),opacity 240ms ease;will-change:transform,opacity}
+.notifications-panel.is-visible{opacity:1;transform:translateX(0) scale(1);pointer-events:auto}
+.notifications-feed{scrollbar-width:auto;scrollbar-color:var(--hexora-frame-blue-light,#5f83d6) #111d32;scrollbar-gutter:stable}
+.notifications-feed::-webkit-scrollbar{width:10px}
+.notifications-feed::-webkit-scrollbar-track{background:#111d32;border-radius:10px;margin:8px 0}
+.notifications-feed::-webkit-scrollbar-thumb{background:linear-gradient(180deg,#89a8f2,var(--hexora-frame-blue-light,#557bd4));border:2px solid #111d32;border-radius:12px;min-height:42px}
+.notifications-feed::-webkit-scrollbar-thumb:hover{background:linear-gradient(180deg,#b0c7ff,#6b94f3)}
+@media(prefers-reduced-motion:reduce){.notifications-panel{transition:none!important;transform:none!important}}
