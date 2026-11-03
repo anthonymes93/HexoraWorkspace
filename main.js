@@ -899,6 +899,21 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
   if(!store.get(id)){setDetachedSaved(id,false);continue;}
   try{detachTab(id);}catch(err){console.error('Could not restore detached window',id,err);}
  }
+ ipcMain.handle('pushward:alarm:start',async(event)=>{
+  if(event.sender!==win.webContents)throw new Error('Unauthorized window');
+  const key=process.env.HEXORA_PUSHWARD_API_KEY;
+  if(!key)throw new Error('Set HEXORA_PUSHWARD_API_KEY before starting Hexora.');
+  const https=require('node:https');
+  const payload=JSON.stringify({state:'ongoing',content:{template:'countdown',progress:0,state:'Hexora Alarm',duration:'30s',warning_threshold:10,completion_message:'Time is up!',accent_color:'blue',alarm:true,snooze_seconds:300}});
+  return await new Promise((resolve,reject)=>{
+   const request=https.request('https://api.pushward.app/activities/anthonyos-alarm-test?upsert=true',{method:'PATCH',headers:{Authorization:'Bearer '+key,'Content-Type':'application/merge-patch+json','Content-Length':Buffer.byteLength(payload)},timeout:10000},response=>{
+    let body='';response.setEncoding('utf8');response.on('data',chunk=>{body+=chunk;if(body.length>100000)response.destroy();});
+    response.on('end',()=>{if(response.statusCode>=200&&response.statusCode<300)resolve({ok:true});else reject(new Error('Pushward returned HTTP '+response.statusCode));});
+   });
+   request.on('timeout',()=>request.destroy(new Error('Pushward request timed out')));
+   request.on('error',reject);request.end(payload);
+  });
+ });
  ipcMain.handle('recovery:status',()=>({directory:recoveryDir,enabled:!!(recoveryDir&&recoveryPassword),lastBackup}));
  ipcMain.handle('recovery:configure',async(_e,password)=>{
   if(typeof password!=='string'||password.length<12)throw new Error('Enter a recovery password of at least 12 characters.');
