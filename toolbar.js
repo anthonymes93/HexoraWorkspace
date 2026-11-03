@@ -23,25 +23,20 @@ document.addEventListener('pointermove',event=>{
  if(frameCompact||!previous)return;
  const dt=now-previous.time;
  // Require a distinct, fast upward move near the top, not idle hovering.
- if(dt>0&&dt<160&&previous.y>=22&&event.clientY<=18&&
+ if(dt>0&&dt<160&&previous.y>=64&&event.clientY<=38&&
     previous.y-event.clientY>=10&&(previous.y-event.clientY)/dt>=0.22){
   frameFlickArmed=true;frameFlickAt=now;
  }
  if(frameFlickArmed&&now-frameFlickAt>220)frameFlickArmed=false;
- if(frameFlickArmed&&event.clientY<=4){
+ if(frameFlickArmed&&event.clientY<=35){
   frameFlickArmed=false;
   setCompactFrame(true);
  }
 },{passive:true});
-// Restore without clicking: move from the app content into the blue rail.
-let lastRailPointer=null;
-document.querySelector('.rail')?.addEventListener('pointermove',event=>{
- if(!frameCompact)return;
- const now=performance.now();
- if(lastRailPointer&&now-lastRailPointer.time<300&&
-    lastRailPointer.x>=58&&event.clientX<58)setCompactFrame(false);
- lastRailPointer={x:event.clientX,time:now};
-},{passive:true});
+// The retained rail provides a predictable mouse-only way back.
+document.querySelector('.rail')?.addEventListener('pointerenter',()=>{
+ if(frameCompact)setCompactFrame(false);
+});
 document.querySelector('.rail .logo')?.addEventListener('click',()=>{
  if(frameCompact)setCompactFrame(false);
 });
