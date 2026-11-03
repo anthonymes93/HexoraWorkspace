@@ -1728,3 +1728,14 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&vaultOpen)vaultClos
 
 // Hexora Apps: native multi-account email companion window.
 $('open-email-app')?.addEventListener('click',()=>window.hexora.email.open().catch(err=>alert('Email: '+err.message)));
+
+/* Header notifications: accessible shell, no fabricated alerts. */
+(() => {
+ const wrapper=$('hexora-notifications'),bell=$('notifications-bell'),panel=$('notifications-panel'),close=$('notifications-close');
+ if(!wrapper||!bell||!panel)return;
+ const setOpen=open=>{panel.hidden=!open;bell.setAttribute('aria-expanded',String(open));if(open)close?.focus();};
+ bell.addEventListener('click',()=>setOpen(panel.hidden));
+ close?.addEventListener('click',()=>{setOpen(false);bell.focus();});
+ document.addEventListener('pointerdown',event=>{if(!panel.hidden&&!wrapper.contains(event.target))setOpen(false);});
+ document.addEventListener('keydown',event=>{if(event.key==='Escape'&&!panel.hidden){event.preventDefault();setOpen(false);bell.focus();}});
+})();
