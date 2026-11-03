@@ -52,7 +52,7 @@ function nativeCodeCommand(message,tabId=activeId){
 function nativeCodeBounds(tabId=activeId){
  if(!win||win.isDestroyed()||!nativeCodeHosts.get(tabId)?.ready)return;
  const [w,h]=win.getContentSize();
- nativeCodeCommand('RECT '+sidebarWidth+' '+(TOP_HEIGHT+MAIN_TITLEBAR_HEIGHT)+' '+Math.max(1,w-sidebarWidth)+' '+Math.max(1,h-TOP_HEIGHT-MAIN_TITLEBAR_HEIGHT),tabId);
+ nativeCodeCommand('RECT '+sidebarWidth+' '+(TOP_HEIGHT+(compactFrame?0:MAIN_TITLEBAR_HEIGHT))+' '+Math.max(1,w-sidebarWidth)+' '+Math.max(1,h-TOP_HEIGHT-(compactFrame?0:MAIN_TITLEBAR_HEIGHT)),tabId);
 }
 let nativeCodeLifecycleTimer=null;
 function scheduleNativeCodeLifecycle(reason){
@@ -106,6 +106,7 @@ if(!hasSingleInstanceLock){
 const HOME='https://chatgpt.com/';
 const DETACHED_HEADER=44;
 const MAIN_TITLEBAR_HEIGHT=process.platform==='win32'?16:0;
+let compactFrame=false;
 let TOP_HEIGHT=95;const IDLE_MS=24*60*60*1000,MAX_LIVE=8;
 let recoveryWindow=null,vault=null;
 const detached=new Map();
@@ -467,8 +468,8 @@ function discard(id){const view=live.get(id);if(!view)return;live.delete(id);con
 function bounds(){
  if(!win||win.isDestroyed()||!mainViewport)return;
  const [w,h]=win.getContentSize();
- const visibleWidth=Math.max(0,w-sidebarWidth-((notificationsOpen||quickToastOpen)?412:0)),visibleHeight=Math.max(0,h-TOP_HEIGHT-MAIN_TITLEBAR_HEIGHT);
- mainViewport.setBounds({x:sidebarWidth,y:TOP_HEIGHT+MAIN_TITLEBAR_HEIGHT,width:visibleWidth,height:visibleHeight});
+ const visibleWidth=Math.max(0,w-sidebarWidth-((notificationsOpen||quickToastOpen)?412:0)),visibleHeight=Math.max(0,h-TOP_HEIGHT-(compactFrame?0:MAIN_TITLEBAR_HEIGHT));
+ mainViewport.setBounds({x:sidebarWidth,y:TOP_HEIGHT+(compactFrame?0:MAIN_TITLEBAR_HEIGHT),width:visibleWidth,height:visibleHeight});
  const view=live.get(activeId);
  if(view){
   // Fill the visible viewport exactly: no negative offsets, clipped gray gaps,
@@ -1340,6 +1341,13 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
    store.setMeta('sidebarCustomWidth',String(sidebarWidth));
    if(sidebarWidth>=220)store.setMeta('sidebarLastExpandedWidth',String(sidebarWidth));
    return sidebarWidth;
+  }
+  else if(action==='compact-frame'){
+   compactFrame=!!arg;
+   // Keep the narrow blue rail; restore the user's normal sidebar width on exit.
+   if(compactFrame)setSidebarWidth(true);
+   else setSidebarWidth(false);
+   bounds();return true;
   }
   else if(action==='sidebar'){setSidebarWidth(!!arg);}
   else if(action==='recovery-window'){openRecoveryWindow();}
