@@ -14,14 +14,15 @@ function setCompactFrame(next){
   document.body.classList.toggle('hexora-compact-frame',frameCompact);
  });
 }
-let lastFramePointer=null,frameFlickCooldownUntil=0;
+let lastFramePointer=null,frameFlickReady=true;
 let frameFlickDistance=0,frameFlickStartedAt=0;
 document.addEventListener('pointermove',event=>{
  if(event.pointerType==='touch')return;
  const now=performance.now();
  const previous=lastFramePointer;
  lastFramePointer={x:event.clientX,y:event.clientY,time:now};
- if(frameCompact||now<frameFlickCooldownUntil||!previous)return;
+ if(!previous)return;
+ if(event.clientY>=85)frameFlickReady=true;
  const dt=now-previous.time;
  if(dt<=0||dt>180){
   frameFlickDistance=0;
@@ -40,12 +41,12 @@ document.addEventListener('pointermove',event=>{
  }
  const duration=now-frameFlickStartedAt;
  const velocity=duration>0?frameFlickDistance/duration:0;
- if(event.clientY<=35&&frameFlickDistance>=34&&duration<=280&&
+ if(frameFlickReady&&event.clientY<=35&&frameFlickDistance>=34&&duration<=280&&
     (velocity>=0.18||frameFlickDistance>=65)){
   frameFlickDistance=0;
   frameFlickStartedAt=0;
-  frameFlickCooldownUntil=now+900;
-  setCompactFrame(true);
+  frameFlickReady=false;
+  setCompactFrame(!frameCompact);
  }
 },{passive:true});
 // The retained rail provides a predictable mouse-only way back.
