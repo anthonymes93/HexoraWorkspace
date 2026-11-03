@@ -2,20 +2,20 @@
 <html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' https: http: data:"><title>Hexora Workspace</title><link rel="stylesheet" href="style.css"><style>.hexora-apps{padding:3px 10px 13px}.hexora-apps button{display:flex;align-items:center;gap:11px;width:100%;border:1px solid #685b874d;background:#9e86dc16;color:inherit;border-radius:9px;padding:11px 12px;cursor:pointer;text-align:left;font-size:13px}.hexora-apps button:hover{background:#9e86dc32}.hexora-apps button span:nth-child(2){flex:1}</style><link rel="stylesheet" href="project-picker.css"></head>
 <body>
 <div class="rail">
-  <div class="logo" title="Hexora">✦</div>
-  <button id="toggle-sidebar" class="railbtn selected" title="Toggle workspaces">▦</button>
-  <button id="search-rail" class="railbtn" title="Search open tabs">⌕</button>
-  <button id="new-rail" class="railbtn" title="New ChatGPT tab">＋</button>
-  <button id="native-code-rail" class="railbtn" title="VS Code: choose project (Ctrl-click: blank fast tab; Shift-click: repair active VS Code)">⌘</button>
-  <button id="notion-rail" class="railbtn" type="button" title="New Notion Action Center tab" aria-label="Open Notion Action Center in a new tab"><span class="notion-mark" aria-hidden="true">N</span></button>
-  <button id="split-rail" class="railbtn" title="Split view — coming soon" disabled>◫</button>
-  <button id="recovery-rail" class="railbtn" title="Encrypted backups">⛨</button>
-  <button id="vault-rail" class="railbtn" title="Password vault" aria-label="Password vault">♢</button>
-  <button id="history-rail" class="railbtn" title="Browsing history" aria-label="Browsing history">◷</button>
-  <button id="statistics-rail" class="railbtn" title="Statistics and task manager">▥</button>
-  <button id="extensions-rail" class="railbtn" title="Chrome extensions" aria-label="Chrome extensions"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 13.5V18a2 2 0 0 1-2 2h-4.5a2.5 2.5 0 1 0-5 0H6a2 2 0 0 1-2-2v-4.5a2.5 2.5 0 1 0 0-5V6a2 2 0 0 1 2-2h4.5a2.5 2.5 0 1 0 5 0H18a2 2 0 0 1 2 2v2.5a2.5 2.5 0 1 0 0 5Z"/></svg></button>
-  <button id="theme-rail" class="railbtn" title="Appearance / themes">◐</button>
-  <button id="settings-rail" class="railbtn bottom" title="Open ChatGPT in browser">↗</button>
+  <div class="logo" title="Hexora"><svg class="rail-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 2 2.6 7.4L22 12l-7.4 2.6L12 22l-2.6-7.4L2 12l7.4-2.6Z"/></svg></div>
+  <button id="toggle-sidebar" class="railbtn selected" title="Toggle workspaces"><svg class="rail-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></button>
+  <button id="search-rail" class="railbtn" title="Search open tabs"><svg class="rail-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.8" cy="10.8" r="6.5"/><path d="m16 16 5 5"/></svg></button>
+  <button id="new-rail" class="railbtn" title="New ChatGPT tab"><svg class="rail-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v16M4 12h16"/></svg></button>
+  <button id="native-code-rail" class="railbtn" title="VS Code: choose project (Ctrl-click: blank fast tab; Shift-click: repair active VS Code)"><svg class="rail-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="8" height="8" rx="2"/><rect x="13" y="3" width="8" height="8" rx="2"/><rect x="3" y="13" width="8" height="8" rx="2"/><rect x="13" y="13" width="8" height="8" rx="2"/></svg></button>
+  <button id="notion-rail" class="railbtn" type="button" title="New Notion Action Center tab" aria-label="Open Notion Action Center in a new tab"><svg class="rail-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 17V8l8 9V8"/></svg></button>
+  <button id="split-rail" class="railbtn" title="Split view — coming soon" disabled><svg class="rail-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M12 4v16"/></svg></button>
+  <button id="recovery-rail" class="railbtn" title="Encrypted backups"><svg class="rail-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 20 5v6c0 5-3.2 8.4-8 11-4.8-2.6-8-6-8-11V5Z"/><path d="M8 12h8m-4-4v8"/></svg></button>
+  <button id="vault-rail" class="railbtn" title="Password vault" aria-label="Password vault"><svg class="rail-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 20 12l-8 9-8-9Z"/><path d="M12 7v10"/></svg></button>
+  <button id="history-rail" class="railbtn" title="Browsing history" aria-label="Browsing history"><svg class="rail-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 6v6l4 2"/></svg></button>
+  <button id="statistics-rail" class="railbtn" title="Statistics and task manager"><svg class="rail-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V11m5 9V5m5 15v-7m5 7V8"/></svg></button>
+  <button id="extensions-rail" class="railbtn" title="Chrome extensions" aria-label="Chrome extensions"><svg class="rail-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3h6v5h4v5h-4v8H9v-8H5V8h4Z"/></svg></button>
+  <button id="theme-rail" class="railbtn" title="Appearance / themes"><svg class="rail-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 0 0 18Z"/></svg></button>
+  <button id="settings-rail" class="railbtn bottom" title="Open ChatGPT in browser"><svg class="rail-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M13 4h7v7m0-7-9 9"/><path d="M19 13v6H5V5h6"/></svg></button>
 </div>
 <aside class="sidebar" id="sidebar">
   <div class="sidebar-title"><strong>Hexora <em>Workspace</em></strong><div class="sidebar-title-actions"><button id="add-workspace" title="New workspace">＋</button><button id="collapse-sidebar" title="Collapse workspace panel" aria-label="Collapse workspace panel">‹</button></div></div>
