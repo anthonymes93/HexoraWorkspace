@@ -105,6 +105,7 @@ let quitting=false;
 const LAYOUT_KEY='detachedWindowIds';
 function savedDetachedIds(){try{const values=JSON.parse(store.getMeta(LAYOUT_KEY)||'[]');return Array.isArray(values)?values.filter(x=>Number.isSafeInteger(x)&&x>0).slice(0,32):[];}catch{return [];}}
 function setDetachedSaved(id,present){const ids=new Set(savedDetachedIds());if(present)ids.add(id);else ids.delete(id);store.setMeta(LAYOUT_KEY,JSON.stringify([...ids]));}
+let dualPopupHandler=null;
 let mainViewport=null,win,store,activeId=null,sidebarWidth=330,live=new Map(),favicons=new Map(),loading=new Map(),stateTimer=null,modalVisible=false,recoveryPassword=null,recoveryDir=null,recoveryTimer=null,recoveryBusy=false,lastBackup=null;
 const extensionPartition='persist:hexora-chatgpt';
 let deepLinkReady=false;
@@ -332,7 +333,13 @@ function wire(t){const view=new WebContentsView({webPreferences:{partition:'pers
   wc.executeJavaScript(CHATGPT_DRAFT_GUARD.replace('__HEXORA_SAVED_DRAFT__',initial)).catch(err=>console.warn('Draft restore unavailable:',err.message));
  });
  wc.on('render-process-gone',()=>{loading.delete(t.id);emit();});
- wc.setWindowOpenHandler(({url,frameName})=>/^https:\/\//.test(url)?{action:'allow',overrideBrowserWindowOptions:{show:!/^hexora-dual-pair-/.test(frameName||''),width:540,height:750,autoHideMenuBar:true,webPreferences:{partition:'persist:hexora-chatgpt',sandbox:true,contextIsolation:true,nodeIntegration:false,webSecurity:true,backgroundThrottling:false}}}:{action:'deny'});
+ wc.setWindowOpenHandler(({url,frameName})=>{
+  if(!/^https:\/\//.test(url))return {action:'deny'};
+  if(/^hexora-dual-pair-/.test(frameName||'')){
+   return dualPopupHandler?.({opener:wc,url,frameName})||{action:'deny'};
+  }
+  return {action:'allow',overrideBrowserWindowOptions:{width:540,height:750,autoHideMenuBar:true,webPreferences:{partition:'persist:hexora-chatgpt',sandbox:true,contextIsolation:true,nodeIntegration:false,webSecurity:true}}};
+ });
  wc.loadURL(safeUrl(t.url)).catch(err=>console.error('Tab load error',err));
  return view;
 }
@@ -1021,6 +1028,7 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
  ipcMain.handle('native-code:detach',async event=>{if(event.sender!==win.webContents)throw Error('Invalid caller');if(!isCodeTab(store.get(activeId)))return {detached:false};const entry=activeCodeEntry();if(!entry?.ready)return {detached:false};nativeCodeCommand('TRACE BEFORE_DETACH');nativeCodeCommand('DIAG BEFORE_DETACH');return {detached:detachTab(activeId)};});
  ipcMain.handle('native-code:toggle',async event=>{if(event.sender!==win.webContents)throw Error('Invalid caller');return openCodeTab(store.get(activeId)?.workspace||'web');});
  const openDualMirror=require('./dual-mirror').createDualMirror({getActiveId:()=>activeId,getTab:id=>store.get(id),getView:id=>live.get(id),isCodeTab,getMirrorUrl:id=>store.getMeta('dualPairUrl:'+id),getChatgptSource:()=>{for(const view of live.values()){const wc=view.webContents;if(!wc.isDestroyed()&&/^https:\/\/chatgpt\.com(?:\/|$)/.test(wc.getURL()))return wc;}return null;}});
+ dualPopupHandler=openDualMirror.handlePopup;
  ipcMain.handle('tabs:page',(_e,arg)=>sendPage(arg));
  ipcMain.handle('tabs:search',(_e,term)=>store.search(term,50).map(pageRow));
  ipcMain.handle('tabs:lookup',(_e,id)=>{const row=store.get(Number(id));return row?pageRow(row):null;});
