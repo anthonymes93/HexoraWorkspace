@@ -1418,6 +1418,8 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
  setInterval(syncNativeCodeProjects,1000).unref();
  win.on('closed',()=>{if(nativeCodeLifecycleTimer){clearTimeout(nativeCodeLifecycleTimer);nativeCodeLifecycleTimer=null;}quitting=true;if(nativeCodeInstaller&&nativeCodeInstaller.exitCode===null)nativeCodeInstaller.kill();stopAllNativeCode();for(const folder of [...extensionPopups.keys()])closeExtensionPopup(folder);if(sidebarAnimation)clearInterval(sidebarAnimation);for(const popup of detached.values())if(!popup.isDestroyed())popup.close();detached.clear();clearInterval(recoveryTimer);recoveryPassword=null;clearTimeout(stateTimer);win=null;for(const id of Array.from(live.keys()))discard(id);vault?.lock();tabStoreClosing=true;store.close();});
  // Register every IPC handler before the renderer can issue actions.
+ const stopCornerGoogleGesture=require('./corner-google-gesture').startCornerGoogleGesture();
+ win.once('closed',stopCornerGoogleGesture);
  win.loadFile('toolbar.html',{query:isDevelopment?{hexoraDev:'1'}:{}}).catch(err=>console.error('[Hexora] Toolbar load failed:',err));
 });
 app.whenReady().then(startStableUpdater).catch(error=>console.error('[updates] startup:',error));
