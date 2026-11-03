@@ -166,7 +166,10 @@ function render(p){
  if(p.activeId&&p.activePanelMode){const desired=p.activePanelMode==='wide';if(sidebarOpen!==desired){sidebarOpen=desired;updateSidebar(false);}}
  const workspace=workspaces.find(w=>w.id===activeWorkspace)||workspaces[0];
  $('current-workspace').textContent=workspace.emoji+'  '+workspace.name;
+ // Ensure the experimental entry is visible even if an older saved workspace list was restored.
+ if(!workspaces.some(w=>w.id==='dual'))workspaces.push({id:'dual',name:'Dual Workspace (Test)',emoji:'◫'});
  const container=$('workspaces');container.replaceChildren();
+ console.info('[Hexora Dual Workspace]',{workspaceIds:workspaces.map(w=>w.id),savedIds:(()=>{try{return JSON.parse(localStorage.getItem('hexora-workspace-settings')||'{}').workspaces?.map(w=>w.id)||[];}catch{return ['invalid saved JSON'];}})(),renderedAt:Date.now()});
  for(const w of orderSidebarItems(workspaces,sidebarWorkspaceOrderKey,w=>w.id)){
   const el=document.createElement('button');el.className='workspace'+(w.id===activeWorkspace?' selected':'');
   const symbol=document.createElement('span');symbol.className='emoji';symbol.textContent=w.emoji;
