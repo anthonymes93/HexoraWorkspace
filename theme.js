@@ -14,6 +14,8 @@
     }
     const status=document.getElementById('appearance-status');
     if(status)status.textContent='Active theme: '+({classic:'Classic',obsidian:'Obsidian',white:'White',omega:'Omega'}[theme]);
+    const omegaSection=document.getElementById('omega-color-section');
+    if(omegaSection)omegaSection.hidden=theme!=='omega';
   };
   const omegaKey='hexora-omega-color';
   const omegaColors=[["blue","Blue"],["red","Red"],["orange","Orange"],["amber","Amber"],["green","Green"],["teal","Teal"],["cyan","Cyan"],["purple","Purple"],["pink","Pink"],["indigo","Indigo"]];
@@ -39,7 +41,6 @@
   let savedOmega='blue';try{savedOmega=omegaSafe(localStorage.getItem(omegaKey));}catch{}
   applyOmega(savedOmega);
   const updateOmegaVisibility=()=>{const section=document.getElementById('omega-color-section');if(section)section.hidden=document.documentElement.dataset.hexoraTheme!=='omega';};
-  document.querySelectorAll('[data-theme-choice]').forEach(button=>button.addEventListener('click',updateOmegaVisibility));
   updateOmegaVisibility();
 
   const accents=[
