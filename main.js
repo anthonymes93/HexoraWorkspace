@@ -114,6 +114,7 @@ const LAYOUT_KEY='detachedWindowIds';
 function savedDetachedIds(){try{const values=JSON.parse(store.getMeta(LAYOUT_KEY)||'[]');return Array.isArray(values)?values.filter(x=>Number.isSafeInteger(x)&&x>0).slice(0,32):[];}catch{return [];}}
 function setDetachedSaved(id,present){const ids=new Set(savedDetachedIds());if(present)ids.add(id);else ids.delete(id);store.setMeta(LAYOUT_KEY,JSON.stringify([...ids]));}
 let dualPopupHandler=null;
+let tabLoadingOverlay=null,tabLoadingFor=null,tabLoadingTimer=null;
 let mainViewport=null,win,store,activeId=null,sidebarWidth=324,live=new Map(),favicons=new Map(),loading=new Map(),stateTimer=null,modalVisible=false,notificationsOpen=false,quickToastOpen=false,recoveryPassword=null,recoveryDir=null,recoveryTimer=null,recoveryBusy=false,lastBackup=null;
 const extensionPartition='persist:hexora-chatgpt';
 let deepLinkReady=false;
@@ -388,7 +389,7 @@ function wire(t){const view=new WebContentsView({webPreferences:{partition:'pers
  wc.on('did-navigate',()=>{scrollbarCSSKeys.delete(wc);applyHexoraWebsiteScrollbars(wc);if(tabStoreClosing||quitting)return;if(favicons.get(t.id)?.origin!==originOf(wc.getURL()))favicons.delete(t.id);update();store.recordVisit(wc.getURL(),wc.getTitle(),t.id);});
  wc.on('did-navigate-in-page',()=>{if(tabStoreClosing||quitting)return;update();store.recordVisit(wc.getURL(),wc.getTitle(),t.id);});
  wc.on('did-start-loading',()=>{loading.set(t.id,true);emit();});
- wc.on('did-stop-loading',()=>{loading.delete(t.id);emit();});
+ wc.on('did-stop-loading',()=>{loading.delete(t.id);emit();if(tabLoadingFor===t.id)setTimeout(()=>hideNewTabLoader(t.id),180);});
  const draftKey='chatgptDraft:'+t.id;
  let draftBusy=false;
  const draftTimer=setInterval(async()=>{
@@ -462,6 +463,37 @@ function wire(t){const view=new WebContentsView({webPreferences:{partition:'pers
 }
 function toModel(r){return{id:r.id,url:isCodeTab(r)?r.url:safeUrl(r.url),title:r.title||'ChatGPT',workspace:r.workspace||'web',pinned:!!r.pinned,muted:!!r.muted,lastActive:r.last_active??r.lastActive??Date.now(),ordinal:r.ordinal||r.id};}
 function discard(id){const view=live.get(id);if(!view)return;live.delete(id);const pop=detached.get(id);if(pop&&!pop.isDestroyed())pop.contentView.removeChildView(view);else if(mainViewport)mainViewport.removeChildView(view);loading.delete(id);view.webContents.close();}
+// Native WebContentsView overlays the renderer, so the loading animation must
+// also be a WebContentsView rather than an HTML element in the toolbar.
+function showNewTabLoader(id){
+ if(!mainViewport)return;
+ clearTimeout(tabLoadingTimer);
+ if(tabLoadingOverlay){mainViewport.removeChildView(tabLoadingOverlay);tabLoadingOverlay.webContents.close();}
+ tabLoadingFor=id;
+ const overlay=new WebContentsView({webPreferences:{sandbox:true,contextIsolation:true,nodeIntegration:false}});
+ tabLoadingOverlay=overlay;
+ overlay.setBackgroundColor('#10162a');
+ const html=`<!doctype html><html><head><meta charset="utf-8"><style>
+ *{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;background:radial-gradient(ellipse at 50% 43%,#243b70 0%,#121b35 38%,#0c1020 85%);color:#eaf0ff;font-family:system-ui,Segoe UI,sans-serif;overflow:hidden}
+ body{display:grid;place-items:center}.wrap{text-align:center}.mark{width:70px;height:70px;margin:0 auto 24px;position:relative;display:grid;place-items:center}
+ .ring{position:absolute;inset:0;border:2px solid #5676d344;border-top-color:#8aaaff;border-radius:50%;animation:spin 1.1s linear infinite}
+ .diamond{width:29px;height:29px;transform:rotate(45deg);border:3px solid #a9baff;border-radius:6px;box-shadow:0 0 32px #6489ff77;animation:pulse 1.2s ease-in-out infinite}
+ h1{font-size:19px;font-weight:650;letter-spacing:.12em;margin:0 0 8px}p{font-size:12px;letter-spacing:.14em;color:#9eaccd;margin:0}
+ @keyframes spin{to{transform:rotate(360deg)}}@keyframes pulse{50%{transform:rotate(45deg) scale(.78);opacity:.55}}
+ @media(prefers-reduced-motion:reduce){*{animation:none!important}}
+ </style></head><body><div class="wrap"><div class="mark"><div class="ring"></div><div class="diamond"></div></div><h1>HEXORA</h1><p>OPENING CHATGPT</p></div></body></html>`;
+ overlay.webContents.loadURL('data:text/html;charset=utf-8,'+encodeURIComponent(html)).catch(()=>{});
+ mainViewport.addChildView(overlay);
+ bounds();
+ // Prevent a stalled connection from leaving the loader indefinitely.
+ tabLoadingTimer=setTimeout(()=>hideNewTabLoader(id),12000);
+}
+function hideNewTabLoader(id){
+ if(tabLoadingFor!==id)return;
+ clearTimeout(tabLoadingTimer);tabLoadingTimer=null;
+ const overlay=tabLoadingOverlay;tabLoadingOverlay=null;tabLoadingFor=null;
+ if(overlay&&mainViewport){mainViewport.removeChildView(overlay);if(!overlay.webContents.isDestroyed())overlay.webContents.close();}
+}
 // Clip the native web view to the available viewport while keeping its internal layout stable.
 // The right edge stays anchored to the window; the left portion is revealed/hidden by the panel.
 function bounds(){
@@ -469,6 +501,7 @@ function bounds(){
  const [w,h]=win.getContentSize();
  const visibleWidth=Math.max(0,w-sidebarWidth-((notificationsOpen||quickToastOpen)?412:0)),visibleHeight=Math.max(0,h-TOP_HEIGHT-MAIN_TITLEBAR_HEIGHT);
  mainViewport.setBounds({x:sidebarWidth,y:TOP_HEIGHT+MAIN_TITLEBAR_HEIGHT,width:visibleWidth,height:visibleHeight});
+ if(tabLoadingOverlay)tabLoadingOverlay.setBounds({x:0,y:0,width:visibleWidth,height:visibleHeight});
  const view=live.get(activeId);
  if(view){
   // Fill the visible viewport exactly: no negative offsets, clipped gray gaps,
@@ -512,6 +545,7 @@ function activate(id){
  if(isCodeTab(store.get(activeId))&&activeId!==row.id)hideNativeCode(activeId);
  if(!isCodeTab(row))store.setMeta('nativeCodeLastWebId',String(row.id));
  for(const [otherId,view] of live)if(otherId!==row.id&&!detached.has(otherId))mainViewport.removeChildView(view);
+ if(tabLoadingFor&&tabLoadingFor!==row.id)hideNewTabLoader(tabLoadingFor);
  activeId=row.id;store.setMeta('workspaceActive:'+row.workspace,String(row.id));const t=toModel(row);t.lastActive=Date.now();store.save(t);store.setMeta('activeId',String(row.id));
  if(isCodeTab(row)){if(!modalVisible)showNativeCode();else hideNativeCode();evict();emit();return true;}
  let view=live.get(row.id);if(!view){view=wire(t);live.set(row.id,view);}
@@ -701,7 +735,7 @@ function startNativeCodeHost(tabId,entry){
 function evict(){if(live.size<=MAX_LIVE)return;const candidates=Array.from(live.keys()).filter(id=>id!==activeId&&!detached.has(id)&&!store.get(id)?.pinned);
  candidates.sort((a,b)=>(store.get(a)?.last_active||0)-(store.get(b)?.last_active||0));
  while(live.size>MAX_LIVE&&candidates.length)discard(candidates.shift());}
-function newTab(workspace='web',url=HOME,afterId=null){const id=store.nextId(),t={id,title:'New tab',url:safeUrl(url),workspace:typeof workspace==='string'?workspace:'web',pinned:false,muted:false,lastActive:Date.now(),ordinal:id};if(afterId&&store.get(afterId)?.workspace===t.workspace)store.insertAfter(t,afterId);else store.save(t);activate(id);return id;}
+function newTab(workspace='web',url=HOME,afterId=null){const id=store.nextId(),t={id,title:'New tab',url:safeUrl(url),workspace:typeof workspace==='string'?workspace:'web',pinned:false,muted:false,lastActive:Date.now(),ordinal:id};if(afterId&&store.get(afterId)?.workspace===t.workspace)store.insertAfter(t,afterId);else store.save(t);activate(id);if(safeUrl(url)===HOME)showNewTabLoader(id);return id;}
 function closeTab(id){id=Number(id);favicons.delete(id);const closing=store.get(id);if(!closing)return;
  if(isCodeTab(closing)){
   stopNativeCode(id);
