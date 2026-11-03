@@ -1729,13 +1729,52 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&vaultOpen)vaultClos
 // Hexora Apps: native multi-account email companion window.
 $('open-email-app')?.addEventListener('click',()=>window.hexora.email.open().catch(err=>alert('Email: '+err.message)));
 
-/* Header notifications: accessible shell, no fabricated alerts. */
+/* Omega notification drawer. All items are clearly marked as sample data. */
 (() => {
- const wrapper=$('hexora-notifications'),bell=$('notifications-bell'),panel=$('notifications-panel'),close=$('notifications-close');
- if(!wrapper||!bell||!panel)return;
- const setOpen=open=>{panel.hidden=!open;bell.setAttribute('aria-expanded',String(open));if(open)close?.focus();};
+ const wrapper=$('hexora-notifications'),bell=$('notifications-bell'),panel=$('notifications-panel'),close=$('notifications-close'),feed=$('notifications-feed');
+ if(!wrapper||!bell||!panel||!feed)return;
+ const samples=[
+  {id:1,kind:'updates',icon:'◈',source:'GitHub',title:'Pull request ready for review',detail:'Omega theme color palette · #101',time:'2m',unread:true},
+  {id:2,kind:'system',icon:'✓',source:'Hexora',title:'Workspace backup completed',detail:'Your workspace settings were saved',time:'14m',unread:true},
+  {id:3,kind:'updates',icon:'▣',source:'Notion',title:'Action Center updated',detail:'Three tasks added to your project board',time:'38m',unread:true},
+  {id:4,kind:'updates',icon:'▶',source:'YouTube',title:'New video in your subscriptions',detail:'Building a better daily workflow',time:'2h',unread:false},
+  {id:5,kind:'system',icon:'✦',source:'Hexora',title:'A new version is available',detail:'Performance and interface improvements',time:'4h',unread:false},
+  {id:6,kind:'system',icon:'◷',source:'Reminder',title:'Focus block starts soon',detail:'Your next scheduled work session',time:'9h',unread:false}
+ ];
+ let filter='all';
+ const render=()=>{
+  feed.replaceChildren();
+  const filtered=samples.filter(item=>filter==='all'||item.kind===filter);
+  if(!filtered.length){const empty=document.createElement('p');empty.className='notifications-feed-empty';empty.textContent='Nothing here yet.';feed.append(empty);return;}
+  for(const item of filtered){
+   const row=document.createElement('div');row.className='notification-item'+(item.unread?' is-unread':'');
+   const symbol=document.createElement('span');symbol.className='notification-item-icon';symbol.textContent=item.icon;
+   const content=document.createElement('div');content.className='notification-item-content';
+   const meta=document.createElement('div');meta.className='notification-item-meta';
+   const source=document.createElement('span');source.textContent=item.source;
+   const time=document.createElement('span');time.textContent=item.time;
+   meta.append(source,time);
+   const title=document.createElement('strong');title.textContent=item.title;
+   const detail=document.createElement('p');detail.textContent=item.detail;
+   content.append(meta,title,detail);row.append(symbol,content);
+   if(item.unread){const dot=document.createElement('span');dot.className='notification-item-dot';row.append(dot);}
+   feed.append(row);
+  }
+ };
+ const setOpen=open=>{
+  panel.hidden=!open;bell.setAttribute('aria-expanded',String(open));
+  document.body.classList.toggle('notifications-drawer-open',open);
+  window.hexora?.action('notifications-drawer',open);
+  if(open){render();close?.focus();}
+ };
  bell.addEventListener('click',()=>setOpen(panel.hidden));
  close?.addEventListener('click',()=>{setOpen(false);bell.focus();});
  document.addEventListener('pointerdown',event=>{if(!panel.hidden&&!wrapper.contains(event.target))setOpen(false);});
  document.addEventListener('keydown',event=>{if(event.key==='Escape'&&!panel.hidden){event.preventDefault();setOpen(false);bell.focus();}});
+ document.querySelectorAll('[data-notification-filter]').forEach(button=>button.addEventListener('click',()=>{
+  filter=button.dataset.notificationFilter;
+  document.querySelectorAll('[data-notification-filter]').forEach(b=>b.classList.toggle('selected',b===button));
+  render();
+ }));
+ $('notifications-mark-read')?.addEventListener('click',()=>{samples.forEach(item=>item.unread=false);render();});
 })();
