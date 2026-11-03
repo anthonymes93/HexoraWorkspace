@@ -2,7 +2,7 @@
 const {BrowserWindow}=require('electron');
 
 // One user-input leader at a time: programmatic scrolling cannot echo back.
-function createDualMirror({getActiveId,getTab,getView,isCodeTab}){
+function createDualMirror({getActiveId,getTab,getView,isCodeTab,getMirrorUrl}){
  let state=null;
  const read='(()=>{const e=document.scrollingElement||document.documentElement;return {x:e.scrollLeft,y:e.scrollTop,mx:Math.max(0,e.scrollWidth-e.clientWidth),my:Math.max(0,e.scrollHeight-e.clientHeight)};})()';
  const scroll=position=>`(()=>{const e=document.scrollingElement||document.documentElement;const x=${position.rx}*Math.max(0,e.scrollWidth-e.clientWidth),y=${position.ry}*Math.max(0,e.scrollHeight-e.clientHeight);const previous=e.style.scrollBehavior;e.style.scrollBehavior='auto';e.scrollTo({left:x,top:y,behavior:'instant'});e.style.scrollBehavior=previous;})()`;
@@ -26,11 +26,12 @@ function createDualMirror({getActiveId,getTab,getView,isCodeTab}){
    if(!row||row.workspace!=='dual'||isCodeTab(row))return;
    const source=getView(active)?.webContents,url=source?.getURL();
    if(!source||source.isDestroyed()||!/^https?:\/\//.test(url))return;
-   if(current.id===active&&current.url===url&&current.source===source)return;
-   current.id=active;current.url=url;current.source=source;current.leader=null;current.last=null;
+   const pairedUrl=getMirrorUrl(active)||url;
+   if(current.id===active&&current.url===pairedUrl&&current.source===source)return;
+   current.id=active;current.url=pairedUrl;current.source=source;current.leader=null;current.last=null;
    detach();watch(source,'source');watch(target,'target');
    current.loading=true;
-   try{await target.loadURL(url);}catch(error){console.warn('[Dual Mirror] Navigation failed:',error.message);}finally{current.loading=false;}
+   try{await target.loadURL(pairedUrl);}catch(error){console.warn('[Dual Mirror] Navigation failed:',error.message);}finally{current.loading=false;}
   };
   const sync=async()=>{
    if(current.busy||popup.isDestroyed())return;
