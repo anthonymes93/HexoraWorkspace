@@ -905,3 +905,6 @@ body.sidebar-trim-workspace-details:not(.sidebar-icons-only) .workspace{gap:6px}
 .top-main>.top .actions>.pill.primary{padding-left:12px;padding-right:12px}
 .top-main>.top .header-favorites{margin-right:2px}
 @media(max-width:1050px){.top-main>.top{padding-left:12px;padding-right:12px}.top-main>.top .actions{gap:6px}}
+
+/* Raise title and subtitle together without moving tabs or action buttons. */
+.top-main>.top>div:first-child{transform:translateY(-5px)}
