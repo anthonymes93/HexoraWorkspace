@@ -1108,3 +1108,22 @@ body.notifications-drawer-open .top-main{background:var(--hexora-frame-blue,#1c3
 .notification-quick-actions{display:flex;gap:12px;margin-top:9px}
 .notification-quick-actions button{border:0;padding:0;background:transparent;color:#b3ccff;font-size:10px;cursor:pointer}
 .notification-quick-actions button:hover{text-decoration:underline}
+
+/* Omega custom reminders: match the active frame palette, not Windows' generic toast. */
+.hexora-toast-host{position:fixed;z-index:180;right:14px;top:125px;width:380px;max-width:calc(100vw - 28px);pointer-events:none;opacity:0;transform:translateX(24px) scale(.98);transition:opacity 260ms ease,transform 300ms cubic-bezier(.2,.8,.2,1)}
+.hexora-toast-host.is-visible{opacity:1;transform:translateX(0) scale(1);pointer-events:auto}
+.hexora-toast-card{border:1px solid var(--hexora-frame-blue-light,#405a9b);border-radius:16px;background:linear-gradient(145deg,#263451,#141b2c 52%,#101624);box-shadow:0 22px 55px #000b,0 0 0 1px #ffffff0a;overflow:hidden;padding:17px;color:#f3f6ff}
+.hexora-toast-card:before{content:"";display:block;height:3px;background:var(--hexora-frame-blue-light,#405a9b);position:absolute;top:0;left:16px;right:16px;border-radius:0 0 4px 4px}
+.hexora-toast-heading{display:flex;align-items:center;gap:11px}
+.hexora-toast-icon{display:grid;place-items:center;width:40px;height:40px;flex:0 0 40px;border-radius:12px;background:var(--hexora-frame-blue,#1c347f);color:white;font-size:24px;box-shadow:inset 0 0 0 1px #ffffff30}
+.hexora-toast-label{display:flex;flex:1;flex-direction:column;gap:4px}
+.hexora-toast-label strong{font-size:14px}
+.hexora-toast-label span{font-size:9px;letter-spacing:1px;color:#aabbdc}
+.hexora-toast-close{align-self:flex-start;width:25px;height:25px;border:0;border-radius:7px;background:#ffffff13;color:#c9d5ee;font-size:20px;cursor:pointer}
+.hexora-toast-close:hover{background:#ffffff28}
+.hexora-toast-card p{font-size:14px;line-height:1.5;margin:16px 2px 18px;overflow-wrap:anywhere}
+.hexora-toast-actions{display:flex;gap:9px}
+.hexora-toast-actions button{flex:1;border:1px solid #ffffff30;border-radius:9px;padding:10px 8px;background:#ffffff0b;color:#e3ebfc;font-size:12px;cursor:pointer}
+.hexora-toast-actions button:last-child{background:var(--hexora-frame-blue,#1c347f);border-color:var(--hexora-frame-blue-light,#405a9b);color:#fff}
+.hexora-toast-actions button:hover{filter:brightness(1.25)}
+@media(prefers-reduced-motion:reduce){.hexora-toast-host{transition:none!important;transform:none!important}}
