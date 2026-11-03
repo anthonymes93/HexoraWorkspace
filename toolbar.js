@@ -44,7 +44,7 @@ document.addEventListener('pointermove',event=>{
  const speed=duration>0?frameFlickDistance/duration:0;
  // Detect before entering Electron's draggable titlebar, which can swallow
  // pointer events. Hover alone has no upward distance and never triggers.
- if(frameFlickReady&&event.clientY<=52&&frameFlickDistance>=20&&
+ if(frameFlickReady&&event.clientY<=2&&frameFlickDistance>=20&&
     duration<=380&&(speed>=0.12||frameFlickDistance>=42)){
   frameFlickDistance=0;frameFlickStartedAt=0;
   frameFlickReady=false;
