@@ -1,5 +1,5 @@
 'use strict';
-const {BrowserWindow,WebContentsView}=require('electron');
+const {BrowserWindow}=require('electron');
 
 // Deliberately ephemeral test feature: two webContents with the same session,
 // not one view attached to multiple windows.
@@ -12,12 +12,12 @@ function createDualMirror({getActiveId,getTab,getView,isCodeTab}){
   const id=getActiveId(),tab=getTab(id);
   if(!tab||tab.workspace!=='dual'||isCodeTab(tab))return false;
   if(state&&!state.popup.isDestroyed()){state.popup.focus();return true;}
-  const popup=new BrowserWindow({width:960,height:720,minWidth:420,minHeight:320,title:'Hexora · Dual Workspace (Mirror Test)',backgroundColor:'#111215',autoHideMenuBar:true});
-  const view=new WebContentsView({webPreferences:{partition:'persist:hexora-chatgpt',sandbox:true,contextIsolation:true,nodeIntegration:false,webSecurity:true}});
-  view.setBackgroundColor('#111215');popup.contentView.addChildView(view);
-  const layout=()=>{if(!popup.isDestroyed()){const [width,height]=popup.getContentSize();view.setBounds({x:0,y:0,width,height});}};
-  popup.on('resize',layout);layout();
-  const current={popup,view,id:null,url:null,lastSource:null,lastMirror:null,busy:false,ignoreSourceUntil:0,ignoreMirrorUntil:0};state=current;
+  const popup=new BrowserWindow({width:960,height:720,minWidth:420,minHeight:320,title:'Hexora · Dual Workspace (Mirror Test)',backgroundColor:'#111215',autoHideMenuBar:true,webPreferences:{partition:'persist:hexora-chatgpt',sandbox:true,contextIsolation:true,nodeIntegration:false,webSecurity:true}});
+  // The mirror is a regular browser window, not a nested WebContentsView.
+  // This avoids a second native view obscuring a blank popup on Windows.
+  const target=popup.webContents;
+  const current={popup,id:null,url:null,lastSource:null,lastMirror:null,busy:false,ignoreSourceUntil:0,ignoreMirrorUntil:0};state=current;
+  target.on('did-fail-load',(_event,code,description,url,isMainFrame)=>{if(isMainFrame)console.error('[Dual Mirror] Load failed:',code,description,url);});
   const tick=async()=>{
    if(current.busy||popup.isDestroyed())return;
    current.busy=true;
@@ -27,10 +27,10 @@ function createDualMirror({getActiveId,getTab,getView,isCodeTab}){
      const source=getView(active)?.webContents,url=source?.getURL();
      if(source&&!source.isDestroyed()&&/^https?:\/\//.test(url)&&(current.id!==active||current.url!==url)){
       current.id=active;current.url=url;current.lastSource=null;current.lastMirror=null;current.ignoreSourceUntil=0;current.ignoreMirrorUntil=0;
-      await view.webContents.loadURL(url);
+      await target.loadURL(url);
      }
     }
-    const source=getView(current.id)?.webContents,target=view.webContents;
+    const source=getView(current.id)?.webContents;
     if(!source||source.isDestroyed()||target.isDestroyed()||target.isLoading()||source.isLoading())return;
     const [a,b]=await Promise.all([source.executeJavaScript(read),target.executeJavaScript(read)]);
     const now=Date.now();
@@ -54,7 +54,7 @@ function createDualMirror({getActiveId,getTab,getView,isCodeTab}){
    }catch(error){/* Some sites have inaccessible or non-scrollable contexts. */}
    finally{current.busy=false;}
   };
-  const timer=setInterval(tick,33);
+  const timer=setInterval(tick,50);
   popup.on('closed',()=>{clearInterval(timer);if(state===current)state=null;});
   void tick();return true;
  };
