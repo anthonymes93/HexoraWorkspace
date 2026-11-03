@@ -24,7 +24,7 @@ function createDualMirror({getActiveId,getTab,getView,isCodeTab}){
     const active=getActiveId(),row=getTab(active);
     if(row?.workspace==='dual'&&!isCodeTab(row)){
      const source=getView(active)?.webContents,url=source?.getURL();
-     if(source&&!source.isDestroyed()&&/^https?:\\/\\//.test(url)&&(current.id!==active||current.url!==url)){
+     if(source&&!source.isDestroyed()&&/^https?:\/\//.test(url)&&(current.id!==active||current.url!==url)){
       current.id=active;current.url=url;current.lastSource=null;current.lastMirror=null;
       await view.webContents.loadURL(url);
      }
