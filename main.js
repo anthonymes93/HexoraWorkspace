@@ -320,7 +320,7 @@ const HEXORA_SCROLLBAR_PALETTES={
 let websiteScrollbarTheme={theme:'classic',color:'blue'};
 function scrollbarColors(){
  return websiteScrollbarTheme.theme==='omega'
-  ?HEXORA_SCROLLBAR_PALETTES[websiteScrollbarTheme.color]||HEXORA_SCROLLBAR_PALETTES.blue
+  ?(websiteScrollbarTheme.thumb&&websiteScrollbarTheme.hover?[websiteScrollbarTheme.thumb,websiteScrollbarTheme.hover]:HEXORA_SCROLLBAR_PALETTES[websiteScrollbarTheme.color]||HEXORA_SCROLLBAR_PALETTES.blue)
   :['#405a9b','#628ce4'];
 }
 function websiteScrollbarCSS(){
@@ -1312,7 +1312,8 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
   else if(action==='scrollbar-theme'){
    const theme=arg?.theme==='omega'?'omega':'classic';
    const color=Object.hasOwn(HEXORA_SCROLLBAR_PALETTES,arg?.color)?arg.color:'blue';
-   websiteScrollbarTheme={theme,color};
+   const validHex=value=>typeof value==='string'&&/^#[0-9a-fA-F]{6}$/.test(value)?value:null;
+   websiteScrollbarTheme={theme,color,thumb:validHex(arg?.thumb),hover:validHex(arg?.hover)};
    for(const view of live.values())applyHexoraWebsiteScrollbars(view.webContents);
    return true;
   }
