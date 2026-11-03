@@ -794,7 +794,7 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
  syncNativeCodeProjects();
  sidebarWidth=Math.max(64,Math.min(560,Number(store.getMeta('sidebarCustomWidth'))||330));
  const mainTaskbar=safeTaskbarIdentity();
- win=new BrowserWindow({width:1360,height:900,minWidth:700,minHeight:400,title:isDevelopment?'Hexora Workspace [DEV]':'Hexora Workspace',icon:mainTaskbar?.iconPath,autoHideMenuBar:true,...(process.platform==='win32'?{titleBarStyle:'hidden',titleBarOverlay:{color:'#1d367d',symbolColor:'#ffffff',height:MAIN_TITLEBAR_HEIGHT}}:{}),backgroundColor:'#111215',webPreferences:{preload:path.join(__dirname,'preload.js'),contextIsolation:true,sandbox:true,nodeIntegration:false}});
+ win=new BrowserWindow({width:1360,height:900,minWidth:700,minHeight:400,title:isDevelopment?'Hexora Workspace [DEV]':'Hexora Workspace',icon:mainTaskbar?.iconPath,autoHideMenuBar:true,...(process.platform==='win32'?{titleBarStyle:'hidden',titleBarOverlay:{color:'#1c347f',symbolColor:'#ffffff',height:MAIN_TITLEBAR_HEIGHT}}:{}),backgroundColor:'#111215',webPreferences:{preload:path.join(__dirname,'preload.js'),contextIsolation:true,sandbox:true,nodeIntegration:false}});
  safeApplyTaskbar(win,mainTaskbar);
  if(isDevelopment){
   // A loaded HTML title may overwrite BrowserWindow.title; keep the native

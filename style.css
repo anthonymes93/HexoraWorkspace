@@ -854,3 +854,20 @@ body.sidebar-trim-workspace-details:not(.sidebar-icons-only) .workspace{gap:6px}
  .rail,.sidebar,.top-main{top:32px}
  #sidebar-resize-handle{top:32px}
 }
+
+/* Hexora Email-inspired continuous blue frame, without changing tab geometry. */
+:root{--hexora-frame-blue:#1c347f;--hexora-frame-blue-light:#405a9b}
+.main-titlebar-drag{background:var(--hexora-frame-blue)}
+.rail{background:var(--hexora-frame-blue);border-right:1px solid #ffffff1c}
+.rail .logo{background:transparent;color:#fff}
+.railbtn{color:#c5d0f4}
+.railbtn:hover{background:#ffffff25;color:#fff}
+.railbtn.selected{background:#ffffff30;color:#fff}
+.railbtn.selected::before{background:#d9dcff}
+.railbtn:focus-visible{outline-color:#fff}
+.top-main{background:#11131d}
+.tabsbar{background:var(--hexora-frame-blue);border-bottom:1px solid #ffffff1e}
+.tabsbar .tabs .tab{border-color:transparent;background:#ffffff0c;color:#dce5ff}
+.tabsbar .tabs .tab:hover{background:#ffffff1e}
+.tabsbar .tabs .tab.active,.tabsbar .tabs .tab.selected{background:var(--hexora-frame-blue-light);border-color:#ffffff24;color:#fff}
+.tabsbar button{color:#e1e8ff}
