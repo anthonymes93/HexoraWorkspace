@@ -98,7 +98,7 @@ function createDualMirror({getActiveId,getTab,getView,isCodeTab,getMirrorUrl,get
   detach(g);watch(g,source,'source');watch(g,entry.view.webContents,'target');resize(g);
  }
  async function sync(g){
-  if(g.busy||g.closed)return;g.busy=true;
+  if(g.busy||g.closed||g.window.isDestroyed()||!g.window.isVisible())return;g.busy=true;
   try{
    await select(g);
    const source=g.source,target=g.active?.view.webContents;
@@ -135,6 +135,14 @@ function createDualMirror({getActiveId,getTab,getView,isCodeTab,getMirrorUrl,get
     leader:null,leaderUntil:0,last:null,busy:false,closed:false,timer:null};
    state=g;
    window.on('resize',()=>resize(g));
+   // Closing the secondary screen hides it; its authenticated tab views stay alive.
+   // A full Hexora quit still destroys the window and releases the cached views.
+   window.on('close',event=>{
+    if(g.closed||window.isDestroyed())return;
+    const {app}=require('electron');
+    if(app.isQuitting||app.isQuiting)return;
+    event.preventDefault();window.hide();
+   });
    window.on('closed',()=>stop(g));
    await select(g);
    if(g.closed)return false;
