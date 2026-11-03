@@ -52,7 +52,7 @@ function nativeCodeCommand(message,tabId=activeId){
 function nativeCodeBounds(tabId=activeId){
  if(!win||win.isDestroyed()||!nativeCodeHosts.get(tabId)?.ready)return;
  const [w,h]=win.getContentSize();
- nativeCodeCommand('RECT '+sidebarWidth+' '+TOP_HEIGHT+' '+Math.max(1,w-sidebarWidth)+' '+Math.max(1,h-TOP_HEIGHT),tabId);
+ nativeCodeCommand('RECT '+sidebarWidth+' '+(TOP_HEIGHT+MAIN_TITLEBAR_HEIGHT)+' '+Math.max(1,w-sidebarWidth)+' '+Math.max(1,h-TOP_HEIGHT-MAIN_TITLEBAR_HEIGHT),tabId);
 }
 let nativeCodeLifecycleTimer=null;
 function scheduleNativeCodeLifecycle(reason){
@@ -105,6 +105,7 @@ if(!hasSingleInstanceLock){
 }
 const HOME='https://chatgpt.com/';
 const DETACHED_HEADER=44;
+const MAIN_TITLEBAR_HEIGHT=process.platform==='win32'?32:0;
 let TOP_HEIGHT=120;const IDLE_MS=24*60*60*1000,MAX_LIVE=8;
 let recoveryWindow=null,vault=null;
 const detached=new Map();
@@ -402,8 +403,8 @@ function discard(id){const view=live.get(id);if(!view)return;live.delete(id);con
 function bounds(){
  if(!win||win.isDestroyed()||!mainViewport)return;
  const [w,h]=win.getContentSize();
- const visibleWidth=Math.max(0,w-sidebarWidth),visibleHeight=Math.max(0,h-TOP_HEIGHT);
- mainViewport.setBounds({x:sidebarWidth,y:TOP_HEIGHT,width:visibleWidth,height:visibleHeight});
+ const visibleWidth=Math.max(0,w-sidebarWidth),visibleHeight=Math.max(0,h-TOP_HEIGHT-MAIN_TITLEBAR_HEIGHT);
+ mainViewport.setBounds({x:sidebarWidth,y:TOP_HEIGHT+MAIN_TITLEBAR_HEIGHT,width:visibleWidth,height:visibleHeight});
  const view=live.get(activeId);
  if(view){
   // Fill the visible viewport exactly: no negative offsets, clipped gray gaps,
@@ -793,7 +794,7 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
  syncNativeCodeProjects();
  sidebarWidth=Math.max(64,Math.min(560,Number(store.getMeta('sidebarCustomWidth'))||330));
  const mainTaskbar=safeTaskbarIdentity();
- win=new BrowserWindow({width:1360,height:900,minWidth:700,minHeight:400,title:isDevelopment?'Hexora Workspace [DEV]':'Hexora Workspace',icon:mainTaskbar?.iconPath,autoHideMenuBar:true,backgroundColor:'#111215',webPreferences:{preload:path.join(__dirname,'preload.js'),contextIsolation:true,sandbox:true,nodeIntegration:false}});
+ win=new BrowserWindow({width:1360,height:900,minWidth:700,minHeight:400,title:isDevelopment?'Hexora Workspace [DEV]':'Hexora Workspace',icon:mainTaskbar?.iconPath,autoHideMenuBar:true,...(process.platform==='win32'?{titleBarStyle:'hidden',titleBarOverlay:{color:'#1d367d',symbolColor:'#ffffff',height:MAIN_TITLEBAR_HEIGHT}}:{}),backgroundColor:'#111215',webPreferences:{preload:path.join(__dirname,'preload.js'),contextIsolation:true,sandbox:true,nodeIntegration:false}});
  safeApplyTaskbar(win,mainTaskbar);
  if(isDevelopment){
   // A loaded HTML title may overwrite BrowserWindow.title; keep the native
