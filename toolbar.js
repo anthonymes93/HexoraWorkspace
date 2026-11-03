@@ -1,11 +1,9 @@
 // Window controls are restricted to the main Hexora window by the main-process IPC handler.
 document.querySelectorAll('[data-window-action]').forEach(button=>button.addEventListener('click',()=>window.hexora.windowControl(button.dataset.windowAction)));
 const $=id=>document.getElementById(id);
-/* A deliberate quick tap toggles focus mode; merely hovering over the
-   draggable titlebar does nothing. Delay single-click so double/triple
-   clicks can retain their existing new-tab and theme gestures. */
-let frameTapStart=0,frameTapTimer=null,frameCompact=false;
-const frameTapTarget=document.querySelector('.main-titlebar-drag');
+/* A fast upward flick into the screen's top edge enters focus mode.
+   A cursor parked at the edge never triggers; no click is needed. */
+let frameCompact=false;
 function setCompactFrame(next){
  if(frameCompact===next)return;
  frameCompact=next;
@@ -16,16 +14,34 @@ function setCompactFrame(next){
   document.body.classList.toggle('hexora-compact-frame',frameCompact);
  });
 }
-frameTapTarget?.addEventListener('pointerdown',event=>{
- if(event.button===0&&!event.target.closest('button,a,input,textarea,select'))frameTapStart=performance.now();
-});
-frameTapTarget?.addEventListener('click',event=>{
- if(event.target.closest('button,a,input,textarea,select'))return;
- clearTimeout(frameTapTimer);
- if(event.detail!==1)return;
- if(!frameTapStart||performance.now()-frameTapStart>240)return;
- frameTapTimer=setTimeout(()=>{frameTapTimer=null;setCompactFrame(true);},360);
-});
+let lastFramePointer=null,frameFlickArmed=false,frameFlickAt=0;
+document.addEventListener('pointermove',event=>{
+ if(event.pointerType==='touch')return;
+ const now=performance.now();
+ const previous=lastFramePointer;
+ lastFramePointer={x:event.clientX,y:event.clientY,time:now};
+ if(frameCompact||!previous)return;
+ const dt=now-previous.time;
+ // Require a distinct, fast upward move near the top, not idle hovering.
+ if(dt>0&&dt<160&&previous.y>=22&&event.clientY<=18&&
+    previous.y-event.clientY>=10&&(previous.y-event.clientY)/dt>=0.22){
+  frameFlickArmed=true;frameFlickAt=now;
+ }
+ if(frameFlickArmed&&now-frameFlickAt>220)frameFlickArmed=false;
+ if(frameFlickArmed&&event.clientY<=4){
+  frameFlickArmed=false;
+  setCompactFrame(true);
+ }
+},{passive:true});
+// Restore without clicking: move from the app content into the blue rail.
+let lastRailPointer=null;
+document.querySelector('.rail')?.addEventListener('pointermove',event=>{
+ if(!frameCompact)return;
+ const now=performance.now();
+ if(lastRailPointer&&now-lastRailPointer.time<300&&
+    lastRailPointer.x>=58&&event.clientX<58)setCompactFrame(false);
+ lastRailPointer={x:event.clientX,time:now};
+},{passive:true});
 document.querySelector('.rail .logo')?.addEventListener('click',()=>{
  if(frameCompact)setCompactFrame(false);
 });
