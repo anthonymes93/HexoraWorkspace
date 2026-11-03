@@ -18,7 +18,12 @@ function createDualMirror({getActiveId,getTab,getView,isCodeTab,getMirrorUrl,get
     resolve(popup);
    };
    const onWindow=(popup,details)=>{
-    if(details.url===url)finish(popup);
+    if(details.url===url){
+     // A paired popup must not appear as a second visible Dual window
+     // while the existing active pair is still on screen.
+     popup.hide();
+     finish(popup);
+    }
    };
    opener.on('did-create-window',onWindow);
    const timer=setTimeout(()=>finish(null),5000);
@@ -76,11 +81,11 @@ function createDualMirror({getActiveId,getTab,getView,isCodeTab,getMirrorUrl,get
     width:960,height:720,minWidth:420,minHeight:320,
     title:'Hexora · Dual Workspace (Paired)',
     backgroundColor:'#111215',autoHideMenuBar:true,
-    webPreferences:{sandbox:true,contextIsolation:true,nodeIntegration:false,webSecurity:true}
+    webPreferences:{sandbox:true,contextIsolation:true,nodeIntegration:false,webSecurity:true,backgroundThrottling:false}
    });
    view=new WebContentsView({webPreferences:{
     session:sharedSession,preload:path.join(__dirname,'site-vault-preload.js'),
-    sandbox:true,contextIsolation:true,nodeIntegration:false,webSecurity:true,javascript:true
+    sandbox:true,contextIsolation:true,nodeIntegration:false,webSecurity:true,javascript:true,backgroundThrottling:false
    }});
    view.setBackgroundColor('#111215');
    popup.contentView.addChildView(view);
@@ -99,6 +104,8 @@ function createDualMirror({getActiveId,getTab,getView,isCodeTab,getMirrorUrl,get
    catch(error){console.warn('[Dual Mirror] Paired page navigation failed:',error.message);}
   }
   if(group.closed){if(!popup.isDestroyed())popup.close();return null;}
+  // The new pair is parked until select() makes it the sole visible one.
+  popup.hide();
   popup.setTitle('Hexora · Dual Workspace (Paired)');
   popup.setMinimumSize(420,320);
   popup.setSize(960,720);
@@ -146,9 +153,8 @@ function createDualMirror({getActiveId,getTab,getView,isCodeTab,getMirrorUrl,get
   // became active while ChatGPT was opening this one.
   if(getActiveId()!==id){
    // A pending popup can complete after the user switches tabs.
-   // Park it without hiding/suspending Chromium's authenticated renderer.
-   entry.popup.setIgnoreMouseEvents(true);
-   entry.popup.setOpacity(0);
+   // Keep it cached, but never expose another Dual window.
+   entry.popup.hide();
    return;
   }
   if(group.active===entry&&group.source===source)return;
@@ -159,20 +165,13 @@ function createDualMirror({getActiveId,getTab,getView,isCodeTab,getMirrorUrl,get
   if(previous&&previous!==entry&&!previous.popup.isDestroyed()){
    group.bounds=previous.popup.getBounds();
    group.maximized=previous.popup.isMaximized();
-   // Electron's hide() sends a hidden page-visibility event to Chromium.
-   // Keep each authenticated page alive and painting, but make the inactive
-   // native window transparent and mouse-pass-through instead of hiding it.
-   // Avoid setSkipTaskbar changes, which mutate Windows native window styles.
-   previous.popup.setIgnoreMouseEvents(true);
-   previous.popup.setOpacity(0);
+   previous.popup.hide();
   }
   if(group.bounds){
    if(!group.maximized&&entry.popup.isMaximized())entry.popup.unmaximize();
    if(!group.maximized)entry.popup.setBounds(group.bounds);
   }
   if(group.maximized&&!entry.popup.isMaximized())entry.popup.maximize();
-  entry.popup.setOpacity(1);
-  entry.popup.setIgnoreMouseEvents(false);
   if(previous!==entry&&wasVisible)entry.popup.showInactive();
   group.active=entry;
   group.source=source;
