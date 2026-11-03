@@ -846,3 +846,11 @@ body.sidebar-trim-workspace-details:not(.sidebar-icons-only) .workspace{gap:6px}
 .hexora-dev-indicator{display:inline-flex;align-items:center;justify-content:center;flex:none;border:1px solid #8b74d5;border-radius:5px;padding:3px 6px;background:#2b2145;color:#e8dcff;font-size:10px;font-weight:800;letter-spacing:.7px}
 .hexora-dev-indicator[hidden]{display:none!important}
 :root[data-hexora-theme="white"] .hexora-dev-indicator{background:#eee9ff;color:#5936a3;border-color:#bfa9ef}
+
+/* Windows title bar: native minimize/maximize and red close hover stay intact. */
+.main-titlebar-drag{display:none}
+@media (min-width:0px){
+ .main-titlebar-drag{display:block;position:absolute;top:0;left:0;right:0;height:32px;background:#1d367d;-webkit-app-region:drag;z-index:100}
+ .rail,.sidebar,.top-main{top:32px}
+ #sidebar-resize-handle{top:32px}
+}
