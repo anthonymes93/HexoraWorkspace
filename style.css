@@ -908,3 +908,7 @@ body.sidebar-trim-workspace-details:not(.sidebar-icons-only) .workspace{gap:6px}
 
 /* Raise title and subtitle together without moving tabs or action buttons. */
 .top-main>.top>div:first-child{transform:translateY(-5px)}
+
+/* Seamless header-to-tab transition: remove the separator above tabs. */
+.top-main>.top{border-bottom:0!important}
+.top-main>.tabsbar{border-top:0!important}
