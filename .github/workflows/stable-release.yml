@@ -42,3 +42,12 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: npx --yes electron-builder@26.18.0 --win nsis --x64 --publish always
+      - name: Build branded first-time installer
+        run: npx --yes electron-builder@26.18.0 --config installer-shell/builder.config.cjs --win portable --x64 --publish never
+      - name: Attach branded installer to approved release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: pwsh
+        run: |
+          $version = node -p "require('./package.json').version"
+          gh release upload $env:GITHUB_REF_NAME "dist/Hexora-Install-${version}-x64.exe" --clobber

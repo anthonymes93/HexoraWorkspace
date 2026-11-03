@@ -1,0 +1,43 @@
+name: Validate branded Hexora Windows installer
+on:
+  pull_request:
+    paths:
+      - 'installer-shell/**'
+      - '.github/workflows/stable-release.yml'
+      - '.github/workflows/installer-shell-test.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Validate installer JavaScript
+        shell: pwsh
+        run: |
+          node --check installer-shell/main.cjs
+          node --check installer-shell/preload.cjs
+          node --check installer-shell/builder.config.cjs
+      - name: Build bundled NSIS installer
+        run: npm run build:win
+      - name: Build branded portable installer
+        run: npx --yes electron-builder@26.18.0 --config installer-shell/builder.config.cjs --win portable --x64 --publish never
+      - name: Verify installer artifacts
+        shell: pwsh
+        run: |
+          $version = node -p "require('./package.json').version"
+          if (!(Test-Path "dist/Hexora-Setup-${version}-x64.exe")) { throw 'NSIS installer missing' }
+          if (!(Test-Path "dist/Hexora-Install-${version}-x64.exe")) { throw 'Branded installer missing' }
+          Get-Item "dist/Hexora-Setup-${version}-x64.exe","dist/Hexora-Install-${version}-x64.exe" | Select-Object Name,Length
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hexora-branded-installer-preview
+          path: dist/Hexora-Install-*-x64.exe
+          retention-days: 7
