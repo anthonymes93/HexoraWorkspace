@@ -22,6 +22,8 @@ document.addEventListener('pointermove',event=>{
  const previous=lastFramePointer;
  lastFramePointer={x:event.clientX,y:event.clientY,time:now};
  if(!previous)return;
+ // The permanent left rail is never a gesture trigger.
+ if(event.clientX<=58){frameFlickDistance=0;frameFlickStartedAt=0;return;}
  // Moving away from the top edge immediately rearms the next flick.
  if(event.clientY>=72){
   frameFlickReady=true;
@@ -51,14 +53,6 @@ document.addEventListener('pointermove',event=>{
   setCompactFrame(!frameCompact);
  }
 },{passive:true});
-// The retained rail provides a predictable mouse-only way back.
-document.querySelector('.rail')?.addEventListener('pointerenter',()=>{
- if(frameCompact)setCompactFrame(false);
-});
-document.querySelector('.rail .logo')?.addEventListener('click',()=>{
- if(frameCompact)setCompactFrame(false);
-});
-
 // The development marker is driven by the Electron main process, not local storage.
 // Initialize before the rest of the toolbar so startup is unambiguous.
 if(new URLSearchParams(window.location.search).get('hexoraDev')==='1'){
