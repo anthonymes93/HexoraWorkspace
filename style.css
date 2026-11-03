@@ -1032,3 +1032,32 @@ body::before{content:"";position:absolute;top:16px;left:58px;width:18px;height:1
 .notifications-empty-icon{display:grid;place-items:center;width:36px;height:36px;border-radius:50%;background:#ffffff10;color:#b4c8ef;font-size:18px}
 .notifications-empty strong{font-size:13px}
 .notifications-empty p{margin:0;color:#99a8c2;font-size:11px;line-height:1.5}
+
+/* Native browser view is clipped 412px while the drawer is open, so the
+   Chromium toolbar owns this right-side surface without webview overlap. */
+.notifications-panel{position:fixed;top:110px;right:10px;bottom:12px;width:392px;max-width:calc(100vw - 30px);max-height:none;z-index:150;display:flex;flex-direction:column;border-radius:16px;background:linear-gradient(165deg,#202a44 0%,#151b2b 27%,#111827 100%);border:1px solid #4e689f;box-shadow:0 20px 55px #0009,0 0 0 1px #ffffff08;overflow:hidden}
+.notifications-panel-header{padding:20px 18px 17px;gap:12px;background:linear-gradient(130deg,#29457f66,#17233c55)}
+.notifications-heading-icon{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;background:linear-gradient(140deg,#406cce,#244587);box-shadow:inset 0 0 0 1px #ffffff30;color:#fff;font-size:25px}
+.notifications-heading{display:flex;flex:1;min-width:0;flex-direction:column;gap:4px}
+.notifications-heading strong{font-size:18px;letter-spacing:-.3px}
+.notifications-heading span{font-size:11px;color:#a8b8d5}
+.notifications-demo-note{padding:11px 18px 4px;font-size:9px;font-weight:750;letter-spacing:1.2px;color:#91a9d8}
+.notifications-filters{display:flex;gap:7px;padding:10px 17px 15px;border-bottom:1px solid #ffffff13}
+.notifications-filters button{flex:1;border:1px solid #ffffff20;border-radius:18px;background:#ffffff08;color:#b9c7e0;padding:8px 9px;font-size:11px;cursor:pointer}
+.notifications-filters button:hover{background:#ffffff17}
+.notifications-filters button.selected{background:#557bd4;color:#fff;border-color:#7899ed}
+.notifications-feed{flex:1;min-height:0;overflow:auto;padding:15px 12px}
+.notification-item{display:flex;align-items:flex-start;gap:12px;position:relative;padding:14px 12px;margin-bottom:7px;border:1px solid #ffffff0b;border-radius:12px;background:#ffffff08}
+.notification-item.is-unread{background:#3c53852c;border-color:#6485ca30}
+.notification-item-icon{display:grid;place-items:center;flex:0 0 38px;width:38px;height:38px;border:1px solid #6888c455;border-radius:12px;background:#223758;color:#d2e0ff;font-size:19px}
+.notification-item-content{min-width:0;flex:1}
+.notification-item-meta{display:flex;justify-content:space-between;gap:8px;margin-bottom:6px;color:#9eb6e3;font-size:10px}
+.notification-item-meta span:last-child{color:#8391ad}
+.notification-item-content strong{display:block;font-size:12px;color:#f0f4ff;line-height:1.4}
+.notification-item-content p{margin:5px 0 0;color:#9caac2;font-size:11px;line-height:1.4}
+.notification-item-dot{width:6px;height:6px;flex:0 0 6px;margin-top:25px;border-radius:50%;background:#78a3ff}
+.notifications-feed-empty{padding:40px 0;text-align:center;color:#9caac2;font-size:12px}
+.notifications-panel-footer{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-top:1px solid #ffffff18;background:#ffffff05;color:#8496b8;font-size:10px}
+.notifications-panel-footer button{border:0;background:transparent;color:#b8d0ff;font-size:11px;cursor:pointer}
+.notifications-panel-footer button:hover{color:#fff}
+body.notifications-drawer-open .top-main{background:var(--hexora-frame-blue,#1c347f)}
