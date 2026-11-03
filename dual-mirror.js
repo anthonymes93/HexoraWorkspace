@@ -1,61 +1,84 @@
 'use strict';
 const {BrowserWindow}=require('electron');
 
-// Deliberately ephemeral test feature: two webContents with the same session,
-// not one view attached to multiple windows.
+// Experimental: separate windows with a shared session; synchronize only real user scrolling.
 function createDualMirror({getActiveId,getTab,getView,isCodeTab}){
  let state=null;
- const read='(()=>({x:scrollX,y:scrollY,mx:Math.max(0,document.documentElement.scrollWidth-innerWidth),my:Math.max(0,document.documentElement.scrollHeight-innerHeight)}))()';
- const changed=(a,b)=>!b||Math.abs(a.x-b.x)>1||Math.abs(a.y-b.y)>1;
- const instant=(x,y)=>`(()=>{const root=document.documentElement,previous=root.style.scrollBehavior;root.style.scrollBehavior='auto';window.scrollTo({left:${x},top:${y},behavior:'instant'});root.style.scrollBehavior=previous;})()`;
+ const prefix='HEXORA_DUAL_SCROLL_'+Math.random().toString(36).slice(2)+':';
+ const install=JSON.stringify(prefix);
+ const listener=`(()=>{
+  if(window.__hexoraDualScrollInstalled)return;
+  window.__hexoraDualScrollInstalled=true;
+  const prefix=${install};
+  const bridge=window.__hexoraDualScroll={muteUntil:0,activeUntil:0,raf:0};
+  const user=()=>{bridge.activeUntil=performance.now()+650;};
+  addEventListener('wheel',user,{capture:true,passive:true});
+  addEventListener('touchstart',user,{capture:true,passive:true});
+  addEventListener('touchmove',user,{capture:true,passive:true});
+  addEventListener('pointerdown',user,{capture:true,passive:true});
+  addEventListener('keydown',e=>{if(['ArrowUp','ArrowDown','PageUp','PageDown','Home','End',' '].includes(e.key))user();},true);
+  addEventListener('scroll',()=>{
+   if(bridge.raf)return;
+   bridge.raf=requestAnimationFrame(()=>{
+    bridge.raf=0;
+    if(performance.now()<bridge.muteUntil||performance.now()>bridge.activeUntil)return;
+    const root=document.scrollingElement||document.documentElement;
+    const mx=Math.max(0,root.scrollWidth-innerWidth),my=Math.max(0,root.scrollHeight-innerHeight);
+    console.info(prefix+JSON.stringify({x:scrollX,y:scrollY,mx,my}));
+   });
+  },{capture:true,passive:true});
+ })()`;
+ const apply=(position)=>`(()=>{
+  const b=window.__hexoraDualScroll;
+  if(b)b.muteUntil=performance.now()+350;
+  const root=document.scrollingElement||document.documentElement;
+  const mx=Math.max(0,root.scrollWidth-innerWidth),my=Math.max(0,root.scrollHeight-innerHeight);
+  const x=${position.mx?Math.round(position.x/position.mx*1000000):0}/1000000*mx;
+  const y=${position.my?Math.round(position.y/position.my*1000000):0}/1000000*my;
+  const old=root.style.scrollBehavior;
+  root.style.scrollBehavior='auto';
+  window.scrollTo({left:x,top:y,behavior:'instant'});
+  root.style.scrollBehavior=old;
+ })()`;
  return function open(){
   const id=getActiveId(),tab=getTab(id);
   if(!tab||tab.workspace!=='dual'||isCodeTab(tab))return false;
   if(state&&!state.popup.isDestroyed()){state.popup.focus();return true;}
   const popup=new BrowserWindow({width:960,height:720,minWidth:420,minHeight:320,title:'Hexora · Dual Workspace (Mirror Test)',backgroundColor:'#111215',autoHideMenuBar:true,webPreferences:{partition:'persist:hexora-chatgpt',sandbox:true,contextIsolation:true,nodeIntegration:false,webSecurity:true}});
-  // The mirror is a regular browser window, not a nested WebContentsView.
-  // This avoids a second native view obscuring a blank popup on Windows.
   const target=popup.webContents;
-  const current={popup,id:null,url:null,lastSource:null,lastMirror:null,busy:false,ignoreSourceUntil:0,ignoreMirrorUntil:0};state=current;
-  target.on('did-fail-load',(_event,code,description,url,isMainFrame)=>{if(isMainFrame)console.error('[Dual Mirror] Load failed:',code,description,url);});
-  const tick=async()=>{
-   if(current.busy||popup.isDestroyed())return;
-   current.busy=true;
-   try{
-    const active=getActiveId(),row=getTab(active);
-    if(row?.workspace==='dual'&&!isCodeTab(row)){
-     const source=getView(active)?.webContents,url=source?.getURL();
-     if(source&&!source.isDestroyed()&&/^https?:\/\//.test(url)&&(current.id!==active||current.url!==url)){
-      current.id=active;current.url=url;current.lastSource=null;current.lastMirror=null;current.ignoreSourceUntil=0;current.ignoreMirrorUntil=0;
-      await target.loadURL(url);
-     }
-    }
-    const source=getView(current.id)?.webContents;
-    if(!source||source.isDestroyed()||target.isDestroyed()||target.isLoading()||source.isLoading())return;
-    const [a,b]=await Promise.all([source.executeJavaScript(read),target.executeJavaScript(read)]);
-    const now=Date.now();
-    const sourceMoved=changed(a,current.lastSource)&&now>=current.ignoreSourceUntil;
-    const mirrorMoved=changed(b,current.lastMirror)&&now>=current.ignoreMirrorUntil;
-    if(sourceMoved){
-     const x=a.mx?Math.round(a.x/a.mx*b.mx):0,y=a.my?Math.round(a.y/a.my*b.my):0;
-     current.lastSource=a;current.lastMirror={...b,x,y};
-     current.ignoreMirrorUntil=now+110;
-     await target.executeJavaScript(instant(x,y));
-    }else if(mirrorMoved){
-     const x=b.mx?Math.round(b.x/b.mx*a.mx):0,y=b.my?Math.round(b.y/b.my*a.my):0;
-     current.lastMirror=b;current.lastSource={...a,x,y};
-     current.ignoreSourceUntil=now+110;
-     await source.executeJavaScript(instant(x,y));
-    }else{
-     // Update baselines after programmatic scrolling, without bouncing it back.
-     if(now<current.ignoreSourceUntil)current.lastSource=a;
-     if(now<current.ignoreMirrorUntil)current.lastMirror=b;
-    }
-   }catch(error){/* Some sites have inaccessible or non-scrollable contexts. */}
-   finally{current.busy=false;}
+  const current={popup,id:null,url:null,source:null,handlers:[],generation:0};state=current;
+  const detach=()=>{
+   for(const [wc,event,handler] of current.handlers)if(!wc.isDestroyed())wc.removeListener(event,handler);
+   current.handlers=[];
   };
-  const timer=setInterval(tick,50);
-  popup.on('closed',()=>{clearInterval(timer);if(state===current)state=null;});
+  const on=(wc,event,handler)=>{wc.on(event,handler);current.handlers.push([wc,event,handler]);};
+  const listen=(wc,other)=>{
+   const onMessage=(_event,...args)=>{
+    const message=typeof args[0]==='object'?args[0]?.message:args[1];
+    if(typeof message!=='string'||!message.startsWith(prefix)||other.isDestroyed()||other.isLoading())return;
+    try{const position=JSON.parse(message.slice(prefix.length));void other.executeJavaScript(apply(position)).catch(()=>{});}catch{}
+   };
+   on(wc,'console-message',onMessage);
+   on(wc,'dom-ready',()=>{void wc.executeJavaScript(listener).catch(()=>{});});
+   if(!wc.isLoading())void wc.executeJavaScript(listener).catch(()=>{});
+  };
+  on(target,'did-fail-load',(_event,code,description,url,isMainFrame)=>{if(isMainFrame)console.error('[Dual Mirror] Load failed:',code,description,url);});
+  const tick=async()=>{
+   if(popup.isDestroyed())return;
+   const active=getActiveId(),row=getTab(active);
+   if(!row||row.workspace!=='dual'||isCodeTab(row))return;
+   const source=getView(active)?.webContents,url=source?.getURL();
+   if(!source||source.isDestroyed()||!/^https?:\/\//.test(url))return;
+   if(current.id===active&&current.url===url&&current.source===source)return;
+   current.id=active;current.url=url;current.source=source;
+   const generation=++current.generation;
+   detach();
+   listen(source,target);listen(target,source);
+   try{await target.loadURL(url);}catch(error){console.error('[Dual Mirror] Navigation failed:',error.message);}
+   if(generation!==current.generation)return;
+  };
+  const timer=setInterval(()=>{void tick().catch(error=>console.warn('[Dual Mirror]',error.message));},300);
+  popup.on('closed',()=>{clearInterval(timer);detach();if(state===current)state=null;});
   void tick();return true;
  };
 }
