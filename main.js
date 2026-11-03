@@ -372,7 +372,46 @@ function applyHexoraWebsiteScrollbars(wc){
   else wc.removeInsertedCSS(key).catch(()=>{});
  }).catch(error=>console.warn('[Hexora] Website scrollbar style unavailable:',error.message));
 }
+// Local recent downloads and saved images. Paths stay on this computer.
+let recentSaves=[];
+let recentSavesFile='';
+const imageSaveRequests=new Map();
+function rememberSave(filePath){
+ if(!filePath)return;
+ const entry={path:filePath,name:path.basename(filePath),savedAt:Date.now()};
+ recentSaves=[entry,...recentSaves.filter(item=>item.path!==filePath)].slice(0,50);
+ try{fs.writeFileSync(recentSavesFile,JSON.stringify(recentSaves));}
+ catch(error){console.warn('[Hexora] Could not persist recent saves:',error.message);}
+}
+function installDownloadTracking(){
+ const browserSession=session.fromPartition('persist:hexora-chatgpt');
+ browserSession.on('will-download',(_event,item)=>{
+  const url=item.getURL();
+  const pending=imageSaveRequests.get(url);
+  if(pending){
+   imageSaveRequests.delete(url);
+   item.setSaveDialogOptions({title:'Save Image As',defaultPath:path.join(app.getPath('downloads'),item.getFilename())});
+  }
+  item.once('done',(_event,state)=>{
+   if(state==='completed')rememberSave(item.getSavePath());
+  });
+ });
+}
+function attachImageSaveMenu(wc){
+ wc.on('context-menu',(_event,params)=>{
+  if(!params.srcURL||params.mediaType!=='image')return;
+  const imageUrl=params.srcURL;
+  if(!/^https?:\/\//i.test(imageUrl))return;
+  const menu=Menu.buildFromTemplate([{label:'Save Image As…',click:()=>{
+   imageSaveRequests.set(imageUrl,true);
+   setTimeout(()=>imageSaveRequests.delete(imageUrl),30000).unref?.();
+   wc.downloadURL(imageUrl);
+  }}]);
+  menu.popup({window:BrowserWindow.fromWebContents(wc)||win});
+ });
+}
 function wire(t){const view=new WebContentsView({webPreferences:{partition:'persist:hexora-chatgpt',preload:path.join(__dirname,'site-vault-preload.js'),sandbox:true,contextIsolation:true,nodeIntegration:false,webSecurity:true,javascript:true}});const wc=view.webContents;
+ attachImageSaveMenu(wc);
  wc.setAudioMuted(!!t.muted);
  if(chromeMode(t.id))wc.setUserAgent(chromeUserAgent(wc));
  // Use a neutral white backing for transparent areas in third-party websites.
@@ -821,6 +860,9 @@ function openRecoveryWindow(){
 function sendPage(payload){const w=typeof payload?.workspace==='string'?payload.workspace:'web';const offset=Number.isSafeInteger(payload?.offset)?payload.offset:0;return state(w,offset);}
 if(hasSingleInstanceLock)app.whenReady().then(()=>{
  const dataDir=app.getPath('userData');
+ recentSavesFile=path.join(dataDir,'hexora-recent-saves.json');
+ try{const entries=JSON.parse(fs.readFileSync(recentSavesFile,'utf8'));if(Array.isArray(entries))recentSaves=entries.filter(x=>typeof x.path==='string'&&typeof x.name==='string').slice(0,50);}catch{}
+ installDownloadTracking();
  vault=new PasswordVault(dataDir);
  vault.restoreDeviceUnlock(safeStorage);
  try{applyPending(dataDir);}catch(err){dialog.showErrorBox('Hexora restore could not be applied',err.message);}
@@ -1187,6 +1229,24 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
  ipcMain.handle('native-code:toggle',async event=>{if(event.sender!==win.webContents)throw Error('Invalid caller');return openCodeTab(store.get(activeId)?.workspace||'web');});
  const openDualMirror=require('./dual-mirror').createDualMirror({getActiveId:()=>activeId,getTab:id=>store.get(id),getView:id=>live.get(id),isCodeTab,getMirrorUrl:id=>store.getMeta('dualPairUrl:'+id),getChatgptSource:()=>{for(const view of live.values()){const wc=view.webContents;if(!wc.isDestroyed()&&/^https:\/\/chatgpt\.com(?:\/|$)/.test(wc.getURL()))return wc;}return null;}});
  dualPopupHandler=openDualMirror.handlePopup;
+ ipcMain.handle('saves:list',event=>{
+  if(event.sender!==win.webContents)throw Error('Invalid caller');
+  return recentSaves.filter(item=>fs.existsSync(item.path)).slice(0,30);
+ });
+ ipcMain.handle('saves:open',async(event,filePath)=>{
+  if(event.sender!==win.webContents)throw Error('Invalid caller');
+  const entry=recentSaves.find(item=>item.path===filePath);
+  if(!entry||!fs.existsSync(entry.path))throw Error('Saved file not found.');
+  const error=await shell.openPath(entry.path);
+  if(error)throw Error(error);
+  return true;
+ });
+ ipcMain.handle('saves:folder',async(event,filePath)=>{
+  if(event.sender!==win.webContents)throw Error('Invalid caller');
+  const entry=recentSaves.find(item=>item.path===filePath);
+  if(!entry||!fs.existsSync(entry.path))throw Error('Saved file not found.');
+  shell.showItemInFolder(entry.path);return true;
+ });
  ipcMain.handle('tabs:page',(_e,arg)=>sendPage(arg));
  ipcMain.handle('tabs:search',(_e,term)=>store.search(term,50).map(pageRow));
  ipcMain.handle('tabs:lookup',(_e,id)=>{const row=store.get(Number(id));return row?pageRow(row):null;});
