@@ -883,3 +883,14 @@ body.sidebar-trim-workspace-details:not(.sidebar-icons-only) .workspace{gap:6px}
 .top-main>.top .pill:hover:not(:disabled){background:#ffffff2b}
 .top-main>.top .pill.primary{background:#d6ddf0;border-color:#d6ddf0;color:#162b65}
 .top-main>.top .pill.primary:hover:not(:disabled){background:#f1f4ff}
+
+/* Compact 16px custom Windows titlebar.  Controls remain clickable, drag region stays native. */
+.main-titlebar-drag{height:16px!important;background:#1c347f;z-index:120;display:flex!important;justify-content:flex-end;-webkit-app-region:drag}
+.micro-window-controls{height:16px;display:flex;margin-left:auto;-webkit-app-region:no-drag}
+.micro-window-button{appearance:none;border:0;border-radius:0;background:transparent;color:#e8edff;width:34px;height:16px;display:grid;place-items:center;padding:0;cursor:pointer;-webkit-app-region:no-drag}
+.micro-window-button svg{width:12px;height:12px;fill:none;stroke:currentColor;stroke-width:1.35;stroke-linecap:round;stroke-linejoin:round}
+.micro-window-button:hover{background:#ffffff2a}
+.micro-window-close:hover{background:#e81123;color:white}
+.micro-window-button:focus-visible{outline:1px solid #fff;outline-offset:-1px}
+.rail,.sidebar,.top-main{top:16px!important}
+#sidebar-resize-handle{top:16px!important}
