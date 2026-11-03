@@ -1,5 +1,12 @@
 'use strict';
 const {app,BrowserWindow,WebContentsView,View,session,ipcMain,shell,dialog,clipboard,safeStorage,Menu}=require('electron');
+// Experimental Chromium fallback for sites whose Google Identity Services FedCM
+// token retrieval fails inside Electron. Chromium flags are process-wide, so
+// this is opt-in and must be set before Electron creates any sessions.
+if(process.env.HEXORA_PINTEREST_FEDCM_FALLBACK==='1'){
+ app.commandLine.appendSwitch('disable-features','FedCm');
+ console.info('[Hexora OAuth] Experimental FedCM fallback enabled for this launch (all tabs).');
+}
 const path=require('node:path');
 const {screen}=require('electron');
 const {TabStore}=require('./tab-store');
