@@ -1072,21 +1072,30 @@ tabStrip.addEventListener('drop',e=>{
 function hideTabMenu(restore=true){ $('tab-workspace-submenu').classList.add('hidden');$('tab-menu-move').setAttribute('aria-expanded','false'); const wasOpen=!$('tab-context-menu').classList.contains('hidden');$('tab-context-menu').classList.add('hidden');contextTab=null;if(wasOpen&&restore&&!websiteTarget)action('modal',false); }
 function ensureDualPairMenu(){
  let button=document.getElementById('hexora-dual-pair-menu');
- if(button)return button;
- button=document.createElement('button');button.id='hexora-dual-pair-menu';button.type='button';
- button.textContent='◫  Set paired window URL…';
- button.style.cssText='width:100%;padding:10px 14px;text-align:left;background:transparent;color:inherit;border:0;cursor:pointer';
- button.onclick=async()=>{
-  const tab=contextTab;if(!tab)return;
-  hideTabMenu();
-  const previous=await action('dual-pair-get',tab.id);
-  const value=prompt('Paired URL for '+(tab.title||'this tab')+' (blank = mirror main URL):',previous||'');
-  if(value===null)return;
-  try{await action('dual-pair-set',{id:tab.id,url:value.trim()});await action('dual-mirror');}
-  catch(error){alert('Paired URL: '+error.message);}
- };
- $('tab-context-menu').append(button);
+ if(!button){
+  button=document.createElement('button');button.id='hexora-dual-pair-menu';button.type='button';
+  button.style.cssText='width:100%;padding:10px 14px;text-align:left;background:transparent;color:inherit;border:0;cursor:pointer';
+  $('tab-context-menu').append(button);
+ }
  return button;
+}
+async function configureDualSecondScreen(tab,connected){
+ hideTabMenu();
+ try{
+  if(connected){
+   await action('dual-pair-set',{id:tab.id,url:''});
+   await action('dual-mirror');
+   return;
+  }
+  const previous=await action('dual-pair-get',tab.id);
+  const value=prompt('Second screen URL for '+(tab.title||'this tab')+':',previous||'https://');
+  if(value===null)return;
+  if(!value.trim()){alert('Enter a URL to connect the second screen.');return;}
+  await action('dual-pair-set',{id:tab.id,url:value.trim()});
+  await action('activate',tab.id);
+  await action('dual-mirror');
+  refresh();
+ }catch(error){alert('Second screen: '+error.message);}
 }
 function showTabMenu(x,y,item){
  contextTab=item;
@@ -1115,6 +1124,17 @@ function showTabMenu(x,y,item){
  $('tab-menu-domain-wide').disabled=!pref.domain;
  $('tab-menu-domain-thin').disabled=!pref.domain;
  renderWorkspaceSubmenu(item);
+ const dualButton=ensureDualPairMenu();
+ dualButton.classList.toggle('hidden',item.workspace!=='dual');
+ if(item.workspace==='dual'){
+  dualButton.textContent='◫  Open Second Screen…';
+  dualButton.onclick=()=>configureDualSecondScreen(item,false);
+  void action('dual-pair-get',item.id).then(url=>{
+   if(contextTab?.id!==item.id)return;
+   dualButton.textContent=url?'◫  Disconnect Second Screen':'◫  Open Second Screen…';
+   dualButton.onclick=()=>configureDualSecondScreen(item,!!url);
+  }).catch(error=>console.warn('[Dual] Could not read second screen URL:',error.message));
+ }
  const menu=$('tab-context-menu');menu.classList.remove('hidden');
  menu.style.left=Math.max(8,Math.min(x,innerWidth-menu.offsetWidth-8))+'px';
  menu.style.top=Math.max(8,Math.min(y,innerHeight-menu.offsetHeight-8))+'px';
