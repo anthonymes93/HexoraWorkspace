@@ -979,7 +979,7 @@ body::before{content:"";position:absolute;top:16px;left:58px;width:18px;height:1
 /* Omega: current blue-frame design, with ten saturated frame palettes. */
 :root[data-hexora-theme="omega"]{--hexora-frame-blue:#1c347f;--hexora-frame-blue-light:#405a9b}
 :root[data-hexora-theme="omega"][data-hexora-omega-color="blue"]{--hexora-frame-blue:#1c347f;--hexora-frame-blue-light:#405a9b}
-:root[data-hexora-theme="omega"][data-hexora-omega-color="red"]{--hexora-frame-blue:#8d233b;--hexora-frame-blue-light:#b3475f}
+:root[data-hexora-theme="omega"][data-hexora-omega-color="red"]{--hexora-frame-blue:#b10501;--hexora-frame-blue-light:#ce3029}
 :root[data-hexora-theme="omega"][data-hexora-omega-color="orange"]{--hexora-frame-blue:#a94c1e;--hexora-frame-blue-light:#ce6c35}
 :root[data-hexora-theme="omega"][data-hexora-omega-color="amber"]{--hexora-frame-blue:#936019;--hexora-frame-blue-light:#bd8734}
 :root[data-hexora-theme="omega"][data-hexora-omega-color="green"]{--hexora-frame-blue:#176b4c;--hexora-frame-blue-light:#2e956f}
@@ -1006,7 +1006,7 @@ body::before{content:"";position:absolute;top:16px;left:58px;width:18px;height:1
 .omega-color-choice.selected{border-color:#a8bdea;box-shadow:0 0 0 1px #a8bdea55}
 .omega-color-swatch{width:30px;height:30px;border-radius:9px;border:1px solid #ffffff3b;display:block}
 .omega-color-swatch-blue{background:linear-gradient(135deg,#405a9b,#1c347f)}
-.omega-color-swatch-red{background:linear-gradient(135deg,#b3475f,#8d233b)}
+.omega-color-swatch-red{background:linear-gradient(135deg,#ce3029,#b10501)}
 .omega-color-swatch-orange{background:linear-gradient(135deg,#ce6c35,#a94c1e)}
 .omega-color-swatch-amber{background:linear-gradient(135deg,#bd8734,#936019)}
 .omega-color-swatch-green{background:linear-gradient(135deg,#2e956f,#176b4c)}
