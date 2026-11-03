@@ -1,7 +1,7 @@
 'use strict';
 const {BrowserWindow,WebContentsView,session}=require('electron');
 const path=require('node:path');
-function createDualMirror({getActiveId,getTab,getView,isCodeTab,getMirrorUrl,getChatgptSource}){
+function createDualMirror({getActiveId,getTab,getView,isCodeTab,getMirrorUrl,getChatgptSource,onVisit}){
  let state=null,opening=null;
  const pending=new Map();
  const read='(()=>{const e=document.scrollingElement||document.documentElement;return {x:e.scrollLeft,y:e.scrollTop,mx:Math.max(0,e.scrollWidth-e.clientWidth),my:Math.max(0,e.scrollHeight-e.clientHeight)};})()';
@@ -76,6 +76,16 @@ function createDualMirror({getActiveId,getTab,getView,isCodeTab,getMirrorUrl,get
   view.webContents.on('did-fail-load',(_event,code,description,failedUrl,isMainFrame)=>{
    if(isMainFrame)console.error('[Dual] Load failed:',code,description,failedUrl);
   });
+  // Only the secondary Dual window reports visits; both full and SPA navigation count.
+  let lastVisited='';
+  const visit=()=>{
+   const current=view.webContents.getURL();
+   if(current===lastVisited)return;
+   lastVisited=current;
+   onVisit?.(current);
+  };
+  view.webContents.on('did-navigate',visit);
+  view.webContents.on('did-navigate-in-page',visit);
   view.webContents.on('render-process-gone',(_event,details)=>console.error('[Dual] Renderer exited:',details.reason));
   if(!fromPopup)void view.webContents.loadURL(url).catch(error=>console.warn('[Dual] Navigation failed:',error.message));
   return entry;

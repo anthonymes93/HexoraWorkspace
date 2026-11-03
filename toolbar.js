@@ -1755,6 +1755,12 @@ $('open-email-app')?.addEventListener('click',()=>window.hexora.email.open().cat
  let quick=[];
  try{const stored=JSON.parse(localStorage.getItem(quickKey)||'[]');if(Array.isArray(stored))quick=stored.filter(n=>n&&typeof n.id==='string'&&typeof n.message==='string'&&Number.isFinite(n.due)&&typeof n.delivered==='boolean').slice(-100);}catch{}
  const saveQuick=()=>{try{localStorage.setItem(quickKey,JSON.stringify(quick));}catch{}};
+ // Persist secondary-window URL test visits in the existing bell feed.
+ window.hexora?.onDualVisit(data=>{
+  if(data?.message!=="You've checked out x")return;
+  quick.push({id:'dual-visit-'+Date.now()+'-'+Math.random().toString(36).slice(2,7),message:data.message,due:Date.now(),deepLink:'',delivered:true,read:false,important:false,themeFlipped:false,source:'Dual Workspace'});
+  quick=quick.slice(-100);saveQuick();render();updateBell();
+ });
  const validQuickLink=value=>{
   if(!value)return true;
   if(value.length>512)return false;
@@ -1866,7 +1872,7 @@ $('open-email-app')?.addEventListener('click',()=>window.hexora.email.open().cat
    const symbol=document.createElement('span');symbol.className='notification-item-icon';symbol.textContent=n.delivered?'✓':'◷';
    const content=document.createElement('div');content.className='notification-item-content';
    const meta=document.createElement('div');meta.className='notification-item-meta';
-   const source=document.createElement('span');source.textContent=n.delivered?'Quick notification':'Scheduled';
+   const source=document.createElement('span');source.textContent=n.source|| (n.delivered?'Quick notification':'Scheduled');
    const when=document.createElement('span');when.textContent=prettyDue(n.due);meta.append(source,when);
    const title=document.createElement('strong');title.textContent=n.important?'★ '+n.message:n.message;
    if(n.deepLink){const linkLabel=document.createElement('p');linkLabel.className='notification-quick-link';linkLabel.textContent='↗ '+n.deepLink;content.append(linkLabel);}
