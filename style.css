@@ -912,3 +912,12 @@ body.sidebar-trim-workspace-details:not(.sidebar-icons-only) .workspace{gap:6px}
 /* Seamless header-to-tab transition: remove the separator above tabs. */
 .top-main>.top{border-bottom:0!important}
 .top-main>.tabsbar{border-top:0!important}
+
+/* Single centered tab-action toolbar; same hit target and optical icon size. */
+.tabsbar>.tab-toolbar{align-self:stretch;display:flex;align-items:center;gap:8px;flex:0 0 auto}
+.tabsbar .tab-toolbar>.tab-plus{align-self:center;display:grid;place-items:center;width:28px;height:28px;min-width:28px;padding:0;border:0;border-radius:7px;background:transparent}
+.tabsbar .tab-toolbar>.extension-actions{align-self:center;display:flex;align-items:center;gap:6px}
+.tabsbar .tab-toolbar>.nav{align-self:center;display:flex;align-items:center;gap:4px;padding-left:9px;border-left:1px solid #ffffff30}
+.tabsbar .tab-toolbar>.nav button{display:grid;place-items:center;width:28px;height:28px;min-width:28px;padding:0;border-radius:7px;font-size:inherit;line-height:1}
+.tabsbar .tab-toolbar svg{width:16px;height:16px;display:block;pointer-events:none}
+.tabsbar .tab-toolbar>.tab-plus:hover,.tabsbar .tab-toolbar>.nav button:hover{background:#ffffff20}
