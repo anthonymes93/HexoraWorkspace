@@ -341,8 +341,11 @@ function wire(t){const view=new WebContentsView({webPreferences:{partition:'pers
   if(!pinterestPage())return;
   const details=typeof detailsOrLevel==='object'?detailsOrLevel:{level:detailsOrLevel,message};
   const level=details.level;
-  if(level!=='error'&&level!=='warning'&&level!==2&&level!==3)return;
   const raw=String(details.message||message||'');
+  if(raw.includes('[Hexora Pinterest OAuth] Google sign-in control clicked')){
+   pinterestLog('Google sign-in click captured');return;
+  }
+  if(level!=='error'&&level!=='warning'&&level!==2&&level!==3)return;
   // Report error category only; third-party scripts may include sensitive URLs.
   const category=/content.security.policy|csp/i.test(raw)?'CSP':
    /cross.origin|cors/i.test(raw)?'CORS':
