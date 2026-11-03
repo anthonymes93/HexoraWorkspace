@@ -1,6 +1,7 @@
 'use strict';
 const {BrowserWindow,WebContentsView,session}=require('electron');
 const path=require('node:path');
+const HEADER_HEIGHT=44;
 function createDualMirror({getActiveId,getTab,getView,isCodeTab,getMirrorUrl,getChatgptSource}){
  let state=null,opening=null;
  const pending=new Map();
@@ -14,7 +15,7 @@ function createDualMirror({getActiveId,getTab,getView,isCodeTab,getMirrorUrl,get
   wc.on('input-event',mouse);wc.on('before-input-event',key);
   g.handlers.push([wc,'input-event',mouse],[wc,'before-input-event',key]);
  };
- const resize=g=>{if(g.window.isDestroyed()||!g.active)return;const [width,height]=g.window.getContentSize();g.active.view.setBounds({x:0,y:0,width,height});};
+ const resize=g=>{if(g.window.isDestroyed()||!g.active)return;const [width,height]=g.window.getContentSize();g.active.view.setBounds({x:0,y:HEADER_HEIGHT,width,height:Math.max(0,height-HEADER_HEIGHT)});};
  const dispose=(g,entry)=>{
   g.entries.delete(entry.id);
   if(g.active===entry){g.active=null;g.source=null;detach(g);}
@@ -30,54 +31,26 @@ function createDualMirror({getActiveId,getTab,getView,isCodeTab,getMirrorUrl,get
  };
  // Chromium calls createWindow synchronously. Returning WebContentsView's
  // webContents means no second native BrowserWindow is ever created.
- function handlePopup({opener,url,frameName}){
-  const request=pending.get(frameName);
-  if(!request||request.opener!==opener||request.url!==url||!state||state.closed)return {action:'deny'};
-  return {action:'allow',outlivesOpener:true,createWindow:options=>{
-   const view=new WebContentsView({webPreferences:{...options.webPreferences,session:opener.session,
-    sandbox:true,contextIsolation:true,nodeIntegration:false,webSecurity:true,backgroundThrottling:false}});
-   view.setBackgroundColor('#ffffff');
-   request.resolve(view);
-   return view.webContents;
-  }};
- }
- async function authenticatedView(id,url,opener){
-  const frameName='hexora-dual-pair-'+id+'-'+Date.now();
-  return new Promise(resolve=>{
-   let done=false;
-   const finish=view=>{
-    if(done){if(view&&!view.webContents.isDestroyed())view.webContents.close();return;}
-    done=true;clearTimeout(request.timer);pending.delete(frameName);resolve(view);
-   };
-   const request={opener,url,resolve:finish,timer:setTimeout(()=>finish(null),5000)};
-   pending.set(frameName,request);
-   void opener.executeJavaScript('window.open('+JSON.stringify(url)+','+JSON.stringify(frameName)+');true',true)
-    .catch(error=>{console.warn('[Dual] Popup opener failed:',error.message);finish(null);});
-  });
- }
+ // Popup-backed WebContentsView creation is unsupported by Electron's
+ // window-open ownership checks. Use the existing persistent session directly.
+ function handlePopup(){return {action:'deny'};}
  async function createEntry(g,id,url){
   const opener=getChatgptSource?.();
-  let view=null,fromPopup=false;
-  if(opener&&!opener.isDestroyed()&&/^https:\/\/chatgpt\.com\//.test(url)){
-   view=await authenticatedView(id,url,opener);
-   fromPopup=!!view;
-  }
-  if(g.closed){if(view&&!view.webContents.isDestroyed())view.webContents.close();return null;}
-  if(!view){
-   view=new WebContentsView({webPreferences:{session:session.fromPartition('persist:hexora-chatgpt'),
-    preload:path.join(__dirname,'site-vault-preload.js'),sandbox:true,contextIsolation:true,
-    nodeIntegration:false,webSecurity:true,javascript:true,backgroundThrottling:false}});
-   view.setBackgroundColor('#ffffff');
-   if(opener&&!opener.isDestroyed()&&new URL(url).hostname==='chatgpt.com')
-    view.webContents.setUserAgent(opener.getUserAgent());
-  }
+  const view=new WebContentsView({webPreferences:{session:session.fromPartition('persist:hexora-chatgpt'),
+   preload:path.join(__dirname,'site-vault-preload.js'),sandbox:true,contextIsolation:true,
+   nodeIntegration:false,webSecurity:true,javascript:true,backgroundThrottling:false}});
+  view.setBackgroundColor('#ffffff');
+  const opener=getChatgptSource?.();
+  if(opener&&!opener.isDestroyed()&&new URL(url).hostname==='chatgpt.com')
+   view.webContents.setUserAgent(opener.getUserAgent());
+  if(g.closed){view.webContents.close();return null;}
   const entry={id,url,view};
   g.entries.set(id,entry);
   view.webContents.on('did-fail-load',(_event,code,description,failedUrl,isMainFrame)=>{
    if(isMainFrame)console.error('[Dual] Load failed:',code,description,failedUrl);
   });
   view.webContents.on('render-process-gone',(_event,details)=>console.error('[Dual] Renderer exited:',details.reason));
-  if(!fromPopup)void view.webContents.loadURL(url).catch(error=>console.warn('[Dual] Navigation failed:',error.message));
+  void view.webContents.loadURL(url).catch(error=>console.warn('[Dual] Navigation failed:',error.message));
   return entry;
  }
  async function select(g){
@@ -129,8 +102,9 @@ function createDualMirror({getActiveId,getTab,getView,isCodeTab,getMirrorUrl,get
   if(opening)return opening;
   const task=(async()=>{
    const window=new BrowserWindow({width:960,height:720,minWidth:420,minHeight:320,
-    title:'Hexora · Dual Workspace',backgroundColor:'#111215',autoHideMenuBar:true,
+    title:'Hexora · Dual Workspace (secondary window)',backgroundColor:'#111215',autoHideMenuBar:true,
     webPreferences:{sandbox:true,contextIsolation:true,nodeIntegration:false,webSecurity:true}});
+   await window.loadURL('data:text/html;charset=utf-8,'+encodeURIComponent('<!doctype html><html><head><meta charset="utf-8"><style>html,body{margin:0;background:#151925;color:#e8edff;font:13px system-ui}header{height:43px;display:flex;align-items:center;padding:0 16px;gap:12px;border-bottom:1px solid #34394c}b{color:#bba6ff}small{color:#9ca5bc}</style></head><body><header><b>HEXORA</b><span>Dual Workspace · Secondary window</span><small>Close this window to return to your main workspace</small></header></body></html>'));
    const g={window,entries:new Map(),active:null,source:null,handlers:[],
     leader:null,leaderUntil:0,last:null,busy:false,closed:false,timer:null};
    state=g;
