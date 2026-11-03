@@ -4,6 +4,12 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Existing stable tag to repair (e.g. v0.4.4)'
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -16,6 +22,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref }}
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -26,7 +33,9 @@ jobs:
           git fetch origin main
           git merge-base --is-ancestor HEAD origin/main || { echo 'Release commit is not on main'; exit 1; }
           EXPECTED="v$(node -p "require('./package.json').version")"
-          test "$GITHUB_REF_NAME" = "$EXPECTED" || { echo "Tag must equal $EXPECTED"; exit 1; }
+          TAG="${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref_name }}"
+          test "$TAG" = "$EXPECTED" || { echo "Tag must equal $EXPECTED"; exit 1; }
+          git rev-parse "$TAG^{commit}" | grep -Fx "$(git rev-parse HEAD)" || { echo "Checked out commit differs from release tag"; exit 1; }
       - run: npm ci
       - name: Check JavaScript syntax
         shell: pwsh
@@ -42,6 +51,21 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: npx --yes electron-builder@26.18.0 --win nsis --x64 --publish always
+      - name: Ensure stable update assets are published
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: pwsh
+        run: |
+          $tag = "${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref_name }}"
+          $version = node -p "require('./package.json').version"
+          $setup = "dist/Hexora-Setup-${version}-x64.exe"
+          $metadata = "dist/latest.yml"
+          if (!(Test-Path $setup) -or !(Test-Path $metadata)) { throw "Missing NSIS setup or latest.yml after build" }
+          gh release upload $tag $setup $metadata --clobber
+          $assets = gh release view $tag --json assets --jq '.assets[].name'
+          foreach ($name in @("Hexora-Setup-${version}-x64.exe", "latest.yml")) {
+            if ($assets -notcontains $name) { throw "Release is missing $name" }
+          }
       - name: Build branded first-time installer
         run: npx --yes electron-builder@26.18.0 --config installer-shell/builder.config.cjs --win portable --x64 --publish never
       - name: Attach branded installer to approved release
@@ -50,4 +74,5 @@ jobs:
         shell: pwsh
         run: |
           $version = node -p "require('./package.json').version"
-          gh release upload $env:GITHUB_REF_NAME "dist/Hexora-Install-${version}-x64.exe" --clobber
+          $tag = "${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref_name }}"
+          gh release upload $tag "dist/Hexora-Install-${version}-x64.exe" --clobber
