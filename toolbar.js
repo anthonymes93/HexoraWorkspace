@@ -1336,6 +1336,9 @@ function applySidebarBreakpoint(value){
 window.hexora.onSidebarFrame((width,transitioning=false,target=null)=>{
  const value=Math.max(58,Math.min(560,width));
  const root=document.documentElement,body=document.body;
+ // Focus mode temporarily changes viewport geometry, not the sidebar preference.
+ // Do not apply collapsed breakpoints or rewrite sidebarOpen while hidden.
+ if(frameCompact)return;
  if(transitioning&&!sidebarWasAnimating){
   // Keep one presentation style while native viewport width animates.
   // Opening from fully closed should reveal the regular expanded layout.
