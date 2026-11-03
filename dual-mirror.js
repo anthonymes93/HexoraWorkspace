@@ -30,54 +30,26 @@ function createDualMirror({getActiveId,getTab,getView,isCodeTab,getMirrorUrl,get
  };
  // Chromium calls createWindow synchronously. Returning WebContentsView's
  // webContents means no second native BrowserWindow is ever created.
- function handlePopup({opener,url,frameName}){
-  const request=pending.get(frameName);
-  if(!request||request.opener!==opener||request.url!==url||!state||state.closed)return {action:'deny'};
-  return {action:'allow',outlivesOpener:true,createWindow:options=>{
-   const view=new WebContentsView({webPreferences:{...options.webPreferences,session:opener.session,
-    sandbox:true,contextIsolation:true,nodeIntegration:false,webSecurity:true,backgroundThrottling:false}});
-   view.setBackgroundColor('#ffffff');
-   request.resolve(view);
-   return view.webContents;
-  }};
- }
- async function authenticatedView(id,url,opener){
-  const frameName='hexora-dual-pair-'+id+'-'+Date.now();
-  return new Promise(resolve=>{
-   let done=false;
-   const finish=view=>{
-    if(done){if(view&&!view.webContents.isDestroyed())view.webContents.close();return;}
-    done=true;clearTimeout(request.timer);pending.delete(frameName);resolve(view);
-   };
-   const request={opener,url,resolve:finish,timer:setTimeout(()=>finish(null),5000)};
-   pending.set(frameName,request);
-   void opener.executeJavaScript('window.open('+JSON.stringify(url)+','+JSON.stringify(frameName)+');true',true)
-    .catch(error=>{console.warn('[Dual] Popup opener failed:',error.message);finish(null);});
-  });
- }
+ // Popup-backed WebContentsView creation is unsupported by Electron's
+ // window-open ownership checks. Use the existing persistent session directly.
+ function handlePopup(){return {action:'deny'};}
  async function createEntry(g,id,url){
   const opener=getChatgptSource?.();
-  let view=null,fromPopup=false;
-  if(opener&&!opener.isDestroyed()&&/^https:\/\/chatgpt\.com\//.test(url)){
-   view=await authenticatedView(id,url,opener);
-   fromPopup=!!view;
-  }
-  if(g.closed){if(view&&!view.webContents.isDestroyed())view.webContents.close();return null;}
-  if(!view){
-   view=new WebContentsView({webPreferences:{session:session.fromPartition('persist:hexora-chatgpt'),
-    preload:path.join(__dirname,'site-vault-preload.js'),sandbox:true,contextIsolation:true,
-    nodeIntegration:false,webSecurity:true,javascript:true,backgroundThrottling:false}});
-   view.setBackgroundColor('#ffffff');
-   if(opener&&!opener.isDestroyed()&&new URL(url).hostname==='chatgpt.com')
-    view.webContents.setUserAgent(opener.getUserAgent());
-  }
+  const view=new WebContentsView({webPreferences:{session:session.fromPartition('persist:hexora-chatgpt'),
+   preload:path.join(__dirname,'site-vault-preload.js'),sandbox:true,contextIsolation:true,
+   nodeIntegration:false,webSecurity:true,javascript:true,backgroundThrottling:false}});
+  view.setBackgroundColor('#ffffff');
+  const opener=getChatgptSource?.();
+  if(opener&&!opener.isDestroyed()&&new URL(url).hostname==='chatgpt.com')
+   view.webContents.setUserAgent(opener.getUserAgent());
+  if(g.closed){view.webContents.close();return null;}
   const entry={id,url,view};
   g.entries.set(id,entry);
   view.webContents.on('did-fail-load',(_event,code,description,failedUrl,isMainFrame)=>{
    if(isMainFrame)console.error('[Dual] Load failed:',code,description,failedUrl);
   });
   view.webContents.on('render-process-gone',(_event,details)=>console.error('[Dual] Renderer exited:',details.reason));
-  if(!fromPopup)void view.webContents.loadURL(url).catch(error=>console.warn('[Dual] Navigation failed:',error.message));
+  void view.webContents.loadURL(url).catch(error=>console.warn('[Dual] Navigation failed:',error.message));
   return entry;
  }
  async function select(g){
