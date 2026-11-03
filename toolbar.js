@@ -812,7 +812,7 @@ function renderSecondTabRow(page){
   if(host.children[depth]!==row)host.insertBefore(row,host.children[depth]||null);
  }
  while(host.children.length>openStackPath.length)host.lastElementChild.remove();
- const height=120+34*openStackPath.length;
+ const height=95+34*openStackPath.length;
  document.body.classList.toggle('stack-row-open',openStackPath.length>0);
  document.documentElement.style.setProperty('--hexora-rows-height',height+'px');
  if(height!==lastRowHeight){lastRowHeight=height;action('stack-row-height',height);}
