@@ -22,29 +22,31 @@ document.addEventListener('pointermove',event=>{
  const previous=lastFramePointer;
  lastFramePointer={x:event.clientX,y:event.clientY,time:now};
  if(!previous)return;
- if(event.clientY>=85)frameFlickReady=true;
+ // Moving away from the top edge immediately rearms the next flick.
+ if(event.clientY>=72){
+  frameFlickReady=true;
+  if(event.clientY>=180){frameFlickDistance=0;frameFlickStartedAt=0;}
+ }
  const dt=now-previous.time;
- if(dt<=0||dt>180){
-  frameFlickDistance=0;
-  frameFlickStartedAt=0;
+ if(dt<=0||dt>240){
+  frameFlickDistance=0;frameFlickStartedAt=0;
   return;
  }
  const dy=previous.y-event.clientY;
- // Accumulate an intentional upward gesture rather than requiring one
- // unusually large pointer event (which varies with mouse polling rate).
- if(dy>0&&event.clientY<150&&Math.abs(event.clientX-previous.x)<85){
+ // Track upward motion over multiple pointer samples, even on high-DPI mice.
+ if(dy>0&&event.clientY<190&&Math.abs(event.clientX-previous.x)<125){
   if(!frameFlickStartedAt)frameFlickStartedAt=now;
   frameFlickDistance+=dy;
- }else if(dy< -3||event.clientY>=150){
-  frameFlickDistance=0;
-  frameFlickStartedAt=0;
+ }else if(dy< -5){
+  frameFlickDistance=0;frameFlickStartedAt=0;
  }
  const duration=now-frameFlickStartedAt;
- const velocity=duration>0?frameFlickDistance/duration:0;
- if(frameFlickReady&&event.clientY<=35&&frameFlickDistance>=34&&duration<=280&&
-    (velocity>=0.18||frameFlickDistance>=65)){
-  frameFlickDistance=0;
-  frameFlickStartedAt=0;
+ const speed=duration>0?frameFlickDistance/duration:0;
+ // Detect before entering Electron's draggable titlebar, which can swallow
+ // pointer events. Hover alone has no upward distance and never triggers.
+ if(frameFlickReady&&event.clientY<=52&&frameFlickDistance>=20&&
+    duration<=380&&(speed>=0.12||frameFlickDistance>=42)){
+  frameFlickDistance=0;frameFlickStartedAt=0;
   frameFlickReady=false;
   setCompactFrame(!frameCompact);
  }
