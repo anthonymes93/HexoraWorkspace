@@ -309,6 +309,21 @@ function rememberFavicon(tabId,pageUrl,iconUrl){
  emit();
 }
 
+// Chromium-rendered website scrollbars use the same Hexora rail style.
+// insertCSS runs outside page CSP and is reapplied after top-level navigations.
+const HEXORA_SITE_SCROLLBAR_CSS=`
+:root{scrollbar-color:#628ce4 #101b31!important;scrollbar-width:auto!important}
+::-webkit-scrollbar{width:11px!important;height:11px!important}
+::-webkit-scrollbar-track{background:#101b31!important;border-radius:12px!important}
+::-webkit-scrollbar-corner{background:#101b31!important}
+::-webkit-scrollbar-thumb{background:#628ce4!important;border:2px solid #101b31!important;border-radius:12px!important;min-height:38px!important;min-width:38px!important}
+::-webkit-scrollbar-thumb:hover{background:#91b0fa!important}
+::-webkit-scrollbar-thumb:active{background:#b5caff!important}
+`;
+function applyHexoraWebsiteScrollbars(wc){
+ if(wc.isDestroyed()||!/^https?:/i.test(wc.getURL()))return;
+ wc.insertCSS(HEXORA_SITE_SCROLLBAR_CSS,{cssOrigin:'user'}).catch(error=>console.warn('[Hexora] Website scrollbar style unavailable:',error.message));
+}
 function wire(t){const view=new WebContentsView({webPreferences:{partition:'persist:hexora-chatgpt',preload:path.join(__dirname,'site-vault-preload.js'),sandbox:true,contextIsolation:true,nodeIntegration:false,webSecurity:true,javascript:true}});const wc=view.webContents;
  wc.setAudioMuted(!!t.muted);
  if(chromeMode(t.id))wc.setUserAgent(chromeUserAgent(wc));
@@ -322,7 +337,7 @@ function wire(t){const view=new WebContentsView({webPreferences:{partition:'pers
   if(url)rememberFavicon(t.id,wc.getURL(),url);
  });
  wc.on('page-title-updated',()=>{if(tabStoreClosing||quitting)return;update(true);store.recordVisit(wc.getURL(),wc.getTitle(),t.id);});
- wc.on('did-navigate',()=>{if(tabStoreClosing||quitting)return;if(favicons.get(t.id)?.origin!==originOf(wc.getURL()))favicons.delete(t.id);update();store.recordVisit(wc.getURL(),wc.getTitle(),t.id);});
+ wc.on('did-navigate',()=>{applyHexoraWebsiteScrollbars(wc);if(tabStoreClosing||quitting)return;if(favicons.get(t.id)?.origin!==originOf(wc.getURL()))favicons.delete(t.id);update();store.recordVisit(wc.getURL(),wc.getTitle(),t.id);});
  wc.on('did-navigate-in-page',()=>{if(tabStoreClosing||quitting)return;update();store.recordVisit(wc.getURL(),wc.getTitle(),t.id);});
  wc.on('did-start-loading',()=>{loading.set(t.id,true);emit();});
  wc.on('did-stop-loading',()=>{loading.delete(t.id);emit();});
@@ -338,6 +353,7 @@ function wire(t){const view=new WebContentsView({webPreferences:{partition:'pers
  },250);
  wc.once('destroyed',()=>clearInterval(draftTimer));
  wc.on('dom-ready',()=>{
+  applyHexoraWebsiteScrollbars(wc);
   if(!wc.getURL().startsWith('https://chatgpt.com/'))return;
   const initial=JSON.stringify(store.getMeta(draftKey)||'');
   wc.executeJavaScript(CHATGPT_DRAFT_GUARD.replace('__HEXORA_SAVED_DRAFT__',initial)).catch(err=>console.warn('Draft restore unavailable:',err.message));
