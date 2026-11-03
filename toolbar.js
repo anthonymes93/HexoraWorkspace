@@ -1828,6 +1828,7 @@ $('open-email-app')?.addEventListener('click',()=>window.hexora.email.open().cat
   if(closeTimer){clearTimeout(closeTimer);closeTimer=null;}
   bell.setAttribute('aria-expanded',String(open));
   if(open){
+   checkDue();
    panel.hidden=false;
    render();
    requestAnimationFrame(()=>requestAnimationFrame(()=>panel.classList.add('is-visible')));
