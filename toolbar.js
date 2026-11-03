@@ -503,6 +503,46 @@ if(pushwardAlarmButton)pushwardAlarmButton.addEventListener('click',async()=>{
  catch(error){alert('Pushward alarm: '+error.message);}
  finally{pushwardAlarmButton.disabled=false;}
 });
+// Recent Saves: lightweight local file history, without copying files into Hexora.
+const recentSavesButton=$('recent-saves-rail');
+let recentSavesOverlay=null;
+function closeRecentSaves(){
+ if(!recentSavesOverlay)return;
+ recentSavesOverlay.remove();recentSavesOverlay=null;
+ recentSavesButton.classList.remove('selected');action('modal',false);
+}
+async function openRecentSaves(){
+ if(recentSavesOverlay){closeRecentSaves();return;}
+ const veil=document.createElement('div');veil.className='overlay';veil.style.zIndex='99999';
+ const panel=document.createElement('div');panel.className='dialog';
+ panel.style.cssText='width:min(580px,calc(100vw - 36px));max-height:75vh;overflow:auto;padding:24px';
+ const head=document.createElement('div');head.style.cssText='display:flex;align-items:center;justify-content:space-between;gap:12px';
+ const title=document.createElement('h2');title.textContent='Recent Saves';title.style.margin='0';
+ const close=document.createElement('button');close.type='button';close.textContent='×';close.title='Close';close.onclick=closeRecentSaves;
+ head.append(title,close);
+ const subtitle=document.createElement('p');subtitle.textContent='Recently saved images and downloads on this computer.';
+ const list=document.createElement('div');list.style.cssText='display:flex;flex-direction:column;gap:8px;margin-top:18px';
+ panel.append(head,subtitle,list);veil.append(panel);document.body.append(veil);
+ recentSavesOverlay=veil;recentSavesButton.classList.add('selected');action('modal',true);
+ veil.addEventListener('mousedown',e=>{if(e.target===veil)closeRecentSaves();});
+ veil.addEventListener('keydown',e=>{if(e.key==='Escape')closeRecentSaves();});
+ try{
+  const entries=await window.hexora.saves.list();
+  if(recentSavesOverlay!==veil)return;
+  if(!entries.length){list.textContent='No saved files yet. Right-click an image in a website and choose Save Image As…';return;}
+  for(const entry of entries){
+   const row=document.createElement('div');row.style.cssText='display:flex;align-items:center;gap:12px;padding:10px;border:1px solid #ffffff22;border-radius:9px';
+   const details=document.createElement('div');details.style.cssText='flex:1;min-width:0';
+   const name=document.createElement('strong');name.textContent=entry.name;name.style.cssText='display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
+   const date=document.createElement('small');date.textContent=new Date(entry.savedAt).toLocaleString();date.style.opacity='.7';
+   details.append(name,date);
+   const open=document.createElement('button');open.type='button';open.textContent='Open';open.onclick=()=>window.hexora.saves.open(entry.path).catch(err=>alert(err.message));
+   const folder=document.createElement('button');folder.type='button';folder.textContent='Folder';folder.onclick=()=>window.hexora.saves.folder(entry.path).catch(err=>alert(err.message));
+   row.append(details,open,folder);list.append(row);
+  }
+ }catch(error){list.textContent='Could not load recent saves: '+error.message;}
+}
+recentSavesButton.addEventListener('click',openRecentSaves);
 const NOTION_ACTION_CENTER_URL='https://app.notion.com/p/anthonymeszaros/Action-Center-348a372875a78084a961fd11848b2880';
 $('notion-rail').onclick=async()=>{
  try{
