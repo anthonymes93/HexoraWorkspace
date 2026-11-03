@@ -1,6 +1,7 @@
 const {contextBridge,ipcRenderer}=require('electron');
 contextBridge.exposeInMainWorld('hexora',{
  startPushwardAlarm:()=>ipcRenderer.invoke('pushward:alarm:start'),
+ saves:{list:()=>ipcRenderer.invoke('saves:list'),open:file=>ipcRenderer.invoke('saves:open',file),folder:file=>ipcRenderer.invoke('saves:folder',file)},
  windowControl:action=>ipcRenderer.invoke('main-window:control',action),
  codePicker:{locations:()=>ipcRenderer.invoke('code-picker:locations'),list:folder=>ipcRenderer.invoke('code-picker:list',folder),favorite:folder=>ipcRenderer.invoke('code-picker:favorite',folder)},
  nativeCode:{chooseProject:id=>ipcRenderer.invoke('native-code:choose-project',id),clearProject:id=>ipcRenderer.invoke('native-code:clear-project',id),repair:()=>ipcRenderer.invoke('native-code:repair'),toggle:()=>ipcRenderer.invoke('native-code:toggle'),detach:()=>ipcRenderer.invoke('native-code:detach'),onStopped:callback=>ipcRenderer.on('native-code:stopped',callback)},
