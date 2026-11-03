@@ -58,10 +58,10 @@ function createDualMirror({getActiveId,getTab,getView,isCodeTab,getMirrorUrl,get
  async function createEntry(g,id,url){
   const opener=getChatgptSource?.();
   let view=null,fromPopup=false;
-  if(opener&&!opener.isDestroyed()&&/^https:\/\/chatgpt\.com\//.test(url)){
-   view=await authenticatedView(id,url,opener);
-   fromPopup=!!view;
-  }
+  // Electron 38 rejects returning WebContentsView.webContents from
+  // setWindowOpenHandler.createWindow. Use the existing session-backed
+  // fallback below for ChatGPT, just like other Dual Workspace sites.
+  // Keep the secondary-window layout and attachment logic unchanged.
   if(g.closed){if(view&&!view.webContents.isDestroyed())view.webContents.close();return null;}
   if(!view){
    view=new WebContentsView({webPreferences:{session:session.fromPartition('persist:hexora-chatgpt'),
