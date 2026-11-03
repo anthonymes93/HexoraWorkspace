@@ -7,7 +7,7 @@ function createDualMirror({getActiveId,getTab,getView,isCodeTab,getMirrorUrl,get
  let opening=null;
  // Use the browser's native opener relationship so the paired page inherits
  // origin-specific sessionStorage without Hexora reading or copying auth data.
- function openViaChatgpt(opener,url){
+ function openViaChatgpt(opener,url,id){
   return new Promise(resolve=>{
    let finished=false;
    const finish=popup=>{
@@ -29,7 +29,7 @@ function createDualMirror({getActiveId,getTab,getView,isCodeTab,getMirrorUrl,get
    const timer=setTimeout(()=>finish(null),5000);
    // Inherited popup settings and session are provided by the existing
    // setWindowOpenHandler on regular Hexora web tabs.
-   void opener.executeJavaScript('window.open('+JSON.stringify(url)+',"_blank");true',true).catch(()=>finish(null));
+   void opener.executeJavaScript('window.open('+JSON.stringify(url)+','+JSON.stringify('hexora-dual-pair-'+id)+');true',true).catch(()=>finish(null));
   });
  }
  let state=null;
@@ -71,7 +71,7 @@ function createDualMirror({getActiveId,getTab,getView,isCodeTab,getMirrorUrl,get
   let popup=null,view=null;
   const opener=getChatgptSource?.();
   if(opener&&!opener.isDestroyed()&&/^https:\/\/chatgpt\.com\//.test(pairedUrl)){
-   popup=await openViaChatgpt(opener,pairedUrl);
+   popup=await openViaChatgpt(opener,pairedUrl,id);
    if(popup)console.info('[Dual Mirror] Reusing authenticated browser opener for paired tab',id);
    else console.warn('[Dual Mirror] Authenticated popup unavailable; using regular webview for paired tab',id);
   }
