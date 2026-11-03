@@ -922,5 +922,6 @@ body.sidebar-trim-workspace-details:not(.sidebar-icons-only) .workspace{gap:6px}
 .tabsbar .tab-toolbar svg{width:16px;height:16px;display:block;pointer-events:none}
 .tabsbar .tab-toolbar>.tab-plus:hover,.tabsbar .tab-toolbar>.nav button:hover{background:#ffffff20}
 
-/* Round only the upper-left corner of the dark workspace sidebar. */
+/* Reveal blue framing behind the sidebar's rounded top-left corner. */
+body::before{content:"";position:absolute;top:16px;left:64px;width:18px;height:18px;background:var(--hexora-frame-blue,#1c347f);pointer-events:none}
 .sidebar,.sidebar.hidden{border-radius:16px 0 0 0}
