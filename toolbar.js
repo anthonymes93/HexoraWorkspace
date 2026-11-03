@@ -1743,7 +1743,7 @@ $('open-email-app')?.addEventListener('click',()=>window.hexora.email.open().cat
  ];
 
  const quickKey='hexora-quick-notifications-v1';
- const form=$('notifications-quick-form'),add=$('notifications-add'),message=$('quick-notification-message'),date=$('quick-notification-date'),time=$('quick-notification-time'),error=$('quick-notification-error');
+ const form=$('notifications-quick-form'),add=$('notifications-add'),message=$('quick-notification-message'),date=$('quick-notification-date'),time=$('quick-notification-time'),error=$('quick-notification-error'),important=$('quick-notification-important');
  let quick=[];
  try{const stored=JSON.parse(localStorage.getItem(quickKey)||'[]');if(Array.isArray(stored))quick=stored.filter(n=>n&&typeof n.id==='string'&&typeof n.message==='string'&&Number.isFinite(n.due)&&typeof n.delivered==='boolean').slice(-100);}catch{}
  const saveQuick=()=>{try{localStorage.setItem(quickKey,JSON.stringify(quick));}catch{}};
@@ -1776,7 +1776,7 @@ $('open-email-app')?.addEventListener('click',()=>window.hexora.email.open().cat
   const done=document.createElement('button');done.type='button';done.textContent='✓ Dismiss';
   const markDone=()=>{n.read=true;saveQuick();render();updateBell();hideToast();};
   dismiss.addEventListener('click',markDone);done.addEventListener('click',markDone);
-  snooze.addEventListener('click',()=>{n.due=Date.now()+300000;n.delivered=false;n.read=false;saveQuick();render();updateBell();hideToast();});
+  snooze.addEventListener('click',()=>{n.due=Date.now()+300000;n.delivered=false;n.read=false;n.themeFlipped=true;saveQuick();render();updateBell();hideToast();});
   actions.append(snooze,done);card.append(heading,body,actions);toastHost.append(card);
   window.hexora?.action('quick-toast-visible',true).catch(()=>{});
   requestAnimationFrame(()=>requestAnimationFrame(()=>toastHost.classList.add('is-visible')));
@@ -1787,7 +1787,17 @@ $('open-email-app')?.addEventListener('click',()=>window.hexora.email.open().cat
    if(mode==='in-app')showToast(n);
   }).catch(()=>showToast(n));
  };
+ const checkImportantTheme=()=>{
+  const now=Date.now();let changed=false;
+  for(const n of quick){
+   if(!n.important||n.themeFlipped||n.delivered||now<n.due-120000)continue;
+   n.themeFlipped=true;changed=true;
+   window.dispatchEvent(new Event('hexora:important-reminder'));
+  }
+  if(changed)saveQuick();
+ };
  const checkDue=()=>{
+  checkImportantTheme();
   const now=Date.now();let changed=false;
   for(const n of quick)if(!n.delivered&&n.due<=now){n.delivered=true;n.read=false;changed=true;
    alertDue(n);
@@ -1801,7 +1811,7 @@ $('open-email-app')?.addEventListener('click',()=>window.hexora.email.open().cat
    const next=new Date(Date.now()+5*60000);
    const local=new Date(next.getTime()-next.getTimezoneOffset()*60000).toISOString().slice(0,16);
    date.value=local.slice(0,10);time.value=local.slice(11);
-   error.hidden=true;message.focus();
+   error.hidden=true;if(important)important.checked=false;message.focus();
   }else add.focus();
  };
  add?.addEventListener('click',()=>showForm(form.hidden));
@@ -1812,7 +1822,7 @@ $('open-email-app')?.addEventListener('click',()=>window.hexora.email.open().cat
   if(!text||!Number.isFinite(due)||due<=Date.now()){
    error.textContent='Enter a message and a future date and time.';error.hidden=false;return;
   }
-  quick.push({id:String(Date.now())+'-'+Math.random().toString(36).slice(2,7),message:text,due,delivered:false,read:false});
+  quick.push({id:String(Date.now())+'-'+Math.random().toString(36).slice(2,7),message:text,due,delivered:false,read:false,important:!!important?.checked,themeFlipped:false});
   quick.sort((a,b)=>a.due-b.due);quick=quick.slice(-100);
   saveQuick();message.value='';showForm(false);render();updateBell();
  });
@@ -1837,7 +1847,7 @@ $('open-email-app')?.addEventListener('click',()=>window.hexora.email.open().cat
    const meta=document.createElement('div');meta.className='notification-item-meta';
    const source=document.createElement('span');source.textContent=n.delivered?'Quick notification':'Scheduled';
    const when=document.createElement('span');when.textContent=prettyDue(n.due);meta.append(source,when);
-   const title=document.createElement('strong');title.textContent=n.message;
+   const title=document.createElement('strong');title.textContent=n.important?'★ '+n.message:n.message;
    const controls=document.createElement('div');controls.className='notification-quick-actions';
    if(n.delivered&&!n.read){const read=document.createElement('button');read.type='button';read.textContent='Mark read';read.dataset.quickRead=n.id;controls.append(read);}
    const remove=document.createElement('button');remove.type='button';remove.textContent='Remove';remove.dataset.quickRemove=n.id;controls.append(remove);
