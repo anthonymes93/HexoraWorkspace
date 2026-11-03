@@ -105,7 +105,7 @@ if(!hasSingleInstanceLock){
 }
 const HOME='https://chatgpt.com/';
 const DETACHED_HEADER=44;
-const MAIN_TITLEBAR_HEIGHT=process.platform==='win32'?32:0;
+const MAIN_TITLEBAR_HEIGHT=process.platform==='win32'?16:0;
 let TOP_HEIGHT=95;const IDLE_MS=24*60*60*1000,MAX_LIVE=8;
 let recoveryWindow=null,vault=null;
 const detached=new Map();
@@ -794,7 +794,18 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
  syncNativeCodeProjects();
  sidebarWidth=Math.max(64,Math.min(560,Number(store.getMeta('sidebarCustomWidth'))||330));
  const mainTaskbar=safeTaskbarIdentity();
- win=new BrowserWindow({width:1360,height:900,minWidth:700,minHeight:400,title:isDevelopment?'Hexora Workspace [DEV]':'Hexora Workspace',icon:mainTaskbar?.iconPath,autoHideMenuBar:true,...(process.platform==='win32'?{titleBarStyle:'hidden',titleBarOverlay:{color:'#1c347f',symbolColor:'#ffffff',height:MAIN_TITLEBAR_HEIGHT}}:{}),backgroundColor:'#111215',webPreferences:{preload:path.join(__dirname,'preload.js'),contextIsolation:true,sandbox:true,nodeIntegration:false}});
+ win=new BrowserWindow({width:1360,height:900,minWidth:700,minHeight:400,title:isDevelopment?'Hexora Workspace [DEV]':'Hexora Workspace',icon:mainTaskbar?.iconPath,autoHideMenuBar:true,...(process.platform==='win32'?{frame:false}: {}),backgroundColor:'#111215',webPreferences:{preload:path.join(__dirname,'preload.js'),contextIsolation:true,sandbox:true,nodeIntegration:false}});
+ if(process.platform==='win32'){
+  ipcMain.removeHandler('main-window:control');
+  ipcMain.handle('main-window:control',(event,action)=>{
+   if(event.sender!==win.webContents)return false;
+   if(action==='minimize')win.minimize();
+   else if(action==='maximize'){if(win.isMaximized())win.unmaximize();else win.maximize();}
+   else if(action==='close')win.close();
+   else return false;
+   return true;
+  });
+ }
  safeApplyTaskbar(win,mainTaskbar);
  if(isDevelopment){
   // A loaded HTML title may overwrite BrowserWindow.title; keep the native

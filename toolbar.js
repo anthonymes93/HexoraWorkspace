@@ -1,3 +1,5 @@
+// Window controls are restricted to the main Hexora window by the main-process IPC handler.
+document.querySelectorAll('[data-window-action]').forEach(button=>button.addEventListener('click',()=>window.hexora.windowControl(button.dataset.windowAction)));
 const $=id=>document.getElementById(id);
 // The development marker is driven by the Electron main process, not local storage.
 // Initialize before the rest of the toolbar so startup is unambiguous.
