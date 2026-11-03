@@ -1741,11 +1741,73 @@ $('open-email-app')?.addEventListener('click',()=>window.hexora.email.open().cat
   {id:5,kind:'system',icon:'✦',source:'Hexora',title:'A new version is available',detail:'Performance and interface improvements',time:'4h',unread:false},
   {id:6,kind:'system',icon:'◷',source:'Reminder',title:'Focus block starts soon',detail:'Your next scheduled work session',time:'9h',unread:false}
  ];
+
+ const quickKey='hexora-quick-notifications-v1';
+ const form=$('notifications-quick-form'),add=$('notifications-add'),message=$('quick-notification-message'),date=$('quick-notification-date'),time=$('quick-notification-time'),error=$('quick-notification-error');
+ let quick=[];
+ try{const stored=JSON.parse(localStorage.getItem(quickKey)||'[]');if(Array.isArray(stored))quick=stored.filter(n=>n&&typeof n.id==='string'&&typeof n.message==='string'&&Number.isFinite(n.due)&&typeof n.delivered==='boolean').slice(-100);}catch{}
+ const saveQuick=()=>{try{localStorage.setItem(quickKey,JSON.stringify(quick));}catch{}};
+ const prettyDue=timestamp=>new Date(timestamp).toLocaleString(undefined,{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
+ const updateBell=()=>{const count=quick.filter(n=>n.delivered&&!n.read).length;const dot=$('notifications-dot');if(dot)dot.hidden=!count;bell.setAttribute('aria-label',count?'Notifications, '+count+' unread':'Notifications');};
+ const checkDue=()=>{
+  const now=Date.now();let changed=false;
+  for(const n of quick)if(!n.delivered&&n.due<=now){n.delivered=true;n.read=false;changed=true;
+   if(typeof Notification!=='undefined'&&Notification.permission==='granted'){
+    try{new Notification('Hexora · Quick notification',{body:n.message,tag:'hexora-quick-'+n.id});}catch{}
+   }
+  }
+  if(changed){saveQuick();render();}
+  updateBell();
+ };
+ const showForm=show=>{
+  form.hidden=!show;
+  if(show){
+   const next=new Date(Date.now()+5*60000);
+   const local=new Date(next.getTime()-next.getTimezoneOffset()*60000).toISOString().slice(0,16);
+   date.value=local.slice(0,10);time.value=local.slice(11);
+   error.hidden=true;message.focus();
+  }else add.focus();
+ };
+ add?.addEventListener('click',()=>showForm(form.hidden));
+ $('quick-notification-cancel')?.addEventListener('click',()=>showForm(false));
+ form?.addEventListener('submit',event=>{
+  event.preventDefault();
+  const text=message.value.trim(),due=new Date(date.value+'T'+time.value).getTime();
+  if(!text||!Number.isFinite(due)||due<=Date.now()){
+   error.textContent='Enter a message and a future date and time.';error.hidden=false;return;
+  }
+  quick.push({id:String(Date.now())+'-'+Math.random().toString(36).slice(2,7),message:text,due,delivered:false,read:false});
+  quick.sort((a,b)=>a.due-b.due);quick=quick.slice(-100);
+  saveQuick();message.value='';showForm(false);render();updateBell();
+ });
+ feed.addEventListener('click',event=>{
+  const remove=event.target.closest('[data-quick-remove]');
+  if(remove){quick=quick.filter(n=>n.id!==remove.dataset.quickRemove);saveQuick();render();updateBell();return;}
+  const read=event.target.closest('[data-quick-read]');
+  if(read){const n=quick.find(n=>n.id===read.dataset.quickRead);if(n){n.read=true;saveQuick();render();updateBell();}}
+ });
+ document.addEventListener('visibilitychange',()=>{if(!document.hidden)checkDue();});
+ window.addEventListener('focus',checkDue);
+ setInterval(checkDue,15000);
  let filter='all';
  const render=()=>{
   feed.replaceChildren();
   const filtered=samples.filter(item=>filter==='all'||item.kind===filter);
-  if(!filtered.length){const empty=document.createElement('p');empty.className='notifications-feed-empty';empty.textContent='Nothing here yet.';feed.append(empty);return;}
+  const quickVisible=filter==='all'||filter==='system';
+  if(quickVisible)for(const n of [...quick].sort((a,b)=>a.due-b.due)){
+   const row=document.createElement('div');row.className='notification-item notification-quick'+(n.delivered&&!n.read?' is-unread':'');
+   const symbol=document.createElement('span');symbol.className='notification-item-icon';symbol.textContent=n.delivered?'✓':'◷';
+   const content=document.createElement('div');content.className='notification-item-content';
+   const meta=document.createElement('div');meta.className='notification-item-meta';
+   const source=document.createElement('span');source.textContent=n.delivered?'Quick notification':'Scheduled';
+   const when=document.createElement('span');when.textContent=prettyDue(n.due);meta.append(source,when);
+   const title=document.createElement('strong');title.textContent=n.message;
+   const controls=document.createElement('div');controls.className='notification-quick-actions';
+   if(n.delivered&&!n.read){const read=document.createElement('button');read.type='button';read.textContent='Mark read';read.dataset.quickRead=n.id;controls.append(read);}
+   const remove=document.createElement('button');remove.type='button';remove.textContent='Remove';remove.dataset.quickRemove=n.id;controls.append(remove);
+   content.append(meta,title,controls);row.append(symbol,content);feed.append(row);
+  }
+  if(!filtered.length&&(!quickVisible||!quick.length)){const empty=document.createElement('p');empty.className='notifications-feed-empty';empty.textContent='Nothing here yet.';feed.append(empty);return;}
   for(const item of filtered){
    const row=document.createElement('div');row.className='notification-item'+(item.unread?' is-unread':'');
    const symbol=document.createElement('span');symbol.className='notification-item-icon';symbol.textContent=item.icon;
@@ -1789,5 +1851,6 @@ $('open-email-app')?.addEventListener('click',()=>window.hexora.email.open().cat
   document.querySelectorAll('[data-notification-filter]').forEach(b=>b.classList.toggle('selected',b===button));
   render();
  }));
- $('notifications-mark-read')?.addEventListener('click',()=>{samples.forEach(item=>item.unread=false);render();});
+ $('notifications-mark-read')?.addEventListener('click',()=>{samples.forEach(item=>item.unread=false);quick.forEach(n=>{if(n.delivered)n.read=true;});saveQuick();render();updateBell();});
+ checkDue();
 })();
