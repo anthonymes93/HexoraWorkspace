@@ -1761,11 +1761,24 @@ $('open-email-app')?.addEventListener('click',()=>window.hexora.email.open().cat
    feed.append(row);
   }
  };
+ let closeTimer=null;
  const setOpen=open=>{
-  panel.hidden=!open;bell.setAttribute('aria-expanded',String(open));
-  document.body.classList.toggle('notifications-drawer-open',open);
-  window.hexora?.action('notifications-drawer',open);
-  if(open){render();close?.focus();}
+  if(closeTimer){clearTimeout(closeTimer);closeTimer=null;}
+  bell.setAttribute('aria-expanded',String(open));
+  if(open){
+   panel.hidden=false;
+   render();
+   requestAnimationFrame(()=>requestAnimationFrame(()=>panel.classList.add('is-visible')));
+   document.body.classList.add('notifications-drawer-open');
+   window.hexora?.action('notifications-drawer',true);
+   close?.focus();
+  }else{
+   panel.classList.remove('is-visible');
+   document.body.classList.remove('notifications-drawer-open');
+   const finish=()=>{panel.hidden=true;window.hexora?.action('notifications-drawer',false);closeTimer=null;};
+   if(window.matchMedia('(prefers-reduced-motion: reduce)').matches)finish();
+   else closeTimer=setTimeout(finish,270);
+  }
  };
  bell.addEventListener('click',()=>setOpen(panel.hidden));
  close?.addEventListener('click',()=>{setOpen(false);bell.focus();});
