@@ -1071,3 +1071,10 @@ body.notifications-drawer-open .top-main{background:var(--hexora-frame-blue,#1c3
 .notifications-feed::-webkit-scrollbar-thumb{background:linear-gradient(180deg,#89a8f2,var(--hexora-frame-blue-light,#557bd4));border:2px solid #111d32;border-radius:12px;min-height:42px}
 .notifications-feed::-webkit-scrollbar-thumb:hover{background:linear-gradient(180deg,#b0c7ff,#6b94f3)}
 @media(prefers-reduced-motion:reduce){.notifications-panel{transition:none!important;transform:none!important}}
+
+/* Hexora-owned scroll containers share the same visible scrollbar as web tabs. */
+:where(.sidebar,.theme-modal,.theme-options,.notifications-feed,.modal-body,.tab-list,.workspace-list,.search-results){scrollbar-width:auto;scrollbar-color:#628ce4 #101b31}
+:where(.sidebar,.theme-modal,.theme-options,.notifications-feed,.modal-body,.tab-list,.workspace-list,.search-results)::-webkit-scrollbar{width:11px;height:11px}
+:where(.sidebar,.theme-modal,.theme-options,.notifications-feed,.modal-body,.tab-list,.workspace-list,.search-results)::-webkit-scrollbar-track{background:#101b31;border-radius:12px}
+:where(.sidebar,.theme-modal,.theme-options,.notifications-feed,.modal-body,.tab-list,.workspace-list,.search-results)::-webkit-scrollbar-thumb{background:#628ce4;border:2px solid #101b31;border-radius:12px;min-height:38px}
+:where(.sidebar,.theme-modal,.theme-options,.notifications-feed,.modal-body,.tab-list,.workspace-list,.search-results)::-webkit-scrollbar-thumb:hover{background:#91b0fa}
