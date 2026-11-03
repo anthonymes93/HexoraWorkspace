@@ -1078,3 +1078,11 @@ body.notifications-drawer-open .top-main{background:var(--hexora-frame-blue,#1c3
 :where(.sidebar,.theme-modal,.theme-options,.notifications-feed,.modal-body,.tab-list,.workspace-list,.search-results)::-webkit-scrollbar-track{background:#101b31;border-radius:12px}
 :where(.sidebar,.theme-modal,.theme-options,.notifications-feed,.modal-body,.tab-list,.workspace-list,.search-results)::-webkit-scrollbar-thumb{background:#628ce4;border:2px solid #101b31;border-radius:12px;min-height:38px}
 :where(.sidebar,.theme-modal,.theme-options,.notifications-feed,.modal-body,.tab-list,.workspace-list,.search-results)::-webkit-scrollbar-thumb:hover{background:#91b0fa}
+
+/* Unified Hexora scrollbar colors follow the active Omega frame palette. */
+:root{--hx-scroll-thumb:#405a9b;--hx-scroll-hover:#628ce4;--hx-scroll-track:#17191f}
+:root[data-hexora-theme="omega"]{--hx-scroll-thumb:var(--hexora-frame-blue);--hx-scroll-hover:var(--hexora-frame-blue-light)}
+:where(.sidebar,.theme-modal,.theme-options,.notifications-feed,.modal-body,.tab-list,.workspace-list,.search-results){scrollbar-color:var(--hx-scroll-thumb) var(--hx-scroll-track)!important}
+:where(.sidebar,.theme-modal,.theme-options,.notifications-feed,.modal-body,.tab-list,.workspace-list,.search-results)::-webkit-scrollbar-track{background:var(--hx-scroll-track)!important}
+:where(.sidebar,.theme-modal,.theme-options,.notifications-feed,.modal-body,.tab-list,.workspace-list,.search-results)::-webkit-scrollbar-thumb{background:var(--hx-scroll-thumb)!important;border-color:var(--hx-scroll-track)!important}
+:where(.sidebar,.theme-modal,.theme-options,.notifications-feed,.modal-body,.tab-list,.workspace-list,.search-results)::-webkit-scrollbar-thumb:hover{background:var(--hx-scroll-hover)!important}
