@@ -1139,3 +1139,11 @@ body.notifications-drawer-open .top-main{background:var(--hexora-frame-blue,#1c3
 .notifications-quick-form .quick-link-optional{font-weight:400;color:#8fa4cb}
 .notifications-quick-form #quick-notification-deep-link{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:11px}
 .notification-quick-link{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;color:#a9c5ff!important;font-size:10px!important;overflow-wrap:anywhere}
+
+/* Quick-tap focus frame: preserve the blue left rail and the tab controls. */
+body.hexora-compact-frame .main-titlebar-drag{display:none}
+body.hexora-compact-frame .rail{top:0}
+body.hexora-compact-frame .sidebar{visibility:hidden;pointer-events:none}
+body.hexora-compact-frame #sidebar-resize-handle{display:none}
+body.hexora-compact-frame .top-main{top:0;left:58px}
+body.hexora-compact-frame .rail .logo{cursor:pointer}
