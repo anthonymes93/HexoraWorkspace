@@ -33,6 +33,11 @@
       button.setAttribute('aria-pressed',String(selected));
     });
   };
+  window.addEventListener('hexora:important-reminder',()=>{
+    if(document.documentElement.dataset.hexoraTheme!=='omega')return;
+    const current=document.documentElement.dataset.hexoraOmegaColor;
+    if(current==='red'||current==='blue')applyOmega(current==='red'?'blue':'red');
+  });
   const omegaHost=document.getElementById('omega-color-options');
   if(omegaHost)for(const [id,name] of omegaColors){
     const button=document.createElement('button');button.type='button';button.className='omega-color-choice';
