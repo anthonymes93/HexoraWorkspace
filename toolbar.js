@@ -176,7 +176,7 @@ function render(p){
   const label=document.createElement('span');label.className='name';label.textContent=w.name;
   const count=document.createElement('span');count.className='count';count.textContent=p.counts.find(x=>x.workspace===w.id)?.count||0;
   const edit=document.createElement('span');edit.className='workspace-edit';edit.title='Edit workspace';edit.textContent='⋯';edit.onclick=e=>{e.stopPropagation();openWorkspaceEditor(w.id);};
-  el.append(symbol,label,count,edit);attachWorkspaceHoverTip(el,w,Number(count.textContent)||0);el.addEventListener('contextmenu',e=>showWorkspaceMenu(e,w));el.onclick=async()=>{activeWorkspace=w.id;offset=0;save();await action('switch-workspace',w.id);if(w.id==='dual')await action('dual-mirror');refresh();};enableSidebarDrag(el,w.id,sidebarWorkspaceOrderKey);container.append(el);
+  el.append(symbol,label,count,edit);attachWorkspaceHoverTip(el,w,Number(count.textContent)||0);el.addEventListener('contextmenu',e=>showWorkspaceMenu(e,w));el.onclick=async()=>{activeWorkspace=w.id;offset=0;save();await action('switch-workspace',w.id);if(w.id==='dual'){await action('dual-setup');await action('dual-mirror');}refresh();};enableSidebarDrag(el,w.id,sidebarWorkspaceOrderKey);container.append(el);
  }
  const conversations=$('conversations');conversations.replaceChildren();
  renderStackTree(conversations,p);
@@ -1060,6 +1060,24 @@ tabStrip.addEventListener('drop',e=>{
 
 // Right-click any tab to turn it into a website, or open a website in a separate tab.
 function hideTabMenu(restore=true){ $('tab-workspace-submenu').classList.add('hidden');$('tab-menu-move').setAttribute('aria-expanded','false'); const wasOpen=!$('tab-context-menu').classList.contains('hidden');$('tab-context-menu').classList.add('hidden');contextTab=null;if(wasOpen&&restore&&!websiteTarget)action('modal',false); }
+function ensureDualPairMenu(){
+ let button=document.getElementById('hexora-dual-pair-menu');
+ if(button)return button;
+ button=document.createElement('button');button.id='hexora-dual-pair-menu';button.type='button';
+ button.textContent='◫  Set paired window URL…';
+ button.style.cssText='display:block;width:100%;padding:10px 14px;text-align:left;background:transparent;color:inherit;border:0;cursor:pointer';
+ button.onclick=async()=>{
+  const tab=contextTab;if(!tab)return;
+  hideTabMenu();
+  const previous=await action('dual-pair-get',tab.id);
+  const value=prompt('Paired URL for '+(tab.title||'this tab')+' (blank = mirror main URL):',previous||'');
+  if(value===null)return;
+  try{await action('dual-pair-set',{id:tab.id,url:value.trim()});await action('dual-mirror');}
+  catch(error){alert('Paired URL: '+error.message);}
+ };
+ $('tab-context-menu').append(button);
+ return button;
+}
 function showTabMenu(x,y,item){
  contextTab=item;
  const multi=selectedTabIds.size>1;
