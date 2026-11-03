@@ -1,8 +1,9 @@
 'use strict';
-const {BrowserWindow,WebContentsView,session}=require('electron');
+const {app,BrowserWindow,WebContentsView,session}=require('electron');
 const path=require('node:path');
 function createDualMirror({getActiveId,getTab,getView,isCodeTab,getMirrorUrl,getChatgptSource}){
- let state=null,opening=null;
+ let state=null,opening=null,quitting=false;
+ app.once('before-quit',()=>{quitting=true;});
  const pending=new Map();
  const read='(()=>{const e=document.scrollingElement||document.documentElement;return {x:e.scrollLeft,y:e.scrollTop,mx:Math.max(0,e.scrollWidth-e.clientWidth),my:Math.max(0,e.scrollHeight-e.clientHeight)};})()';
  const scroll=p=>'(()=>{const e=document.scrollingElement||document.documentElement;const x='+p.rx+'*Math.max(0,e.scrollWidth-e.clientWidth),y='+p.ry+'*Math.max(0,e.scrollHeight-e.clientHeight);const old=e.style.scrollBehavior;e.style.scrollBehavior="auto";e.scrollTo({left:x,top:y,behavior:"instant"});e.style.scrollBehavior=old;})()';
@@ -98,7 +99,7 @@ function createDualMirror({getActiveId,getTab,getView,isCodeTab,getMirrorUrl,get
   detach(g);watch(g,source,'source');watch(g,entry.view.webContents,'target');resize(g);
  }
  async function sync(g){
-  if(g.busy||g.closed)return;g.busy=true;
+  if(g.busy||g.closed||g.window.isDestroyed()||!g.window.isVisible())return;g.busy=true;
   try{
    await select(g);
    const source=g.source,target=g.active?.view.webContents;
@@ -135,6 +136,13 @@ function createDualMirror({getActiveId,getTab,getView,isCodeTab,getMirrorUrl,get
     leader:null,leaderUntil:0,last:null,busy:false,closed:false,timer:null};
    state=g;
    window.on('resize',()=>resize(g));
+   // Closing the secondary screen hides it; its authenticated tab views stay alive.
+   // A full Hexora quit still destroys the window and releases the cached views.
+   window.on('close',event=>{
+    if(g.closed||window.isDestroyed())return;
+    if(quitting)return;
+    event.preventDefault();window.hide();
+   });
    window.on('closed',()=>stop(g));
    await select(g);
    if(g.closed)return false;
