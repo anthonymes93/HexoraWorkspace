@@ -3,7 +3,7 @@
   const key='hexora-appearance-theme';
   const themes=new Set(['classic','obsidian','white','omega']);
   const safe=value=>themes.has(value)?value:'classic';
-  const syncScrollbar=()=>window.hexora?.action('scrollbar-theme',{theme:document.documentElement.dataset.hexoraTheme,color:document.documentElement.dataset.hexoraOmegaColor}).catch(()=>{});
+  const syncScrollbar=()=>window.hexora?.action('scrollbar-theme',{theme:document.documentElement.dataset.hexoraTheme,color:document.documentElement.dataset.hexoraOmegaColor,thumb:document.documentElement.style.getPropertyValue('--hexora-frame-blue').trim(),hover:document.documentElement.style.getPropertyValue('--hexora-frame-blue-light').trim()}).catch(()=>{});
   const apply=value=>{
     const theme=safe(value);
     document.documentElement.dataset.hexoraTheme=theme;
