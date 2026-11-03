@@ -205,12 +205,12 @@ function render(p){
 // Sidebar grip: one serialized resize stream, without competing layout updates.
 const sidebarGrip=$('sidebar-resize-handle');
 let sidebarDrag=null,sidebarDesired=null,sidebarWorker=null;
-const clampSidebarWidth=x=>Math.round(Math.max(64,Math.min(560,Math.max(64,window.innerWidth-420),x)));
+const clampSidebarWidth=x=>Math.round(Math.max(58,Math.min(560,Math.max(58,window.innerWidth-420),x)));
 function snapSidebarWidth(width,drag,direction){
  // Snap only while shrinking. Expanding follows the pointer exactly.
  if(direction>0){drag.snapClosed=false;return width;}
- if(direction<0&&width<=88){drag.snapClosed=true;return 64;}
- if(drag.snapClosed&&direction<=0)return 64;
+ if(direction<0&&width<=88){drag.snapClosed=true;return 58;}
+ if(drag.snapClosed&&direction<=0)return 58;
  return width;
 }
 function queueSidebarResize(width){
@@ -246,7 +246,7 @@ sidebarGrip.addEventListener('pointermove',event=>{
  sidebarDrag.smoothedSpeed=sidebarDrag.smoothedSpeed*.68+Math.min(speed,8)*.32;
  if(sidebarDrag.smoothedSpeed>1.65)sidebarFastDrag=true;
  else if(sidebarDrag.smoothedSpeed<.9)sidebarFastDrag=false;
- if(!sidebarFastDrag||sidebarDrag.last===64)applySidebarBreakpoint(sidebarDrag.last);
+ if(!sidebarFastDrag||sidebarDrag.last===58)applySidebarBreakpoint(sidebarDrag.last);
  clearTimeout(sidebarSettleTimer);
  sidebarSettleTimer=setTimeout(()=>{
   if(!sidebarDrag)return;
@@ -274,7 +274,7 @@ sidebarGrip.addEventListener('pointercancel',endSidebarResize);
 sidebarGrip.addEventListener('keydown',async event=>{
  if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;
  event.preventDefault();
- const current=parseInt(getComputedStyle(document.documentElement).getPropertyValue('--hexora-content-left'),10)||330;
+ const current=parseInt(getComputedStyle(document.documentElement).getPropertyValue('--hexora-content-left'),10)||324;
  const next=event.key==='Home'?64:event.key==='End'?560:current+(event.key==='ArrowRight'?20:-20);
  await queueSidebarResize(next);
  await action('sidebar-resize-save');
@@ -1286,7 +1286,7 @@ function applySidebarBreakpoint(value){
  root.style.setProperty('--hexora-sidebar-fluid',String(Math.max(0,Math.min(1,(value-240)/95))));
 }
 window.hexora.onSidebarFrame((width,transitioning=false,target=null)=>{
- const value=Math.max(64,Math.min(560,width));
+ const value=Math.max(58,Math.min(560,width));
  const root=document.documentElement,body=document.body;
  if(transitioning&&!sidebarWasAnimating){
   // Keep one presentation style while native viewport width animates.
@@ -1302,7 +1302,7 @@ window.hexora.onSidebarFrame((width,transitioning=false,target=null)=>{
   body.classList.add('sidebar-auto-transition');
  }
  sidebarWasAnimating=transitioning;
- root.style.setProperty('--hexora-panel-width',(value-64)+'px');
+ root.style.setProperty('--hexora-panel-width',(value-58)+'px');
  root.style.setProperty('--hexora-content-left',value+'px');
  if(!sidebarDrag)sidebarOpen=value>65;
  if(!transitioning){
