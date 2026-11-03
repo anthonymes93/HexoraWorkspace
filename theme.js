@@ -23,7 +23,6 @@
   const omegaColors=[["blue","Blue"],["red","Red"],["orange","Orange"],["amber","Amber"],["green","Green"],["teal","Teal"],["cyan","Cyan"],["purple","Purple"],["pink","Pink"],["indigo","Indigo"]];
   const omegaSafe=value=>omegaColors.some(([id])=>id===value)?value:'blue';
   const applyOmega=value=>{
-    if(typeof clearTransition==='function')clearTransition();
     const color=omegaSafe(value);
     document.documentElement.dataset.hexoraOmegaColor=color;
     syncScrollbar();
@@ -87,7 +86,7 @@
     button.dataset.omegaChoice=id;button.setAttribute('aria-label',name);button.title=name;
     const swatch=document.createElement('span');swatch.className='omega-color-swatch omega-color-swatch-'+id;
     const label=document.createElement('span');label.textContent=name;
-    button.append(swatch,label);button.addEventListener('click',()=>applyOmega(id));omegaHost.append(button);
+    button.append(swatch,label);button.addEventListener('click',()=>{clearTransition();applyOmega(id);});omegaHost.append(button);
   }
   let savedOmega='blue';try{savedOmega=omegaSafe(localStorage.getItem(omegaKey));}catch{}
   applyOmega(savedOmega);
