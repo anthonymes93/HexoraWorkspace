@@ -136,6 +136,16 @@
     document.getElementById('appearance-overlay')?.classList.add('hidden');
     window.hexora?.action('modal',false);
   };
+  // Triple-click empty frame chrome to switch directly to Omega Red.
+  // Ignore interactive controls so their own triple-click behavior is preserved.
+  for(const selector of ['.main-titlebar-drag','.top','.rail']){
+    document.querySelector(selector)?.addEventListener('click',event=>{
+      if(event.detail!==3||event.target.closest('button,a,input,textarea,select,[contenteditable="true"]'))return;
+      clearTransition();
+      applyOmega('red');
+      apply('omega');
+    });
+  }
   document.getElementById('theme-rail')?.addEventListener('click',open);
   document.getElementById('appearance-close')?.addEventListener('click',close);
   document.getElementById('appearance-overlay')?.addEventListener('click',event=>{
