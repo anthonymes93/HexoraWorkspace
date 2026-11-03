@@ -45,7 +45,7 @@ function startStableUpdater(){
  autoUpdater.on('update-available',info=>console.info('[updates] available:',info.version));
  autoUpdater.on('update-downloaded',info=>{
   console.info('[updates] downloaded:',info.version);
-  showUpdateDialog(info.version,()=>autoUpdater.quitAndInstall(false,true))
+  showUpdateDialog(info.version,()=>autoUpdater.quitAndInstall(true,true))
    .catch(error=>console.error('[updates] update prompt:',error));
  });
  const check=()=>autoUpdater.checkForUpdates().catch(error=>console.error('[updates] check:',error));
