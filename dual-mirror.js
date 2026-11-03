@@ -37,7 +37,7 @@ function createDualMirror({getActiveId,getTab,getView,isCodeTab,getMirrorUrl}){
    // Chrome-compatible embedded tabs, without creating a new session.
    if(new URL(pairedUrl).hostname==='chatgpt.com'){
     const sourceUA=source.getUserAgent();
-    const chromeUA=sourceUA.replace(/\\s+(?:Electron|hexora-workspace)\\/[^\\s]+/gi,'').replace(/\\s{2,}/g,' ').trim();
+    const chromeUA=sourceUA.replace(/\s+(?:Electron|hexora-workspace)\/[^\s]+/gi,'').replace(/\s{2,}/g,' ').trim();
     target.setUserAgent(chromeUA);
    }else target.setUserAgent(source.getUserAgent());
    try{await target.loadURL(pairedUrl);}catch(error){console.warn('[Dual Mirror] Navigation failed:',error.message);}finally{current.loading=false;}
