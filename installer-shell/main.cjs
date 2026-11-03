@@ -27,7 +27,7 @@ ipcMain.handle('install:start',async()=>{
  });
 });
 ipcMain.handle('install:launch',async()=>{
- const exe=path.join(app.getPath('localAppData')||path.join(app.getPath('home'),'AppData','Local'),'Programs','Hexora Workspace','Hexora Workspace.exe');
+ const exe=path.join(process.env.LOCALAPPDATA||path.join(app.getPath('home'),'AppData','Local'),'Programs','Hexora Workspace','Hexora Workspace.exe');
  if(!fs.existsSync(exe))return {ok:false,message:'Launch Hexora from the Start menu.'};
  const error=await shell.openPath(exe);
  return error?{ok:false,message:error}:{ok:true};
