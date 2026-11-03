@@ -1,5 +1,12 @@
 'use strict';
-const {app,BrowserWindow,WebContentsView,View,session,ipcMain,shell,dialog,clipboard,safeStorage,Menu}=require('electron');
+const {app,BrowserWindow,WebContentsView,View,session,ipcMain,shell,dialog,clipboard,safeStorage,Menu,Notification}=require('electron');
+// Experimental Chromium fallback for sites whose Google Identity Services FedCM
+// token retrieval fails inside Electron. Chromium flags are process-wide, so
+// this is opt-in and must be set before Electron creates any sessions.
+if(process.env.HEXORA_PINTEREST_FEDCM_FALLBACK==='1'){
+ app.commandLine.appendSwitch('disable-features','FedCm');
+ console.info('[Hexora OAuth] Experimental FedCM fallback enabled for this launch (all tabs).');
+}
 const path=require('node:path');
 const {screen}=require('electron');
 const {TabStore}=require('./tab-store');
@@ -45,7 +52,7 @@ function nativeCodeCommand(message,tabId=activeId){
 function nativeCodeBounds(tabId=activeId){
  if(!win||win.isDestroyed()||!nativeCodeHosts.get(tabId)?.ready)return;
  const [w,h]=win.getContentSize();
- nativeCodeCommand('RECT '+sidebarWidth+' '+TOP_HEIGHT+' '+Math.max(1,w-sidebarWidth)+' '+Math.max(1,h-TOP_HEIGHT),tabId);
+ nativeCodeCommand('RECT '+sidebarWidth+' '+(TOP_HEIGHT+MAIN_TITLEBAR_HEIGHT)+' '+Math.max(1,w-sidebarWidth)+' '+Math.max(1,h-TOP_HEIGHT-MAIN_TITLEBAR_HEIGHT),tabId);
 }
 let nativeCodeLifecycleTimer=null;
 function scheduleNativeCodeLifecycle(reason){
@@ -98,20 +105,45 @@ if(!hasSingleInstanceLock){
 }
 const HOME='https://chatgpt.com/';
 const DETACHED_HEADER=44;
-let TOP_HEIGHT=120;const IDLE_MS=24*60*60*1000,MAX_LIVE=8;
+const MAIN_TITLEBAR_HEIGHT=process.platform==='win32'?16:0;
+let TOP_HEIGHT=95;const IDLE_MS=24*60*60*1000,MAX_LIVE=8;
 let recoveryWindow=null,vault=null;
 const detached=new Map();
 let quitting=false;
 const LAYOUT_KEY='detachedWindowIds';
 function savedDetachedIds(){try{const values=JSON.parse(store.getMeta(LAYOUT_KEY)||'[]');return Array.isArray(values)?values.filter(x=>Number.isSafeInteger(x)&&x>0).slice(0,32):[];}catch{return [];}}
 function setDetachedSaved(id,present){const ids=new Set(savedDetachedIds());if(present)ids.add(id);else ids.delete(id);store.setMeta(LAYOUT_KEY,JSON.stringify([...ids]));}
-let mainViewport=null,win,store,activeId=null,sidebarWidth=330,live=new Map(),favicons=new Map(),loading=new Map(),stateTimer=null,modalVisible=false,recoveryPassword=null,recoveryDir=null,recoveryTimer=null,recoveryBusy=false,lastBackup=null;
+let dualPopupHandler=null;
+let mainViewport=null,win,store,activeId=null,sidebarWidth=324,live=new Map(),favicons=new Map(),loading=new Map(),stateTimer=null,modalVisible=false,notificationsOpen=false,quickToastOpen=false,recoveryPassword=null,recoveryDir=null,recoveryTimer=null,recoveryBusy=false,lastBackup=null;
 const extensionPartition='persist:hexora-chatgpt';
 let deepLinkReady=false;
 const pendingDeepLinks=[];
 function deliverDeepLinks(){
  if(!deepLinkReady||!win||win.isDestroyed())return;
  while(pendingDeepLinks.length)win.webContents.send('deep-link:navigate',pendingDeepLinks.shift());
+}
+// Quick-notification tab jumps are scheduled in Electron's main process so
+// renderer throttling does not introduce the normal 15-second polling delay.
+const scheduledQuickLinks=new Map();
+const firedQuickLinks=new Set();
+function fireQuickLink(id,link){
+ if(firedQuickLinks.has(id)||!parseDeepLink(link))return false;
+ firedQuickLinks.add(id);
+ if(firedQuickLinks.size>500)firedQuickLinks.delete(firedQuickLinks.values().next().value);
+ return receiveDeepLink(link);
+}
+let quickLinkTimer=null;
+function runScheduledQuickLinks(){
+ if(quickLinkTimer){clearTimeout(quickLinkTimer);quickLinkTimer=null;}
+ const now=Date.now();
+ for(const [id,entry] of scheduledQuickLinks){
+  if(entry.due>now)continue;
+  scheduledQuickLinks.delete(id);
+  fireQuickLink(id,entry.link);
+ }
+ let next=Infinity;
+ for(const entry of scheduledQuickLinks.values())next=Math.min(next,entry.due);
+ if(Number.isFinite(next))quickLinkTimer=setTimeout(runScheduledQuickLinks,Math.max(1,Math.min(2147483647,next-Date.now())));
 }
 function receiveDeepLink(value){
  const target=parseDeepLink(value);
@@ -300,10 +332,52 @@ function rememberFavicon(tabId,pageUrl,iconUrl){
  emit();
 }
 
+// Chromium-rendered website scrollbars use the same Hexora rail style.
+// insertCSS runs outside page CSP and is reapplied after top-level navigations.
+const HEXORA_SCROLLBAR_PALETTES={
+ blue:['#1c347f','#405a9b'],red:['#b10501','#ce3029'],orange:['#a94c1e','#ce6c35'],
+ amber:['#936019','#bd8734'],green:['#176b4c','#2e956f'],teal:['#116c75','#2b929a'],
+ cyan:['#176185','#327fa5'],purple:['#57348c','#7955b2'],pink:['#8d326e','#b45690'],
+ indigo:['#343c98','#555fc1']
+};
+let websiteScrollbarTheme={theme:'classic',color:'blue'};
+function scrollbarColors(){
+ return websiteScrollbarTheme.theme==='omega'
+  ?(websiteScrollbarTheme.thumb&&websiteScrollbarTheme.hover?[websiteScrollbarTheme.thumb,websiteScrollbarTheme.hover]:HEXORA_SCROLLBAR_PALETTES[websiteScrollbarTheme.color]||HEXORA_SCROLLBAR_PALETTES.blue)
+  :['#405a9b','#628ce4'];
+}
+function websiteScrollbarCSS(){
+ const [base,hover]=scrollbarColors();
+ return `
+:root{scrollbar-color:${base} #17191f!important;scrollbar-width:auto!important}
+::-webkit-scrollbar{width:11px!important;height:11px!important}
+::-webkit-scrollbar-track{background:#17191f!important;border-radius:12px!important}
+::-webkit-scrollbar-corner{background:#17191f!important}
+::-webkit-scrollbar-thumb{background:${base}!important;border:2px solid #17191f!important;border-radius:12px!important;min-height:38px!important;min-width:38px!important}
+::-webkit-scrollbar-thumb:hover{background:${hover}!important}
+::-webkit-scrollbar-thumb:active{background:${hover}!important}
+`;
+}
+const scrollbarCSSKeys=new WeakMap();
+function applyHexoraWebsiteScrollbars(wc){
+ if(wc.isDestroyed()||!/^https?:/i.test(wc.getURL()))return;
+ const css=websiteScrollbarCSS();
+ const previous=scrollbarCSSKeys.get(wc);
+ if(previous?.css===css)return;
+ scrollbarCSSKeys.set(wc,{css,key:null});
+ if(previous?.key)wc.removeInsertedCSS(previous.key).catch(()=>{});
+ wc.insertCSS(css,{cssOrigin:'user'}).then(key=>{
+  const current=scrollbarCSSKeys.get(wc);
+  if(current?.css===css)current.key=key;
+  else wc.removeInsertedCSS(key).catch(()=>{});
+ }).catch(error=>console.warn('[Hexora] Website scrollbar style unavailable:',error.message));
+}
 function wire(t){const view=new WebContentsView({webPreferences:{partition:'persist:hexora-chatgpt',preload:path.join(__dirname,'site-vault-preload.js'),sandbox:true,contextIsolation:true,nodeIntegration:false,webSecurity:true,javascript:true}});const wc=view.webContents;
  wc.setAudioMuted(!!t.muted);
  if(chromeMode(t.id))wc.setUserAgent(chromeUserAgent(wc));
- view.setBackgroundColor('#111215');
+ // Use a neutral white backing for transparent areas in third-party websites.
+ // Dark websites still render their own backgrounds normally.
+ view.setBackgroundColor('#ffffff');
  wc.on('did-fail-load',(_event,code,description,url,isMainFrame)=>{if(isMainFrame)console.error('[Hexora] Page load failed:',code,description,url);});
  const update=(title=false)=>{if(tabStoreClosing||quitting)return;const row=store.get(t.id);if(!row)return;if(title)row.title=wc.getTitle()?.slice(0,100)||row.title;const url=wc.getURL();if(/^https?:/.test(url))row.url=url;store.save(toModel(row));emit();};
  wc.on('page-favicon-updated',(_event,icons)=>{
@@ -311,7 +385,7 @@ function wire(t){const view=new WebContentsView({webPreferences:{partition:'pers
   if(url)rememberFavicon(t.id,wc.getURL(),url);
  });
  wc.on('page-title-updated',()=>{if(tabStoreClosing||quitting)return;update(true);store.recordVisit(wc.getURL(),wc.getTitle(),t.id);});
- wc.on('did-navigate',()=>{if(tabStoreClosing||quitting)return;if(favicons.get(t.id)?.origin!==originOf(wc.getURL()))favicons.delete(t.id);update();store.recordVisit(wc.getURL(),wc.getTitle(),t.id);});
+ wc.on('did-navigate',()=>{scrollbarCSSKeys.delete(wc);applyHexoraWebsiteScrollbars(wc);if(tabStoreClosing||quitting)return;if(favicons.get(t.id)?.origin!==originOf(wc.getURL()))favicons.delete(t.id);update();store.recordVisit(wc.getURL(),wc.getTitle(),t.id);});
  wc.on('did-navigate-in-page',()=>{if(tabStoreClosing||quitting)return;update();store.recordVisit(wc.getURL(),wc.getTitle(),t.id);});
  wc.on('did-start-loading',()=>{loading.set(t.id,true);emit();});
  wc.on('did-stop-loading',()=>{loading.delete(t.id);emit();});
@@ -327,12 +401,62 @@ function wire(t){const view=new WebContentsView({webPreferences:{partition:'pers
  },250);
  wc.once('destroyed',()=>clearInterval(draftTimer));
  wc.on('dom-ready',()=>{
+  scrollbarCSSKeys.delete(wc);applyHexoraWebsiteScrollbars(wc);
   if(!wc.getURL().startsWith('https://chatgpt.com/'))return;
   const initial=JSON.stringify(store.getMeta(draftKey)||'');
   wc.executeJavaScript(CHATGPT_DRAFT_GUARD.replace('__HEXORA_SAVED_DRAFT__',initial)).catch(err=>console.warn('Draft restore unavailable:',err.message));
  });
  wc.on('render-process-gone',()=>{loading.delete(t.id);emit();});
- wc.setWindowOpenHandler(({url})=>/^https:\/\//.test(url)?{action:'allow',overrideBrowserWindowOptions:{width:540,height:750,autoHideMenuBar:true,webPreferences:{partition:'persist:hexora-chatgpt',sandbox:true,contextIsolation:true,nodeIntegration:false,webSecurity:true}}}:{action:'deny'});
+ // Targeted Pinterest OAuth diagnostics. No credentials, query strings, form
+ // values, cookie data, or full URLs are written to the terminal.
+ const pinterestPage=()=>{try{return /(^|\\.)pinterest\\.com$/i.test(new URL(wc.getURL()).hostname);}catch{return false;}};
+ const pinterestLog=(kind,detail)=>{if(pinterestPage())console.info('[Pinterest OAuth]',kind,detail||'');};
+ wc.on('console-message',(_event,detailsOrLevel,message)=>{
+  if(!pinterestPage())return;
+  const details=typeof detailsOrLevel==='object'?detailsOrLevel:{level:detailsOrLevel,message};
+  const level=details.level;
+  const raw=String(details.message||message||'');
+  if(raw.includes('[Hexora Pinterest OAuth] Google sign-in control clicked')){
+   pinterestLog('Google sign-in click captured');return;
+  }
+  if(level!=='error'&&level!=='warning'&&level!==2&&level!==3)return;
+  // Report error category only; third-party scripts may include sensitive URLs.
+  const category=/content.security.policy|csp/i.test(raw)?'CSP':
+   /cross.origin|cors/i.test(raw)?'CORS':
+   /fedcm|identity.credential/i.test(raw)?'FedCM':
+   /popup|window.open/i.test(raw)?'popup':
+   /blocked|denied|refused/i.test(raw)?'blocked':
+   /uncaught|typeerror|referenceerror/i.test(raw)?'JavaScript exception':'other';
+  pinterestLog('console '+String(level),category);
+ });
+ wc.on('did-create-window',(popup,details)=>{
+  pinterestLog('popup created',(()=>{try{return new URL(details.url).hostname;}catch{return 'unknown';}})());
+ });
+ wc.on('did-finish-load',()=>{
+  if(!pinterestPage())return;
+  pinterestLog('page loaded','diagnostics active');
+  // Capture only clicks on Google sign-in controls, never form inputs.
+  void wc.executeJavaScript(`(()=>{
+   if(window.__hexoraPinterestOAuthProbe)return;
+   window.__hexoraPinterestOAuthProbe=true;
+   document.addEventListener('click',event=>{
+    const element=event.target?.closest?.('button,a,[role="button"]');
+    if(!element)return;
+    const label=(element.innerText||element.getAttribute('aria-label')||'').trim().slice(0,100);
+    if(!/continue with google|sign in with google|log in with google/i.test(label))return;
+    console.info('[Hexora Pinterest OAuth] Google sign-in control clicked');
+   },true);
+  })()`,true).catch(()=>{});
+ });
+ wc.setWindowOpenHandler(({url,frameName})=>{
+  if(pinterestPage())pinterestLog('window.open requested',(()=>{try{return new URL(url).hostname;}catch{return 'unknown';}})());
+
+  if(!/^https:\/\//.test(url))return {action:'deny'};
+  if(/^hexora-dual-pair-/.test(frameName||'')){
+   return dualPopupHandler?.({opener:wc,url,frameName})||{action:'deny'};
+  }
+  return {action:'allow',overrideBrowserWindowOptions:{width:540,height:750,autoHideMenuBar:true,webPreferences:{partition:'persist:hexora-chatgpt',sandbox:true,contextIsolation:true,nodeIntegration:false,webSecurity:true}}};
+ });
  wc.loadURL(safeUrl(t.url)).catch(err=>console.error('Tab load error',err));
  return view;
 }
@@ -343,8 +467,8 @@ function discard(id){const view=live.get(id);if(!view)return;live.delete(id);con
 function bounds(){
  if(!win||win.isDestroyed()||!mainViewport)return;
  const [w,h]=win.getContentSize();
- const visibleWidth=Math.max(0,w-sidebarWidth),visibleHeight=Math.max(0,h-TOP_HEIGHT);
- mainViewport.setBounds({x:sidebarWidth,y:TOP_HEIGHT,width:visibleWidth,height:visibleHeight});
+ const visibleWidth=Math.max(0,w-sidebarWidth-((notificationsOpen||quickToastOpen)?412:0)),visibleHeight=Math.max(0,h-TOP_HEIGHT-MAIN_TITLEBAR_HEIGHT);
+ mainViewport.setBounds({x:sidebarWidth,y:TOP_HEIGHT+MAIN_TITLEBAR_HEIGHT,width:visibleWidth,height:visibleHeight});
  const view=live.get(activeId);
  if(view){
   // Fill the visible viewport exactly: no negative offsets, clipped gray gaps,
@@ -356,8 +480,8 @@ function bounds(){
 }
 let sidebarAnimation=null,sidebarTransitioning=false,sidebarTransitionTarget=null;
 function setSidebarWidth(collapsed){
- const saved=Math.max(220,Math.min(560,Number(store?.getMeta('sidebarLastExpandedWidth'))||Number(store?.getMeta('sidebarCustomWidth'))||330));
- const start=sidebarWidth,target=collapsed?64:saved;
+ const saved=Math.max(220,Math.min(560,Number(store?.getMeta('sidebarLastExpandedWidth'))||Number(store?.getMeta('sidebarCustomWidth'))||324));
+ const start=sidebarWidth,target=collapsed?58:saved;
  if(sidebarAnimation){clearInterval(sidebarAnimation);sidebarAnimation=null;}
  sidebarTransitioning=start!==target;
  sidebarTransitionTarget=sidebarTransitioning?target:null;
@@ -391,7 +515,22 @@ function activate(id){
  activeId=row.id;store.setMeta('workspaceActive:'+row.workspace,String(row.id));const t=toModel(row);t.lastActive=Date.now();store.save(t);store.setMeta('activeId',String(row.id));
  if(isCodeTab(row)){if(!modalVisible)showNativeCode();else hideNativeCode();evict();emit();return true;}
  let view=live.get(row.id);if(!view){view=wire(t);live.set(row.id,view);}
- if(!modalVisible){mainViewport.addChildView(view);bounds();view.webContents.focus();}
+ if(!modalVisible){
+  mainViewport.addChildView(view);
+  bounds();
+  view.webContents.focus();
+  // Chromium can retain stale compositor tiles when a cached WebContentsView
+  // is reattached after switching tabs. Invalidate only the newly active view;
+  // never reload it (which would discard scroll, forms and in-page state).
+  const shownId=row.id,shownView=view;
+  const repaint=()=>{
+   if(activeId!==shownId||live.get(shownId)!==shownView||modalVisible||shownView.webContents.isDestroyed())return;
+   shownView.webContents.invalidate();
+  };
+  repaint();
+  setTimeout(repaint,40);
+  setTimeout(repaint,160);
+ }
  evict();emit();return true;
 }
 
@@ -717,9 +856,20 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
  // Apply any project saved by VS Code immediately before the prior shutdown,
  // before activating its native tab and regenerating its workspace file.
  syncNativeCodeProjects();
- sidebarWidth=Math.max(64,Math.min(560,Number(store.getMeta('sidebarCustomWidth'))||330));
+ sidebarWidth=Math.max(58,Math.min(560,Number(store.getMeta('sidebarCustomWidth'))||324));
  const mainTaskbar=safeTaskbarIdentity();
- win=new BrowserWindow({width:1360,height:900,minWidth:700,minHeight:400,title:isDevelopment?'Hexora Workspace [DEV]':'Hexora Workspace',icon:mainTaskbar?.iconPath,autoHideMenuBar:true,backgroundColor:'#111215',webPreferences:{preload:path.join(__dirname,'preload.js'),contextIsolation:true,sandbox:true,nodeIntegration:false}});
+ win=new BrowserWindow({width:1360,height:900,minWidth:700,minHeight:400,title:isDevelopment?'Hexora Workspace [DEV]':'Hexora Workspace',icon:mainTaskbar?.iconPath,autoHideMenuBar:true,...(process.platform==='win32'?{frame:false}: {}),backgroundColor:'#111215',webPreferences:{preload:path.join(__dirname,'preload.js'),contextIsolation:true,sandbox:true,nodeIntegration:false}});
+ if(process.platform==='win32'){
+  ipcMain.removeHandler('main-window:control');
+  ipcMain.handle('main-window:control',(event,action)=>{
+   if(event.sender!==win.webContents)return false;
+   if(action==='minimize')win.minimize();
+   else if(action==='maximize'){if(win.isMaximized())win.unmaximize();else win.maximize();}
+   else if(action==='close')win.close();
+   else return false;
+   return true;
+  });
+ }
  safeApplyTaskbar(win,mainTaskbar);
  if(isDevelopment){
   // A loaded HTML title may overwrite BrowserWindow.title; keep the native
@@ -1020,11 +1170,45 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
  });
  ipcMain.handle('native-code:detach',async event=>{if(event.sender!==win.webContents)throw Error('Invalid caller');if(!isCodeTab(store.get(activeId)))return {detached:false};const entry=activeCodeEntry();if(!entry?.ready)return {detached:false};nativeCodeCommand('TRACE BEFORE_DETACH');nativeCodeCommand('DIAG BEFORE_DETACH');return {detached:detachTab(activeId)};});
  ipcMain.handle('native-code:toggle',async event=>{if(event.sender!==win.webContents)throw Error('Invalid caller');return openCodeTab(store.get(activeId)?.workspace||'web');});
+ const openDualMirror=require('./dual-mirror').createDualMirror({getActiveId:()=>activeId,getTab:id=>store.get(id),getView:id=>live.get(id),isCodeTab,getMirrorUrl:id=>store.getMeta('dualPairUrl:'+id),getChatgptSource:()=>{for(const view of live.values()){const wc=view.webContents;if(!wc.isDestroyed()&&/^https:\/\/chatgpt\.com(?:\/|$)/.test(wc.getURL()))return wc;}return null;}});
+ dualPopupHandler=openDualMirror.handlePopup;
  ipcMain.handle('tabs:page',(_e,arg)=>sendPage(arg));
  ipcMain.handle('tabs:search',(_e,term)=>store.search(term,50).map(pageRow));
  ipcMain.handle('tabs:lookup',(_e,id)=>{const row=store.get(Number(id));return row?pageRow(row):null;});
- ipcMain.handle('tabs:action',(_e,action,arg)=>{
+ ipcMain.handle('tabs:action',(event,action,arg)=>{
   const current=store.get(activeId);const wc=live.get(activeId)?.webContents;
+  if(action==='dual-mirror')return openDualMirror();
+  if(action==='dual-pair-get'){
+   const row=store.get(Number(arg));
+   return row?.workspace==='dual'?(store.getMeta('dualPairUrl:'+row.id)||''):null;
+  }
+  if(action==='dual-pair-set'){
+   const row=store.get(Number(arg?.id));
+   if(!row||row.workspace!=='dual')throw Error('Select a Dual Workspace tab.');
+   const raw=String(arg?.url||'').trim();
+   if(raw){
+    const parsed=new URL(raw);
+    if(!['http:','https:'].includes(parsed.protocol)||!parsed.hostname||parsed.username||parsed.password)throw Error('Enter a valid website URL.');
+    store.setMeta('dualPairUrl:'+row.id,parsed.href);
+   }else store.setMeta('dualPairUrl:'+row.id,'');
+   return true;
+  }
+  if(action==='dual-setup'){
+   if(store.getMeta('dualExampleSetup')==='true')return false;
+   const examples=[
+    ['Google','https://www.google.com/','https://chatgpt.com/g/g-p-6ae527dd93988191bf48b9890567e9ad-hexora-workspace/c/6ae903df-557c-83ea-a24e-992677839f48'],
+    ['Yahoo','https://www.yahoo.com/','https://chatgpt.com/c/6ae96a50-050c-83e9-a254-44be12e22272'],
+    ['Bing','https://www.bing.com/','https://chatgpt.com/c/6ae9914b-5628-83ea-8325-47161fac300b']
+   ];
+   for(const [title,url,paired] of examples){
+    const existing=store.page('dual',0,1000).find(row=>row.url===url);
+    const id=existing?.id||store.nextId();
+    if(!existing)store.save({id,title,url,workspace:'dual',pinned:false,muted:false,lastActive:Date.now(),ordinal:id});
+    store.setMeta('dualPairUrl:'+id,paired);
+   }
+   store.setMeta('dualExampleSetup','true');emit();return true;
+  }
+
   if(action==='copy-tab-link'){
     const tab=store.get(Number(arg));
     if(!tab)throw Error('This tab no longer exists.');
@@ -1053,7 +1237,7 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
    if(candidate)activate(candidate);else newTab(workspace);
    return true;
   }
-  else if(action==='stack-row-height'){TOP_HEIGHT=Number.isFinite(arg)?Math.max(120,Math.min(120+34*100,Math.round(arg))):120;bounds();return true;}
+  else if(action==='stack-row-height'){TOP_HEIGHT=Number.isFinite(arg)?Math.max(95,Math.min(95+34*100,Math.round(arg))):95;bounds();return true;}
   else if(action==='stack-create-pair'){const id=store.createStackPair(arg?.workspace,arg?.name,Number(arg?.sourceId),Number(arg?.targetId),arg?.parentId??null);emit();return id;}
   else if(action==='stack-create'){const id=store.createStack(arg?.workspace,arg?.name,arg?.tabId??null,arg?.parentId??null);emit();return id;}
   else if(action==='stack-assign'){store.putTabInStack(Number(arg?.tabId),arg?.stackId===null?null:Number(arg?.stackId));emit();return true;}
@@ -1133,8 +1317,8 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
   else if(action==='sidebar-resize'){
    if(sidebarAnimation){clearInterval(sidebarAnimation);sidebarAnimation=null;}
    sidebarTransitioning=false;sidebarTransitionTarget=null;
-   const max=Math.min(560,Math.max(64,win.getContentSize()[0]-420));
-   sidebarWidth=Math.round(Math.max(64,Math.min(max,Number(arg?.width)??330)));
+   const max=Math.min(560,Math.max(58,win.getContentSize()[0]-420));
+   sidebarWidth=Math.round(Math.max(58,Math.min(max,Number(arg?.width)??324)));
    bounds();return sidebarWidth;
   }
   else if(action==='sidebar-resize-save'){
@@ -1148,6 +1332,56 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
   else if(action==='dock'){dockTab(arg);}
   else if(action==='swap-detached'){swapDetached(arg?.source,arg?.target);}
   else if(action==='detached-info'){return {title:store.get(Number(arg))?.title||'ChatGPT'};}
+  else if(action==='scrollbar-theme'){
+   const theme=arg?.theme==='omega'?'omega':'classic';
+   const color=Object.hasOwn(HEXORA_SCROLLBAR_PALETTES,arg?.color)?arg.color:'blue';
+   const validHex=value=>typeof value==='string'&&/^#[0-9a-fA-F]{6}$/.test(value)?value:null;
+   websiteScrollbarTheme={theme,color,thumb:validHex(arg?.thumb),hover:validHex(arg?.hover)};
+   for(const view of live.values())applyHexoraWebsiteScrollbars(view.webContents);
+   return true;
+  }
+  else if(action==='fire-quick-link'){
+   if(event.sender!==win.webContents)throw Error('Invalid quick link caller');
+   const id=String(arg?.id||'');
+   const link=String(arg?.link||'');
+   if(!id||id.length>100||!parseDeepLink(link))return false;
+   const scheduled=scheduledQuickLinks.get(id);
+   if(scheduled&&scheduled.link!==link)return false;
+   scheduledQuickLinks.delete(id);
+   return fireQuickLink(id,link);
+  }
+  else if(action==='schedule-quick-links'){
+   if(event.sender!==win.webContents)throw Error('Invalid quick link scheduler caller');
+   if(!Array.isArray(arg)||arg.length>100)throw Error('Invalid quick link schedule');
+   const next=new Map();
+   for(const item of arg){
+    const id=String(item?.id||'');
+    const due=Number(item?.due);
+    const target=parseDeepLink(item?.link);
+    if(!id||id.length>100||!Number.isFinite(due)||!target||due<=Date.now())continue;
+    next.set(id,{due,link:item.link});
+   }
+   scheduledQuickLinks.clear();
+   for(const [id,entry] of next)scheduledQuickLinks.set(id,entry);
+   runScheduledQuickLinks();
+   return scheduledQuickLinks.size;
+  }
+  else if(action==='quick-notification-alert'){
+   if(event.sender!==win.webContents)throw Error('Invalid notification caller');
+   const body=String(arg?.message||'').slice(0,500);
+   if(!body)return 'ignored';
+   if(win.isFocused()&&!win.isMinimized()&&win.isVisible())return 'in-app';
+   if(Notification.isSupported()){
+    try{
+     const notification=new Notification({title:'Hexora · Reminder',body,silent:false});
+     notification.on('click',()=>{if(win.isMinimized())win.restore();win.show();win.focus();});
+     notification.show();return 'native';
+    }catch(error){console.warn('[Hexora] Native reminder unavailable:',error.message);}
+   }
+   return 'in-app';
+  }
+  else if(action==='quick-toast-visible'){quickToastOpen=!!arg;bounds();return true;}
+  else if(action==='notifications-drawer'){notificationsOpen=!!arg;bounds();return true;}
   else if(action==='modal'){
    modalVisible=!!arg;
    if(isCodeTab(store.get(activeId))){if(modalVisible){hideNativeCode();win.webContents.focus();}else showNativeCode();return true;}

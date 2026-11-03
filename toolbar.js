@@ -1,3 +1,5 @@
+// Window controls are restricted to the main Hexora window by the main-process IPC handler.
+document.querySelectorAll('[data-window-action]').forEach(button=>button.addEventListener('click',()=>window.hexora.windowControl(button.dataset.windowAction)));
 const $=id=>document.getElementById(id);
 // The development marker is driven by the Electron main process, not local storage.
 // Initialize before the rest of the toolbar so startup is unambiguous.
@@ -6,7 +8,7 @@ if(new URLSearchParams(window.location.search).get('hexoraDev')==='1'){
  const indicator=$('hexora-dev-indicator');
  if(indicator)indicator.hidden=false;
 }
-const workspaces=[{id:'web',name:'Web Development',emoji:'◈'},{id:'business',name:'Business',emoji:'▤'},{id:'personal',name:'Personal',emoji:'☼'},{id:'ideas',name:'Ideas Lab',emoji:'✦'}];
+const workspaces=[{id:'web',name:'Web Development',emoji:'◈'},{id:'business',name:'Business',emoji:'▤'},{id:'personal',name:'Personal',emoji:'☼'},{id:'ideas',name:'Ideas Lab',emoji:'✦'},{id:'dual',name:'Dual Workspace (Test)',emoji:'◫'}];
 const conversationsCollapsedKey='hexora-conversations-collapsed';
 function setConversationsCollapsed(collapsed){
  const list=document.getElementById('conversations'),toggle=document.getElementById('toggle-conversations');
@@ -151,7 +153,7 @@ function renderQuickJumps(){
  add.onclick=()=>showQuickJumpEditor().catch(err=>alert('Quick Jump: '+err.message));
  host.append(add);
 }
-try{const s=JSON.parse(localStorage.getItem('hexora-workspace-settings')||'{}');if(s.workspaces?.length)workspaces.splice(0,workspaces.length,...s.workspaces);if(s.selected)activeWorkspace=s.selected;if(s.sidebarOpen===false)sidebarOpen=false;}catch{}
+try{const s=JSON.parse(localStorage.getItem('hexora-workspace-settings')||'{}');if(s.workspaces?.length){const saved=s.workspaces.filter(w=>w&&typeof w.id==='string');const additions=workspaces.filter(w=>!saved.some(existing=>existing.id===w.id));workspaces.splice(0,workspaces.length,...saved,...additions);}if(s.selected)activeWorkspace=s.selected;if(s.sidebarOpen===false)sidebarOpen=false;}catch{}
 const save=()=>localStorage.setItem('hexora-workspace-settings',JSON.stringify({workspaces,selected:activeWorkspace,sidebarOpen}));
 if(!workspaces.some(w=>w.id===activeWorkspace))activeWorkspace=workspaces[0].id;
 const action=(name,arg)=>window.hexora.action(name,arg);
@@ -166,14 +168,17 @@ function render(p){
  if(p.activeId&&p.activePanelMode){const desired=p.activePanelMode==='wide';if(sidebarOpen!==desired){sidebarOpen=desired;updateSidebar(false);}}
  const workspace=workspaces.find(w=>w.id===activeWorkspace)||workspaces[0];
  $('current-workspace').textContent=workspace.emoji+'  '+workspace.name;
+ // Ensure the experimental entry is visible even if an older saved workspace list was restored.
+ if(!workspaces.some(w=>w.id==='dual'))workspaces.push({id:'dual',name:'Dual Workspace (Test)',emoji:'◫'});
  const container=$('workspaces');container.replaceChildren();
+ console.info('[Hexora Dual Workspace]',{workspaceIds:workspaces.map(w=>w.id),savedIds:(()=>{try{return JSON.parse(localStorage.getItem('hexora-workspace-settings')||'{}').workspaces?.map(w=>w.id)||[];}catch{return ['invalid saved JSON'];}})(),renderedAt:Date.now()});
  for(const w of orderSidebarItems(workspaces,sidebarWorkspaceOrderKey,w=>w.id)){
   const el=document.createElement('button');el.className='workspace'+(w.id===activeWorkspace?' selected':'');
   const symbol=document.createElement('span');symbol.className='emoji';symbol.textContent=w.emoji;
   const label=document.createElement('span');label.className='name';label.textContent=w.name;
   const count=document.createElement('span');count.className='count';count.textContent=p.counts.find(x=>x.workspace===w.id)?.count||0;
   const edit=document.createElement('span');edit.className='workspace-edit';edit.title='Edit workspace';edit.textContent='⋯';edit.onclick=e=>{e.stopPropagation();openWorkspaceEditor(w.id);};
-  el.append(symbol,label,count,edit);attachWorkspaceHoverTip(el,w,Number(count.textContent)||0);el.addEventListener('contextmenu',e=>showWorkspaceMenu(e,w));el.onclick=async()=>{activeWorkspace=w.id;offset=0;save();await action('switch-workspace',w.id);refresh();};enableSidebarDrag(el,w.id,sidebarWorkspaceOrderKey);container.append(el);
+  el.append(symbol,label,count,edit);attachWorkspaceHoverTip(el,w,Number(count.textContent)||0);el.addEventListener('contextmenu',e=>showWorkspaceMenu(e,w));el.onclick=async()=>{activeWorkspace=w.id;offset=0;save();await action('switch-workspace',w.id);if(w.id==='dual'){await action('dual-setup');await action('dual-mirror');}refresh();};enableSidebarDrag(el,w.id,sidebarWorkspaceOrderKey);container.append(el);
  }
  const conversations=$('conversations');conversations.replaceChildren();
  renderStackTree(conversations,p);
@@ -200,12 +205,12 @@ function render(p){
 // Sidebar grip: one serialized resize stream, without competing layout updates.
 const sidebarGrip=$('sidebar-resize-handle');
 let sidebarDrag=null,sidebarDesired=null,sidebarWorker=null;
-const clampSidebarWidth=x=>Math.round(Math.max(64,Math.min(560,Math.max(64,window.innerWidth-420),x)));
+const clampSidebarWidth=x=>Math.round(Math.max(58,Math.min(560,Math.max(58,window.innerWidth-420),x)));
 function snapSidebarWidth(width,drag,direction){
  // Snap only while shrinking. Expanding follows the pointer exactly.
  if(direction>0){drag.snapClosed=false;return width;}
- if(direction<0&&width<=88){drag.snapClosed=true;return 64;}
- if(drag.snapClosed&&direction<=0)return 64;
+ if(direction<0&&width<=88){drag.snapClosed=true;return 58;}
+ if(drag.snapClosed&&direction<=0)return 58;
  return width;
 }
 function queueSidebarResize(width){
@@ -241,7 +246,7 @@ sidebarGrip.addEventListener('pointermove',event=>{
  sidebarDrag.smoothedSpeed=sidebarDrag.smoothedSpeed*.68+Math.min(speed,8)*.32;
  if(sidebarDrag.smoothedSpeed>1.65)sidebarFastDrag=true;
  else if(sidebarDrag.smoothedSpeed<.9)sidebarFastDrag=false;
- if(!sidebarFastDrag||sidebarDrag.last===64)applySidebarBreakpoint(sidebarDrag.last);
+ if(!sidebarFastDrag||sidebarDrag.last===58)applySidebarBreakpoint(sidebarDrag.last);
  clearTimeout(sidebarSettleTimer);
  sidebarSettleTimer=setTimeout(()=>{
   if(!sidebarDrag)return;
@@ -269,7 +274,7 @@ sidebarGrip.addEventListener('pointercancel',endSidebarResize);
 sidebarGrip.addEventListener('keydown',async event=>{
  if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;
  event.preventDefault();
- const current=parseInt(getComputedStyle(document.documentElement).getPropertyValue('--hexora-content-left'),10)||330;
+ const current=parseInt(getComputedStyle(document.documentElement).getPropertyValue('--hexora-content-left'),10)||324;
  const next=event.key==='Home'?64:event.key==='End'?560:current+(event.key==='ArrowRight'?20:-20);
  await queueSidebarResize(next);
  await action('sidebar-resize-save');
@@ -809,7 +814,7 @@ function renderSecondTabRow(page){
   if(host.children[depth]!==row)host.insertBefore(row,host.children[depth]||null);
  }
  while(host.children.length>openStackPath.length)host.lastElementChild.remove();
- const height=120+34*openStackPath.length;
+ const height=95+34*openStackPath.length;
  document.body.classList.toggle('stack-row-open',openStackPath.length>0);
  document.documentElement.style.setProperty('--hexora-rows-height',height+'px');
  if(height!==lastRowHeight){lastRowHeight=height;action('stack-row-height',height);}
@@ -1057,6 +1062,24 @@ tabStrip.addEventListener('drop',e=>{
 
 // Right-click any tab to turn it into a website, or open a website in a separate tab.
 function hideTabMenu(restore=true){ $('tab-workspace-submenu').classList.add('hidden');$('tab-menu-move').setAttribute('aria-expanded','false'); const wasOpen=!$('tab-context-menu').classList.contains('hidden');$('tab-context-menu').classList.add('hidden');contextTab=null;if(wasOpen&&restore&&!websiteTarget)action('modal',false); }
+function ensureDualPairMenu(){
+ let button=document.getElementById('hexora-dual-pair-menu');
+ if(button)return button;
+ button=document.createElement('button');button.id='hexora-dual-pair-menu';button.type='button';
+ button.textContent='◫  Set paired window URL…';
+ button.style.cssText='width:100%;padding:10px 14px;text-align:left;background:transparent;color:inherit;border:0;cursor:pointer';
+ button.onclick=async()=>{
+  const tab=contextTab;if(!tab)return;
+  hideTabMenu();
+  const previous=await action('dual-pair-get',tab.id);
+  const value=prompt('Paired URL for '+(tab.title||'this tab')+' (blank = mirror main URL):',previous||'');
+  if(value===null)return;
+  try{await action('dual-pair-set',{id:tab.id,url:value.trim()});await action('dual-mirror');}
+  catch(error){alert('Paired URL: '+error.message);}
+ };
+ $('tab-context-menu').append(button);
+ return button;
+}
 function showTabMenu(x,y,item){
  contextTab=item;
  const multi=selectedTabIds.size>1;
@@ -1263,7 +1286,7 @@ function applySidebarBreakpoint(value){
  root.style.setProperty('--hexora-sidebar-fluid',String(Math.max(0,Math.min(1,(value-240)/95))));
 }
 window.hexora.onSidebarFrame((width,transitioning=false,target=null)=>{
- const value=Math.max(64,Math.min(560,width));
+ const value=Math.max(58,Math.min(560,width));
  const root=document.documentElement,body=document.body;
  if(transitioning&&!sidebarWasAnimating){
   // Keep one presentation style while native viewport width animates.
@@ -1279,7 +1302,7 @@ window.hexora.onSidebarFrame((width,transitioning=false,target=null)=>{
   body.classList.add('sidebar-auto-transition');
  }
  sidebarWasAnimating=transitioning;
- root.style.setProperty('--hexora-panel-width',(value-64)+'px');
+ root.style.setProperty('--hexora-panel-width',(value-58)+'px');
  root.style.setProperty('--hexora-content-left',value+'px');
  if(!sidebarDrag)sidebarOpen=value>65;
  if(!transitioning){
@@ -1705,3 +1728,191 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&vaultOpen)vaultClos
 
 // Hexora Apps: native multi-account email companion window.
 $('open-email-app')?.addEventListener('click',()=>window.hexora.email.open().catch(err=>alert('Email: '+err.message)));
+
+/* Omega notification drawer. All items are clearly marked as sample data. */
+(() => {
+ const wrapper=$('hexora-notifications'),bell=$('notifications-bell'),panel=$('notifications-panel'),close=$('notifications-close'),feed=$('notifications-feed');
+ if(!wrapper||!bell||!panel||!feed)return;
+ const samples=[
+  {id:1,kind:'updates',icon:'◈',source:'GitHub',title:'Pull request ready for review',detail:'Omega theme color palette · #101',time:'2m',unread:true},
+  {id:2,kind:'system',icon:'✓',source:'Hexora',title:'Workspace backup completed',detail:'Your workspace settings were saved',time:'14m',unread:true},
+  {id:3,kind:'updates',icon:'▣',source:'Notion',title:'Action Center updated',detail:'Three tasks added to your project board',time:'38m',unread:true},
+  {id:4,kind:'updates',icon:'▶',source:'YouTube',title:'New video in your subscriptions',detail:'Building a better daily workflow',time:'2h',unread:false},
+  {id:5,kind:'system',icon:'✦',source:'Hexora',title:'A new version is available',detail:'Performance and interface improvements',time:'4h',unread:false},
+  {id:6,kind:'system',icon:'◷',source:'Reminder',title:'Focus block starts soon',detail:'Your next scheduled work session',time:'9h',unread:false}
+ ];
+
+ const quickKey='hexora-quick-notifications-v1';
+ const form=$('notifications-quick-form'),add=$('notifications-add'),message=$('quick-notification-message'),date=$('quick-notification-date'),time=$('quick-notification-time'),error=$('quick-notification-error'),important=$('quick-notification-important'),deepLink=$('quick-notification-deep-link');
+ let quick=[];
+ try{const stored=JSON.parse(localStorage.getItem(quickKey)||'[]');if(Array.isArray(stored))quick=stored.filter(n=>n&&typeof n.id==='string'&&typeof n.message==='string'&&Number.isFinite(n.due)&&typeof n.delivered==='boolean').slice(-100);}catch{}
+ const saveQuick=()=>{try{localStorage.setItem(quickKey,JSON.stringify(quick));}catch{}};
+ const validQuickLink=value=>{
+  if(!value)return true;
+  if(value.length>512)return false;
+  try{
+   const url=new URL(value);
+   if(url.protocol!=='hexora:'||url.hostname!=='workspace'||url.port||url.username||url.password||url.search||url.hash)return false;
+   const parts=url.pathname.split('/').filter(Boolean);
+   return parts.length===3&&/^[A-Za-z0-9_-]{1,80}$/.test(parts[0])&&parts[1]==='tab'&&/^[1-9][0-9]*$/.test(parts[2])&&Number.isSafeInteger(Number(parts[2]));
+  }catch{return false;}
+ };
+ const syncQuickLinks=()=>window.hexora?.action('schedule-quick-links',quick.filter(n=>!n.delivered&&n.deepLink&&n.due>Date.now()).map(n=>({id:n.id,due:n.due,link:n.deepLink}))).catch(error=>console.warn('Could not schedule quick tab links',error));
+ const prettyDue=timestamp=>new Date(timestamp).toLocaleString(undefined,{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
+ const updateBell=()=>{const count=quick.filter(n=>n.delivered&&!n.read).length;const dot=$('notifications-dot');if(dot)dot.hidden=!count;bell.setAttribute('aria-label',count?'Notifications, '+count+' unread':'Notifications');};
+ const toastHost=$('hexora-toast-host');
+ let toastTimer=null,toastId=null;
+ const hideToast=()=>{
+  if(toastTimer){clearTimeout(toastTimer);toastTimer=null;}
+  toastId=null;toastHost?.classList.remove('is-visible');
+  window.hexora?.action('quick-toast-visible',false).catch(()=>{});
+  setTimeout(()=>{if(!toastId)toastHost?.replaceChildren();},280);
+ };
+ const showToast=n=>{
+  if(!toastHost)return;
+  if(toastTimer)clearTimeout(toastTimer);
+  toastId=n.id;toastHost.replaceChildren();
+  const card=document.createElement('div');card.className='hexora-toast-card';
+  const heading=document.createElement('div');heading.className='hexora-toast-heading';
+  const icon=document.createElement('span');icon.className='hexora-toast-icon';icon.textContent='◈';
+  const label=document.createElement('div');label.className='hexora-toast-label';
+  const title=document.createElement('strong');title.textContent='Quick reminder';
+  const subtitle=document.createElement('span');subtitle.textContent='HEXORA · JUST NOW';
+  label.append(title,subtitle);
+  const dismiss=document.createElement('button');dismiss.type='button';dismiss.className='hexora-toast-close';dismiss.textContent='×';dismiss.setAttribute('aria-label','Dismiss reminder');
+  heading.append(icon,label,dismiss);
+  const body=document.createElement('p');body.textContent=n.message;
+  const actions=document.createElement('div');actions.className='hexora-toast-actions';
+  const snooze=document.createElement('button');snooze.type='button';snooze.textContent='◷ Snooze 5 min';
+  const done=document.createElement('button');done.type='button';done.textContent='✓ Dismiss';
+  const markDone=()=>{n.read=true;saveQuick();render();updateBell();hideToast();};
+  dismiss.addEventListener('click',markDone);done.addEventListener('click',markDone);
+  snooze.addEventListener('click',()=>{n.due=Date.now()+300000;n.delivered=false;n.read=false;n.themeFlipped=true;saveQuick();syncQuickLinks();render();updateBell();hideToast();});
+  actions.append(snooze,done);card.append(heading,body,actions);toastHost.append(card);
+  window.hexora?.action('quick-toast-visible',true).catch(()=>{});
+  requestAnimationFrame(()=>requestAnimationFrame(()=>toastHost.classList.add('is-visible')));
+  toastTimer=setTimeout(hideToast,14000);
+ };
+ const alertDue=n=>{
+  window.hexora?.action('quick-notification-alert',{message:n.message}).then(mode=>{
+   if(mode==='in-app')showToast(n);
+  }).catch(()=>showToast(n));
+ };
+ const checkImportantTheme=()=>{
+  const now=Date.now();let changed=false;
+  for(const n of quick){
+   if(!n.important||n.themeFlipped||n.delivered||now<n.due-120000)continue;
+   n.themeFlipped=true;changed=true;
+   window.dispatchEvent(new CustomEvent('hexora:important-reminder',{detail:{due:n.due}}));
+  }
+  if(changed)saveQuick();
+ };
+ const checkDue=()=>{
+  checkImportantTheme();
+  const now=Date.now();let changed=false;
+  for(const n of quick)if(!n.delivered&&n.due<=now){n.delivered=true;n.read=false;changed=true;
+   if(n.deepLink)window.hexora?.action('fire-quick-link',{id:n.id,link:n.deepLink}).catch(error=>console.warn('Could not open scheduled tab',error));
+   alertDue(n);
+  }
+  if(changed){saveQuick();render();syncQuickLinks();}
+  updateBell();
+ };
+ const showForm=show=>{
+  form.hidden=!show;
+  if(show){
+   const next=new Date(Date.now()+5*60000);
+   const local=new Date(next.getTime()-next.getTimezoneOffset()*60000).toISOString().slice(0,16);
+   date.value=local.slice(0,10);time.value=local.slice(11);
+   error.hidden=true;if(important)important.checked=false;if(deepLink)deepLink.value='';message.focus();
+  }else add.focus();
+ };
+ add?.addEventListener('click',()=>showForm(form.hidden));
+ $('quick-notification-cancel')?.addEventListener('click',()=>showForm(false));
+ form?.addEventListener('submit',event=>{
+  event.preventDefault();
+  const text=message.value.trim(),due=new Date(date.value+'T'+time.value).getTime(),link=deepLink?.value.trim()||'';
+  if(!text||!Number.isFinite(due)||due<=Date.now()){
+   error.textContent='Enter a message and a future date and time.';error.hidden=false;return;
+  }
+  if(!validQuickLink(link)){error.textContent='Enter a valid Hexora tab link, e.g. hexora://workspace/dual/tab/13';error.hidden=false;return;}
+  quick.push({id:String(Date.now())+'-'+Math.random().toString(36).slice(2,7),message:text,due,deepLink:link,delivered:false,read:false,important:!!important?.checked,themeFlipped:false});
+  quick.sort((a,b)=>a.due-b.due);quick=quick.slice(-100);
+  saveQuick();syncQuickLinks();message.value='';showForm(false);render();updateBell();
+ });
+ feed.addEventListener('click',event=>{
+  const remove=event.target.closest('[data-quick-remove]');
+  if(remove){quick=quick.filter(n=>n.id!==remove.dataset.quickRemove);saveQuick();syncQuickLinks();render();updateBell();return;}
+  const read=event.target.closest('[data-quick-read]');
+  if(read){const n=quick.find(n=>n.id===read.dataset.quickRead);if(n){n.read=true;saveQuick();render();updateBell();}}
+ });
+ document.addEventListener('visibilitychange',()=>{if(!document.hidden)checkDue();});
+ window.addEventListener('focus',checkDue);
+ setInterval(checkDue,15000);
+ let filter='all';
+ const render=()=>{
+  feed.replaceChildren();
+  const filtered=samples.filter(item=>filter==='all'||item.kind===filter);
+  const quickVisible=filter==='all'||filter==='system';
+  if(quickVisible)for(const n of [...quick].sort((a,b)=>a.due-b.due)){
+   const row=document.createElement('div');row.className='notification-item notification-quick'+(n.delivered&&!n.read?' is-unread':'');
+   const symbol=document.createElement('span');symbol.className='notification-item-icon';symbol.textContent=n.delivered?'✓':'◷';
+   const content=document.createElement('div');content.className='notification-item-content';
+   const meta=document.createElement('div');meta.className='notification-item-meta';
+   const source=document.createElement('span');source.textContent=n.delivered?'Quick notification':'Scheduled';
+   const when=document.createElement('span');when.textContent=prettyDue(n.due);meta.append(source,when);
+   const title=document.createElement('strong');title.textContent=n.important?'★ '+n.message:n.message;
+   if(n.deepLink){const linkLabel=document.createElement('p');linkLabel.className='notification-quick-link';linkLabel.textContent='↗ '+n.deepLink;content.append(linkLabel);}
+   const controls=document.createElement('div');controls.className='notification-quick-actions';
+   if(n.delivered&&!n.read){const read=document.createElement('button');read.type='button';read.textContent='Mark read';read.dataset.quickRead=n.id;controls.append(read);}
+   const remove=document.createElement('button');remove.type='button';remove.textContent='Remove';remove.dataset.quickRemove=n.id;controls.append(remove);
+   content.append(meta,title,controls);row.append(symbol,content);feed.append(row);
+  }
+  if(!filtered.length&&(!quickVisible||!quick.length)){const empty=document.createElement('p');empty.className='notifications-feed-empty';empty.textContent='Nothing here yet.';feed.append(empty);return;}
+  for(const item of filtered){
+   const row=document.createElement('div');row.className='notification-item'+(item.unread?' is-unread':'');
+   const symbol=document.createElement('span');symbol.className='notification-item-icon';symbol.textContent=item.icon;
+   const content=document.createElement('div');content.className='notification-item-content';
+   const meta=document.createElement('div');meta.className='notification-item-meta';
+   const source=document.createElement('span');source.textContent=item.source;
+   const time=document.createElement('span');time.textContent=item.time;
+   meta.append(source,time);
+   const title=document.createElement('strong');title.textContent=item.title;
+   const detail=document.createElement('p');detail.textContent=item.detail;
+   content.append(meta,title,detail);row.append(symbol,content);
+   if(item.unread){const dot=document.createElement('span');dot.className='notification-item-dot';row.append(dot);}
+   feed.append(row);
+  }
+ };
+ let closeTimer=null;
+ const setOpen=open=>{
+  if(closeTimer){clearTimeout(closeTimer);closeTimer=null;}
+  bell.setAttribute('aria-expanded',String(open));
+  if(open){
+   checkDue();
+   panel.hidden=false;
+   render();
+   requestAnimationFrame(()=>requestAnimationFrame(()=>panel.classList.add('is-visible')));
+   document.body.classList.add('notifications-drawer-open');
+   window.hexora?.action('notifications-drawer',true);
+   close?.focus();
+  }else{
+   panel.classList.remove('is-visible');
+   document.body.classList.remove('notifications-drawer-open');
+   const finish=()=>{panel.hidden=true;window.hexora?.action('notifications-drawer',false);closeTimer=null;};
+   if(window.matchMedia('(prefers-reduced-motion: reduce)').matches)finish();
+   else closeTimer=setTimeout(finish,270);
+  }
+ };
+ bell.addEventListener('click',()=>setOpen(bell.getAttribute('aria-expanded')!=='true'));
+ close?.addEventListener('click',()=>{setOpen(false);bell.focus();});
+ document.addEventListener('pointerdown',event=>{if(!panel.hidden&&!wrapper.contains(event.target))setOpen(false);});
+ document.addEventListener('keydown',event=>{if(event.key==='Escape'&&!panel.hidden){event.preventDefault();setOpen(false);bell.focus();}});
+ document.querySelectorAll('[data-notification-filter]').forEach(button=>button.addEventListener('click',()=>{
+  filter=button.dataset.notificationFilter;
+  document.querySelectorAll('[data-notification-filter]').forEach(b=>b.classList.toggle('selected',b===button));
+  render();
+ }));
+ $('notifications-mark-read')?.addEventListener('click',()=>{samples.forEach(item=>item.unread=false);quick.forEach(n=>{if(n.delivered)n.read=true;});saveQuick();render();updateBell();});
+ checkDue();
+ syncQuickLinks();
+})();
