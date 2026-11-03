@@ -1079,6 +1079,39 @@ function ensureDualPairMenu(){
  }
  return button;
 }
+function askSecondScreenUrl(tab,previous){
+ return new Promise(resolve=>{
+  const veil=document.createElement('div');veil.className='overlay';veil.style.zIndex='99999';
+  const dialog=document.createElement('div');dialog.className='dialog';
+  dialog.style.cssText='max-width:460px;width:min(460px,calc(100vw - 36px));padding:24px';
+  const heading=document.createElement('h2');heading.textContent='Open Second Screen';
+  heading.style.margin='0 0 8px';
+  const description=document.createElement('p');description.textContent='Connect a website to '+(tab.title||'this tab')+'. This URL stays saved until you disconnect it.';
+  const form=document.createElement('form');form.style.cssText='display:flex;flex-direction:column;gap:14px;margin-top:18px';
+  const input=document.createElement('input');input.type='url';input.required=true;input.placeholder='https://example.com';input.value=previous||'';input.autocomplete='url';
+  input.style.cssText='width:100%;padding:12px;border-radius:8px';
+  const error=document.createElement('p');error.style.cssText='color:#ff8b8b;margin:0;min-height:18px';
+  const buttons=document.createElement('div');buttons.style.cssText='display:flex;justify-content:flex-end;gap:10px';
+  const cancel=document.createElement('button');cancel.type='button';cancel.textContent='Cancel';
+  const submit=document.createElement('button');submit.type='submit';submit.textContent='Connect';
+  buttons.append(cancel,submit);form.append(input,error,buttons);dialog.append(heading,description,form);veil.append(dialog);
+  let finished=false;
+  const close=value=>{if(finished)return;finished=true;veil.removeEventListener('keydown',onKey);veil.remove();action('modal',false);resolve(value);};
+  const onKey=e=>{if(e.key==='Escape'){e.preventDefault();close(null);}};
+  veil.addEventListener('keydown',onKey);
+  veil.addEventListener('mousedown',e=>{if(e.target===veil)close(null);});
+  cancel.onclick=()=>close(null);
+  form.onsubmit=e=>{
+   e.preventDefault();
+   try{
+    const url=new URL(input.value.trim());
+    if(!['http:','https:'].includes(url.protocol)||!url.hostname||url.username||url.password)throw Error('Enter a valid website URL.');
+    close(url.href);
+   }catch{error.textContent='Enter a valid website URL starting with https://';input.focus();}
+  };
+  document.body.append(veil);action('modal',true);input.focus();input.select();
+ });
+}
 async function configureDualSecondScreen(tab,connected){
  hideTabMenu();
  try{
@@ -1088,10 +1121,9 @@ async function configureDualSecondScreen(tab,connected){
    return;
   }
   const previous=await action('dual-pair-get',tab.id);
-  const value=prompt('Second screen URL for '+(tab.title||'this tab')+':',previous||'https://');
+  const value=await askSecondScreenUrl(tab,previous);
   if(value===null)return;
-  if(!value.trim()){alert('Enter a URL to connect the second screen.');return;}
-  await action('dual-pair-set',{id:tab.id,url:value.trim()});
+  await action('dual-pair-set',{id:tab.id,url:value});
   await action('activate',tab.id);
   await action('dual-mirror');
   refresh();
