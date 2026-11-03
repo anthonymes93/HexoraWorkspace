@@ -311,18 +311,43 @@ function rememberFavicon(tabId,pageUrl,iconUrl){
 
 // Chromium-rendered website scrollbars use the same Hexora rail style.
 // insertCSS runs outside page CSP and is reapplied after top-level navigations.
-const HEXORA_SITE_SCROLLBAR_CSS=`
-:root{scrollbar-color:#628ce4 #101b31!important;scrollbar-width:auto!important}
+const HEXORA_SCROLLBAR_PALETTES={
+ blue:['#1c347f','#405a9b'],red:['#b10501','#ce3029'],orange:['#a94c1e','#ce6c35'],
+ amber:['#936019','#bd8734'],green:['#176b4c','#2e956f'],teal:['#116c75','#2b929a'],
+ cyan:['#176185','#327fa5'],purple:['#57348c','#7955b2'],pink:['#8d326e','#b45690'],
+ indigo:['#343c98','#555fc1']
+};
+let websiteScrollbarTheme={theme:'classic',color:'blue'};
+function scrollbarColors(){
+ return websiteScrollbarTheme.theme==='omega'
+  ?HEXORA_SCROLLBAR_PALETTES[websiteScrollbarTheme.color]||HEXORA_SCROLLBAR_PALETTES.blue
+  :['#405a9b','#628ce4'];
+}
+function websiteScrollbarCSS(){
+ const [base,hover]=scrollbarColors();
+ return `
+:root{scrollbar-color:${base} #17191f!important;scrollbar-width:auto!important}
 ::-webkit-scrollbar{width:11px!important;height:11px!important}
-::-webkit-scrollbar-track{background:#101b31!important;border-radius:12px!important}
-::-webkit-scrollbar-corner{background:#101b31!important}
-::-webkit-scrollbar-thumb{background:#628ce4!important;border:2px solid #101b31!important;border-radius:12px!important;min-height:38px!important;min-width:38px!important}
-::-webkit-scrollbar-thumb:hover{background:#91b0fa!important}
-::-webkit-scrollbar-thumb:active{background:#b5caff!important}
+::-webkit-scrollbar-track{background:#17191f!important;border-radius:12px!important}
+::-webkit-scrollbar-corner{background:#17191f!important}
+::-webkit-scrollbar-thumb{background:${base}!important;border:2px solid #17191f!important;border-radius:12px!important;min-height:38px!important;min-width:38px!important}
+::-webkit-scrollbar-thumb:hover{background:${hover}!important}
+::-webkit-scrollbar-thumb:active{background:${hover}!important}
 `;
+}
+const scrollbarCSSKeys=new WeakMap();
 function applyHexoraWebsiteScrollbars(wc){
  if(wc.isDestroyed()||!/^https?:/i.test(wc.getURL()))return;
- wc.insertCSS(HEXORA_SITE_SCROLLBAR_CSS,{cssOrigin:'user'}).catch(error=>console.warn('[Hexora] Website scrollbar style unavailable:',error.message));
+ const css=websiteScrollbarCSS();
+ const previous=scrollbarCSSKeys.get(wc);
+ if(previous?.css===css)return;
+ scrollbarCSSKeys.set(wc,{css,key:null});
+ if(previous?.key)wc.removeInsertedCSS(previous.key).catch(()=>{});
+ wc.insertCSS(css,{cssOrigin:'user'}).then(key=>{
+  const current=scrollbarCSSKeys.get(wc);
+  if(current?.css===css)current.key=key;
+  else wc.removeInsertedCSS(key).catch(()=>{});
+ }).catch(error=>console.warn('[Hexora] Website scrollbar style unavailable:',error.message));
 }
 function wire(t){const view=new WebContentsView({webPreferences:{partition:'persist:hexora-chatgpt',preload:path.join(__dirname,'site-vault-preload.js'),sandbox:true,contextIsolation:true,nodeIntegration:false,webSecurity:true,javascript:true}});const wc=view.webContents;
  wc.setAudioMuted(!!t.muted);
@@ -337,7 +362,7 @@ function wire(t){const view=new WebContentsView({webPreferences:{partition:'pers
   if(url)rememberFavicon(t.id,wc.getURL(),url);
  });
  wc.on('page-title-updated',()=>{if(tabStoreClosing||quitting)return;update(true);store.recordVisit(wc.getURL(),wc.getTitle(),t.id);});
- wc.on('did-navigate',()=>{applyHexoraWebsiteScrollbars(wc);if(tabStoreClosing||quitting)return;if(favicons.get(t.id)?.origin!==originOf(wc.getURL()))favicons.delete(t.id);update();store.recordVisit(wc.getURL(),wc.getTitle(),t.id);});
+ wc.on('did-navigate',()=>{scrollbarCSSKeys.delete(wc);applyHexoraWebsiteScrollbars(wc);if(tabStoreClosing||quitting)return;if(favicons.get(t.id)?.origin!==originOf(wc.getURL()))favicons.delete(t.id);update();store.recordVisit(wc.getURL(),wc.getTitle(),t.id);});
  wc.on('did-navigate-in-page',()=>{if(tabStoreClosing||quitting)return;update();store.recordVisit(wc.getURL(),wc.getTitle(),t.id);});
  wc.on('did-start-loading',()=>{loading.set(t.id,true);emit();});
  wc.on('did-stop-loading',()=>{loading.delete(t.id);emit();});
@@ -353,7 +378,7 @@ function wire(t){const view=new WebContentsView({webPreferences:{partition:'pers
  },250);
  wc.once('destroyed',()=>clearInterval(draftTimer));
  wc.on('dom-ready',()=>{
-  applyHexoraWebsiteScrollbars(wc);
+  scrollbarCSSKeys.delete(wc);applyHexoraWebsiteScrollbars(wc);
   if(!wc.getURL().startsWith('https://chatgpt.com/'))return;
   const initial=JSON.stringify(store.getMeta(draftKey)||'');
   wc.executeJavaScript(CHATGPT_DRAFT_GUARD.replace('__HEXORA_SAVED_DRAFT__',initial)).catch(err=>console.warn('Draft restore unavailable:',err.message));
@@ -1284,6 +1309,13 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
   else if(action==='dock'){dockTab(arg);}
   else if(action==='swap-detached'){swapDetached(arg?.source,arg?.target);}
   else if(action==='detached-info'){return {title:store.get(Number(arg))?.title||'ChatGPT'};}
+  else if(action==='scrollbar-theme'){
+   const theme=arg?.theme==='omega'?'omega':'classic';
+   const color=Object.hasOwn(HEXORA_SCROLLBAR_PALETTES,arg?.color)?arg.color:'blue';
+   websiteScrollbarTheme={theme,color};
+   for(const view of live.values())applyHexoraWebsiteScrollbars(view.webContents);
+   return true;
+  }
   else if(action==='notifications-drawer'){notificationsOpen=!!arg;bounds();return true;}
   else if(action==='modal'){
    modalVisible=!!arg;
