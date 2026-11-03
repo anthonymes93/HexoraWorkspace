@@ -6,7 +6,7 @@ if(new URLSearchParams(window.location.search).get('hexoraDev')==='1'){
  const indicator=$('hexora-dev-indicator');
  if(indicator)indicator.hidden=false;
 }
-const workspaces=[{id:'web',name:'Web Development',emoji:'◈'},{id:'business',name:'Business',emoji:'▤'},{id:'personal',name:'Personal',emoji:'☼'},{id:'ideas',name:'Ideas Lab',emoji:'✦'}];
+const workspaces=[{id:'web',name:'Web Development',emoji:'◈'},{id:'business',name:'Business',emoji:'▤'},{id:'personal',name:'Personal',emoji:'☼'},{id:'ideas',name:'Ideas Lab',emoji:'✦'},{id:'dual',name:'Dual Workspace (Test)',emoji:'◫'}];
 const conversationsCollapsedKey='hexora-conversations-collapsed';
 function setConversationsCollapsed(collapsed){
  const list=document.getElementById('conversations'),toggle=document.getElementById('toggle-conversations');
@@ -173,7 +173,7 @@ function render(p){
   const label=document.createElement('span');label.className='name';label.textContent=w.name;
   const count=document.createElement('span');count.className='count';count.textContent=p.counts.find(x=>x.workspace===w.id)?.count||0;
   const edit=document.createElement('span');edit.className='workspace-edit';edit.title='Edit workspace';edit.textContent='⋯';edit.onclick=e=>{e.stopPropagation();openWorkspaceEditor(w.id);};
-  el.append(symbol,label,count,edit);attachWorkspaceHoverTip(el,w,Number(count.textContent)||0);el.addEventListener('contextmenu',e=>showWorkspaceMenu(e,w));el.onclick=async()=>{activeWorkspace=w.id;offset=0;save();await action('switch-workspace',w.id);refresh();};enableSidebarDrag(el,w.id,sidebarWorkspaceOrderKey);container.append(el);
+  el.append(symbol,label,count,edit);attachWorkspaceHoverTip(el,w,Number(count.textContent)||0);el.addEventListener('contextmenu',e=>showWorkspaceMenu(e,w));el.onclick=async()=>{activeWorkspace=w.id;offset=0;save();await action('switch-workspace',w.id);if(w.id==='dual')await action('dual-mirror');refresh();};enableSidebarDrag(el,w.id,sidebarWorkspaceOrderKey);container.append(el);
  }
  const conversations=$('conversations');conversations.replaceChildren();
  renderStackTree(conversations,p);
