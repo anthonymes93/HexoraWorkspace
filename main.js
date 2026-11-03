@@ -106,7 +106,7 @@ if(!hasSingleInstanceLock){
 const HOME='https://chatgpt.com/';
 const DETACHED_HEADER=44;
 const MAIN_TITLEBAR_HEIGHT=process.platform==='win32'?32:0;
-let TOP_HEIGHT=120;const IDLE_MS=24*60*60*1000,MAX_LIVE=8;
+let TOP_HEIGHT=95;const IDLE_MS=24*60*60*1000,MAX_LIVE=8;
 let recoveryWindow=null,vault=null;
 const detached=new Map();
 let quitting=false;
@@ -1162,7 +1162,7 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
    if(candidate)activate(candidate);else newTab(workspace);
    return true;
   }
-  else if(action==='stack-row-height'){TOP_HEIGHT=Number.isFinite(arg)?Math.max(120,Math.min(120+34*100,Math.round(arg))):120;bounds();return true;}
+  else if(action==='stack-row-height'){TOP_HEIGHT=Number.isFinite(arg)?Math.max(95,Math.min(95+34*100,Math.round(arg))):95;bounds();return true;}
   else if(action==='stack-create-pair'){const id=store.createStackPair(arg?.workspace,arg?.name,Number(arg?.sourceId),Number(arg?.targetId),arg?.parentId??null);emit();return id;}
   else if(action==='stack-create'){const id=store.createStack(arg?.workspace,arg?.name,arg?.tabId??null,arg?.parentId??null);emit();return id;}
   else if(action==='stack-assign'){store.putTabInStack(Number(arg?.tabId),arg?.stackId===null?null:Number(arg?.stackId));emit();return true;}
