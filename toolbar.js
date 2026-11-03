@@ -1,6 +1,58 @@
 // Window controls are restricted to the main Hexora window by the main-process IPC handler.
 document.querySelectorAll('[data-window-action]').forEach(button=>button.addEventListener('click',()=>window.hexora.windowControl(button.dataset.windowAction)));
 const $=id=>document.getElementById(id);
+/* A fast upward flick into the screen's top edge enters focus mode.
+   A cursor parked at the edge never triggers; no click is needed. */
+let frameCompact=false;
+function setCompactFrame(next){
+ if(frameCompact===next)return;
+ frameCompact=next;
+ document.body.classList.toggle('hexora-compact-frame',next);
+ window.hexora.action('compact-frame',next).catch(error=>{
+  console.warn('[Hexora] Compact frame:',error);
+  frameCompact=!next;
+  document.body.classList.toggle('hexora-compact-frame',frameCompact);
+ });
+}
+let lastFramePointer=null,frameFlickReady=true;
+let frameFlickDistance=0,frameFlickStartedAt=0;
+document.addEventListener('pointermove',event=>{
+ if(event.pointerType==='touch')return;
+ const now=performance.now();
+ const previous=lastFramePointer;
+ lastFramePointer={x:event.clientX,y:event.clientY,time:now};
+ if(!previous)return;
+ // The permanent left rail is never a gesture trigger.
+ if(event.clientX<=58){frameFlickDistance=0;frameFlickStartedAt=0;return;}
+ // Moving away from the top edge immediately rearms the next flick.
+ if(event.clientY>=72){
+  frameFlickReady=true;
+  if(event.clientY>=180){frameFlickDistance=0;frameFlickStartedAt=0;}
+ }
+ const dt=now-previous.time;
+ if(dt<=0||dt>240){
+  frameFlickDistance=0;frameFlickStartedAt=0;
+  return;
+ }
+ const dy=previous.y-event.clientY;
+ // Track upward motion over multiple pointer samples, even on high-DPI mice.
+ if(dy>0&&event.clientY<190&&Math.abs(event.clientX-previous.x)<125){
+  if(!frameFlickStartedAt)frameFlickStartedAt=now;
+  frameFlickDistance+=dy;
+ }else if(dy< -5){
+  frameFlickDistance=0;frameFlickStartedAt=0;
+ }
+ const duration=now-frameFlickStartedAt;
+ const speed=duration>0?frameFlickDistance/duration:0;
+ // Detect before entering Electron's draggable titlebar, which can swallow
+ // pointer events. Hover alone has no upward distance and never triggers.
+ if(frameFlickReady&&event.clientY<=2&&frameFlickDistance>=20&&
+    duration<=380&&(speed>=0.12||frameFlickDistance>=42)){
+  frameFlickDistance=0;frameFlickStartedAt=0;
+  frameFlickReady=false;
+  setCompactFrame(!frameCompact);
+ }
+},{passive:true});
 // The development marker is driven by the Electron main process, not local storage.
 // Initialize before the rest of the toolbar so startup is unambiguous.
 if(new URLSearchParams(window.location.search).get('hexoraDev')==='1'){
@@ -1308,6 +1360,9 @@ function applySidebarBreakpoint(value){
 window.hexora.onSidebarFrame((width,transitioning=false,target=null)=>{
  const value=Math.max(58,Math.min(560,width));
  const root=document.documentElement,body=document.body;
+ // Focus mode temporarily changes viewport geometry, not the sidebar preference.
+ // Do not apply collapsed breakpoints or rewrite sidebarOpen while hidden.
+ if(frameCompact)return;
  if(transitioning&&!sidebarWasAnimating){
   // Keep one presentation style while native viewport width animates.
   // Opening from fully closed should reveal the regular expanded layout.
