@@ -1,6 +1,35 @@
 // Window controls are restricted to the main Hexora window by the main-process IPC handler.
 document.querySelectorAll('[data-window-action]').forEach(button=>button.addEventListener('click',()=>window.hexora.windowControl(button.dataset.windowAction)));
 const $=id=>document.getElementById(id);
+/* A deliberate quick tap toggles focus mode; merely hovering over the
+   draggable titlebar does nothing. Delay single-click so double/triple
+   clicks can retain their existing new-tab and theme gestures. */
+let frameTapStart=0,frameTapTimer=null,frameCompact=false;
+const frameTapTarget=document.querySelector('.main-titlebar-drag');
+function setCompactFrame(next){
+ if(frameCompact===next)return;
+ frameCompact=next;
+ document.body.classList.toggle('hexora-compact-frame',next);
+ window.hexora.action('compact-frame',next).catch(error=>{
+  console.warn('[Hexora] Compact frame:',error);
+  frameCompact=!next;
+  document.body.classList.toggle('hexora-compact-frame',frameCompact);
+ });
+}
+frameTapTarget?.addEventListener('pointerdown',event=>{
+ if(event.button===0&&!event.target.closest('button,a,input,textarea,select'))frameTapStart=performance.now();
+});
+frameTapTarget?.addEventListener('click',event=>{
+ if(event.target.closest('button,a,input,textarea,select'))return;
+ clearTimeout(frameTapTimer);
+ if(event.detail!==1)return;
+ if(!frameTapStart||performance.now()-frameTapStart>240)return;
+ frameTapTimer=setTimeout(()=>{frameTapTimer=null;setCompactFrame(true);},360);
+});
+document.querySelector('.rail .logo')?.addEventListener('click',()=>{
+ if(frameCompact)setCompactFrame(false);
+});
+
 // The development marker is driven by the Electron main process, not local storage.
 // Initialize before the rest of the toolbar so startup is unambiguous.
 if(new URLSearchParams(window.location.search).get('hexoraDev')==='1'){
