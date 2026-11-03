@@ -1,6 +1,7 @@
 'use strict';
 const {BrowserWindow,WebContentsView,session}=require('electron');
 const path=require('node:path');
+const HEADER_HEIGHT=44;
 function createDualMirror({getActiveId,getTab,getView,isCodeTab,getMirrorUrl,getChatgptSource}){
  let state=null,opening=null;
  const pending=new Map();
@@ -14,7 +15,7 @@ function createDualMirror({getActiveId,getTab,getView,isCodeTab,getMirrorUrl,get
   wc.on('input-event',mouse);wc.on('before-input-event',key);
   g.handlers.push([wc,'input-event',mouse],[wc,'before-input-event',key]);
  };
- const resize=g=>{if(g.window.isDestroyed()||!g.active)return;const [width,height]=g.window.getContentSize();g.active.view.setBounds({x:0,y:0,width,height});};
+ const resize=g=>{if(g.window.isDestroyed()||!g.active)return;const [width,height]=g.window.getContentSize();g.active.view.setBounds({x:0,y:HEADER_HEIGHT,width,height:Math.max(0,height-HEADER_HEIGHT)});};
  const dispose=(g,entry)=>{
   g.entries.delete(entry.id);
   if(g.active===entry){g.active=null;g.source=null;detach(g);}
@@ -101,8 +102,9 @@ function createDualMirror({getActiveId,getTab,getView,isCodeTab,getMirrorUrl,get
   if(opening)return opening;
   const task=(async()=>{
    const window=new BrowserWindow({width:960,height:720,minWidth:420,minHeight:320,
-    title:'Hexora · Dual Workspace',backgroundColor:'#111215',autoHideMenuBar:true,
+    title:'Hexora · Dual Workspace (secondary window)',backgroundColor:'#111215',autoHideMenuBar:true,
     webPreferences:{sandbox:true,contextIsolation:true,nodeIntegration:false,webSecurity:true}});
+   await window.loadURL('data:text/html;charset=utf-8,'+encodeURIComponent('<!doctype html><html><head><meta charset="utf-8"><style>html,body{margin:0;background:#151925;color:#e8edff;font:13px system-ui}header{height:43px;display:flex;align-items:center;padding:0 16px;gap:12px;border-bottom:1px solid #34394c}b{color:#bba6ff}small{color:#9ca5bc}</style></head><body><header><b>HEXORA</b><span>Dual Workspace · Secondary window</span><small>Close this window to return to your main workspace</small></header></body></html>'));
    const g={window,entries:new Map(),active:null,source:null,handlers:[],
     leader:null,leaderUntil:0,last:null,busy:false,closed:false,timer:null};
    state=g;
