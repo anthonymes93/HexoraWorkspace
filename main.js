@@ -1027,6 +1027,37 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
  ipcMain.handle('tabs:action',(_e,action,arg)=>{
   const current=store.get(activeId);const wc=live.get(activeId)?.webContents;
   if(action==='dual-mirror')return openDualMirror();
+  if(action==='dual-pair-get'){
+   const row=store.get(Number(arg));
+   return row?.workspace==='dual'?(store.getMeta('dualPairUrl:'+row.id)||''):null;
+  }
+  if(action==='dual-pair-set'){
+   const row=store.get(Number(arg?.id));
+   if(!row||row.workspace!=='dual')throw Error('Select a Dual Workspace tab.');
+   const raw=String(arg?.url||'').trim();
+   if(raw){
+    const parsed=new URL(raw);
+    if(!['http:','https:'].includes(parsed.protocol)||!parsed.hostname||parsed.username||parsed.password)throw Error('Enter a valid website URL.');
+    store.setMeta('dualPairUrl:'+row.id,parsed.href);
+   }else store.setMeta('dualPairUrl:'+row.id,'');
+   return true;
+  }
+  if(action==='dual-setup'){
+   if(store.getMeta('dualExampleSetup')==='true')return false;
+   const examples=[
+    ['Google','https://www.google.com/','https://chatgpt.com/g/g-p-6ae527dd93988191bf48b9890567e9ad-hexora-workspace/c/6ae903df-557c-83ea-a24e-992677839f48'],
+    ['Yahoo','https://www.yahoo.com/','https://chatgpt.com/c/6ae96a50-050c-83e9-a254-44be12e22272'],
+    ['Bing','https://www.bing.com/','https://chatgpt.com/c/6ae9914b-5628-83ea-8325-47161fac300b']
+   ];
+   for(const [title,url,paired] of examples){
+    const existing=store.page('dual',0,1000).find(row=>row.url===url);
+    const id=existing?.id||store.nextId();
+    if(!existing)store.save({id,title,url,workspace:'dual',pinned:false,muted:false,lastActive:Date.now(),ordinal:id});
+    store.setMeta('dualPairUrl:'+id,paired);
+   }
+   store.setMeta('dualExampleSetup','true');emit();return true;
+  }
+
   if(action==='copy-tab-link'){
     const tab=store.get(Number(arg));
     if(!tab)throw Error('This tab no longer exists.');
