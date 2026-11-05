@@ -2066,3 +2066,21 @@ $('open-pc-tv')?.addEventListener('click',()=>window.hexora.pcTv.open().catch(er
 $('time-intelligence-rail')?.addEventListener('click',()=>window.hexora.action('time-intelligence:open').catch(console.error));
 
 $('notes-studio-rail')?.addEventListener('click',()=>window.hexora.action('notes-studio:open').catch(console.error));
+
+ // Keep the blue app rail at the same scroll position after Hexora restarts.
+ (() => {
+  const rail=document.querySelector('.rail');
+  if(!rail)return;
+  const key='hexora:app-rail-scroll-top';
+  const saved=Number(localStorage.getItem(key));
+  if(Number.isFinite(saved)&&saved>=0)rail.scrollTop=saved;
+  let frame=0;
+  rail.addEventListener('scroll',()=>{
+   if(frame)cancelAnimationFrame(frame);
+   frame=requestAnimationFrame(()=>{
+    localStorage.setItem(key,String(rail.scrollTop));
+    frame=0;
+   });
+  },{passive:true});
+  window.addEventListener('pagehide',()=>localStorage.setItem(key,String(rail.scrollTop)));
+ })();
