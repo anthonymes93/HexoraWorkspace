@@ -1188,3 +1188,25 @@ body.client-zone-hub .tabsbar{display:none}
 body.client-zone-hub #stack-rows{display:none}
 
 .favorite-client:not([hidden]){display:inline-flex;align-items:center;gap:7px;border:1px solid #9e86dc66;border-radius:8px;padding:7px 11px;background:#9e86dc20;color:inherit;cursor:pointer;font-size:12px}.favorite-client:hover{background:#9e86dc40}.client-favorites{display:grid;gap:4px;padding:0 8px 8px}.client-favorite{width:100%;padding:9px 12px;text-align:left;border:0;border-radius:8px;background:transparent;color:inherit;cursor:pointer;font-size:12px}.client-favorite:hover,.client-favorite.selected{background:#9e86dc2e}
+
+/* Compact frame: reserve a visible horizontal scrollbar lane below full-height tabs. */
+body.hexora-compact-frame .tabsbar .tabs{
+ align-self:stretch;
+ min-width:0;
+ min-height:0;
+ height:100%;
+ padding:2px 0 0;
+ align-items:flex-start;
+ overflow-x:auto;
+ overflow-y:hidden;
+ scrollbar-width:thin;
+ scrollbar-color:#b9c9ef #1c347f;
+}
+body.hexora-compact-frame .tabsbar .tabs>.tab{
+ flex-shrink:0;
+ height:calc(100% - 12px);
+ min-height:0;
+}
+body.hexora-compact-frame .tabsbar .tabs::-webkit-scrollbar{height:9px}
+body.hexora-compact-frame .tabsbar .tabs::-webkit-scrollbar-thumb{background:#b9c9ef;border-radius:6px}
+body.hexora-compact-frame .tabsbar .tabs::-webkit-scrollbar-track{background:#1c347f}
