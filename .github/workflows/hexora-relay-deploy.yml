@@ -1,4 +1,5 @@
 name: Deploy Hexora update relay
+# Deployment refresh: trigger initial Worker deployment on develop.
 on:
   workflow_dispatch:
   push:
