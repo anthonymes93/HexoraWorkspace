@@ -35,3 +35,34 @@ function check(){
 }
 window.addEventListener('DOMContentLoaded',check);
 setInterval(check,1200);
+
+ // YouTube handles its own video-player context menu in page JavaScript.
+ // Capture the original trusted right-click before YouTube consumes it.
+ let allowYouTubeMenu=false;
+ document.addEventListener('contextmenu',event=>{
+  if(allowYouTubeMenu){allowYouTubeMenu=false;return;}
+  if(!/^(www\.|m\.)?youtube\.com$/.test(location.hostname))return;
+  const target=event.target;
+  const player=target?.closest?.('#movie_player, .html5-video-player, video, ytd-player');
+  const anchor=target?.closest?.('a[href]');
+  const href=anchor?.href||location.href;
+  let parsed;
+  try{parsed=new URL(href);}catch{return;}
+  const host=parsed.hostname.toLowerCase();
+  const isVideo=(host==='youtu.be'&&/^\/[a-zA-Z0-9_-]{11}$/.test(parsed.pathname))||
+   (['youtube.com','www.youtube.com','m.youtube.com'].includes(host)&&(
+    (parsed.pathname==='/watch'&&/^[a-zA-Z0-9_-]{11}$/.test(parsed.searchParams.get('v')||''))||
+    /^\/(shorts|live)\/[a-zA-Z0-9_-]{11}$/.test(parsed.pathname)));
+  if(!isVideo||(!player&&!anchor))return;
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  const x=event.clientX,y=event.clientY;
+  ipcRenderer.send('pctv:youtube-context',{url:parsed.href});
+  // The native menu includes a choice to show the original YouTube menu.
+  ipcRenderer.once('pctv:show-youtube-menu',()=>{
+   allowYouTubeMenu=true;
+   const next=new MouseEvent('contextmenu',{bubbles:true,cancelable:true,composed:true,button:2,buttons:2,clientX:x,clientY:y});
+   target.dispatchEvent(next);
+   allowYouTubeMenu=false;
+  });
+ },true);
