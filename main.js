@@ -1509,6 +1509,27 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
  setInterval(sweep,60*1000).unref();
  syncNativeCodeProjects();
  setInterval(syncNativeCodeProjects,1000).unref();
+ let nativeCodeShutdownPending=false,nativeCodeShutdownReady=false;
+ win.on('close',event=>{
+  if(nativeCodeShutdownReady||nativeCodeShutdownPending||nativeCodeHosts.size===0)return;
+  event.preventDefault();
+  nativeCodeShutdownPending=true;
+  // A reparented VS Code HWND must be restored before Electron destroys its parent.
+  // Otherwise Windows can close the VS Code window along with Hexora.
+  const hosts=[...nativeCodeHosts.values()].map(entry=>entry.proc).filter(Boolean);
+  stopAllNativeCode();
+  Promise.all(hosts.map(proc=>new Promise(resolve=>{
+   if(proc.exitCode!==null||proc.signalCode!==null)return resolve();
+   const timeout=setTimeout(()=>{console.warn('[Native VS Code] Host detach timeout; keeping Hexora open to protect VS Code.');resolve(false);},5000);
+   proc.once('exit',()=>{clearTimeout(timeout);resolve(true);});
+   proc.once('error',()=>{clearTimeout(timeout);resolve(false);});
+  }))).then(results=>{
+   nativeCodeShutdownPending=false;
+   if(results.some(result=>result===false))return;
+   nativeCodeShutdownReady=true;
+   if(win&&!win.isDestroyed())win.close();
+  });
+ });
  win.on('closed',()=>{if(nativeCodeLifecycleTimer){clearTimeout(nativeCodeLifecycleTimer);nativeCodeLifecycleTimer=null;}quitting=true;if(nativeCodeInstaller&&nativeCodeInstaller.exitCode===null)nativeCodeInstaller.kill();stopAllNativeCode();for(const folder of [...extensionPopups.keys()])closeExtensionPopup(folder);if(sidebarAnimation)clearInterval(sidebarAnimation);for(const popup of detached.values())if(!popup.isDestroyed())popup.close();detached.clear();clearInterval(recoveryTimer);recoveryPassword=null;clearTimeout(stateTimer);win=null;for(const id of Array.from(live.keys()))discard(id);vault?.lock();tabStoreClosing=true;store.close();});
  // Register every IPC handler before the renderer can issue actions.
  const stopCornerGoogleGesture=require('./corner-google-gesture').startCornerGoogleGesture();
