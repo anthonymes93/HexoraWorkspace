@@ -402,6 +402,44 @@ function wire(t){const view=new WebContentsView({webPreferences:{partition:'pers
  wc.on('did-navigate-in-page',()=>{if(tabStoreClosing||quitting)return;update();store.recordVisit(wc.getURL(),wc.getTitle(),t.id);});
  wc.on('did-start-loading',()=>{loading.set(t.id,true);emit();});
  wc.on('did-stop-loading',()=>{loading.delete(t.id);emit();if(tabLoadingFor===t.id)setTimeout(()=>hideNewTabLoader(t.id),180);});
+
+ // Persist the top-level document scroll for each tab and exact URL.
+ // Avoid storing form values or page content; only numeric x/y coordinates.
+ const scrollMetaKey='pageScroll:'+t.id;
+ let scrollReady=false,scrollBusy=false,lastScroll='';
+ const capturePageScroll=async()=>{
+  if(!scrollReady||scrollBusy||wc.isDestroyed()||!wc.getURL().startsWith('http'))return;
+  scrollBusy=true;
+  try{
+   const position=await wc.executeJavaScript('({x:window.scrollX,y:window.scrollY})',true);
+   if(!Number.isFinite(position?.x)||!Number.isFinite(position?.y))return;
+   const next=JSON.stringify({url:wc.getURL(),x:position.x,y:position.y});
+   if(next!==lastScroll){store.setMeta(scrollMetaKey,next);lastScroll=next;}
+  }catch{}finally{scrollBusy=false;}
+ };
+ const scrollCaptureTimer=setInterval(()=>{
+  if(activeId===t.id||detached.has(t.id))capturePageScroll();
+ },650);
+ wc.once('destroyed',()=>{clearInterval(scrollCaptureTimer);capturePageScroll();});
+ const restorePageScroll=()=>{
+  scrollReady=false;
+  let saved;
+  try{saved=JSON.parse(store.getMeta(scrollMetaKey)||'null');}catch{}
+  const url=wc.getURL();
+  if(!saved||saved.url!==url||!Number.isFinite(saved.x)||!Number.isFinite(saved.y)){
+   lastScroll='';scrollReady=true;return;
+  }
+  lastScroll=JSON.stringify(saved);
+  // Retry briefly for pages whose content expands after DOM ready.
+  for(const delay of [100,450,1100,2200]){
+   setTimeout(()=>{
+    if(wc.isDestroyed()||wc.getURL()!==url)return;
+    wc.executeJavaScript('window.scrollTo('+Math.max(0,saved.x)+','+Math.max(0,saved.y)+')',true).catch(()=>{});
+    if(delay===2200)scrollReady=true;
+   },delay);
+  }
+ };
+ wc.on('dom-ready',restorePageScroll);
  const draftKey='chatgptDraft:'+t.id;
  let draftBusy=false;
  const draftTimer=setInterval(async()=>{
