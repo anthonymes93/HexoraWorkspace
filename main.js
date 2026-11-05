@@ -509,8 +509,9 @@ function hideNewTabLoader(id){
 function bounds(){
  if(!win||win.isDestroyed()||!mainViewport)return;
  const [w,h]=win.getContentSize();
- const visibleWidth=Math.max(0,w-sidebarWidth-((notificationsOpen||quickToastOpen)?412:0)),visibleHeight=Math.max(0,h-TOP_HEIGHT-(compactFrame?0:MAIN_TITLEBAR_HEIGHT));
- mainViewport.setBounds({x:sidebarWidth,y:TOP_HEIGHT+(compactFrame?0:MAIN_TITLEBAR_HEIGHT),width:visibleWidth,height:visibleHeight});
+ const headerHeight=clientZoneVisible?42:TOP_HEIGHT;
+ const visibleWidth=Math.max(0,w-sidebarWidth-((notificationsOpen||quickToastOpen)?412:0)),visibleHeight=Math.max(0,h-headerHeight-(compactFrame?0:MAIN_TITLEBAR_HEIGHT));
+ mainViewport.setBounds({x:sidebarWidth,y:headerHeight+(compactFrame?0:MAIN_TITLEBAR_HEIGHT),width:visibleWidth,height:visibleHeight});
  if(tabLoadingOverlay)tabLoadingOverlay.setBounds({x:0,y:0,width:visibleWidth,height:visibleHeight});
  if(clientZoneVisible&&clientZoneView)clientZoneView.setBounds({x:0,y:0,width:visibleWidth,height:visibleHeight});
  const view=live.get(activeId);
@@ -575,6 +576,7 @@ function hideClientZone(){
  if(!clientZoneVisible)return;
  clientZoneVisible=false;
  if(clientZoneView&&mainViewport)mainViewport.removeChildView(clientZoneView);
+ bounds();
 }
 function activate(id){
  hideClientZone();
