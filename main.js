@@ -116,6 +116,7 @@ function savedDetachedIds(){try{const values=JSON.parse(store.getMeta(LAYOUT_KEY
 function setDetachedSaved(id,present){const ids=new Set(savedDetachedIds());if(present)ids.add(id);else ids.delete(id);store.setMeta(LAYOUT_KEY,JSON.stringify([...ids]));}
 let dualPopupHandler=null;
 let tabLoadingOverlay=null,tabLoadingFor=null,tabLoadingTimer=null;
+let clientZoneView=null,clientZoneVisible=false;
 let mainViewport=null,win,store,activeId=null,sidebarWidth=324,live=new Map(),favicons=new Map(),loading=new Map(),stateTimer=null,modalVisible=false,notificationsOpen=false,quickToastOpen=false,recoveryPassword=null,recoveryDir=null,recoveryTimer=null,recoveryBusy=false,lastBackup=null;
 const extensionPartition='persist:hexora-chatgpt';
 let deepLinkReady=false;
@@ -511,6 +512,7 @@ function bounds(){
  const visibleWidth=Math.max(0,w-sidebarWidth-((notificationsOpen||quickToastOpen)?412:0)),visibleHeight=Math.max(0,h-TOP_HEIGHT-(compactFrame?0:MAIN_TITLEBAR_HEIGHT));
  mainViewport.setBounds({x:sidebarWidth,y:TOP_HEIGHT+(compactFrame?0:MAIN_TITLEBAR_HEIGHT),width:visibleWidth,height:visibleHeight});
  if(tabLoadingOverlay)tabLoadingOverlay.setBounds({x:0,y:0,width:visibleWidth,height:visibleHeight});
+ if(clientZoneVisible&&clientZoneView)clientZoneView.setBounds({x:0,y:0,width:visibleWidth,height:visibleHeight});
  const view=live.get(activeId);
  if(view){
   // Fill the visible viewport exactly: no negative offsets, clipped gray gaps,
@@ -548,7 +550,24 @@ function pageRow(r){const codeProject=isCodeTab(r)?store.getCodeProject(r.id)?.p
  return{id:r.id,url:r.url,nativeCode:isCodeTab(r),nativeCodeProject:codeProject,nativeCodeProjectMissing:!!codeProject&&!fs.existsSync(codeProject),title:store.getMeta('tabCustomTitle:'+r.id)||r.title,workspace:r.workspace,pinned:!!r.pinned,muted:!!r.muted,lastActive:r.last_active,ordinal:r.ordinal,favicon:(favicons.get(r.id)?.origin===originOf(r.url)?favicons.get(r.id)?.url:null)||store.getMeta('favicon:'+originOf(r.url))||null,faviconFallback:(()=>{try{const u=new URL(r.url);return ['http:','https:'].includes(u.protocol)?u.origin+'/favicon.ico':null;}catch{return null;}})(),active:r.id===activeId,detached:detached.has(r.id),loading:!!loading.get(r.id),suspended:isCodeTab(r)?false:!live.has(r.id),chromeMode:chromeMode(r.id),panelMode:panelMode(r.id),panelPreference:panelPreference(r.id)};}
 function state(workspace='web',offset=0){const active=activeId?store.get(activeId):null;return{activeId,total:store.total(),counts:store.counts(),tabs:store.page(workspace,offset,50).map(pageRow),active:active?.workspace===workspace?active:null,activePanelMode:activeId?panelMode(activeId):'wide',stackData:store.stacks(workspace),offset};}
 function emit(){if(!win||win.isDestroyed())return;clearTimeout(stateTimer);stateTimer=setTimeout(()=>{if(!win||win.isDestroyed())return;win.webContents.send('tabs:changed');},70);}
+function showClientZone(){
+ if(!win||win.isDestroyed()||!mainViewport)return;
+ if(isCodeTab(store.get(activeId)))hideNativeCode(activeId);
+ for(const view of live.values())mainViewport.removeChildView(view);
+ if(!clientZoneView){
+  clientZoneView=new WebContentsView({webPreferences:{nodeIntegration:false,contextIsolation:true,sandbox:true}});
+  clientZoneView.webContents.loadFile(path.join(__dirname,'client-zone.html')).catch(err=>console.error('[Client Zone] load failed:',err));
+ }
+ mainViewport.addChildView(clientZoneView);
+ clientZoneVisible=true;bounds();emit();
+}
+function hideClientZone(){
+ if(!clientZoneVisible)return;
+ clientZoneVisible=false;
+ if(clientZoneView&&mainViewport)mainViewport.removeChildView(clientZoneView);
+}
 function activate(id){
+ hideClientZone();
  const row=store.get(Number(id));if(!row)return false;
  if(detached.has(row.id)){const popup=detached.get(row.id);if(!popup.isDestroyed()){if(popup.isMinimized())popup.restore();popup.focus();return true;}}
  if(isCodeTab(store.get(activeId))&&activeId!==row.id)hideNativeCode(activeId);
@@ -1324,6 +1343,7 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
   else if(action==='activate')activate(Number(arg));
   else if(action==='switch-workspace'){
    const workspace=typeof arg==='string'?arg:'web';
+   if(workspace==='client-work-area'){showClientZone();return true;}
    const selected=Number(store.getMeta('workspaceActive:'+workspace));
    const candidate=(selected&&store.get(selected)?.workspace===workspace?selected:null)||store.page(workspace,0,1)[0]?.id;
    if(candidate)activate(candidate);else newTab(workspace);
