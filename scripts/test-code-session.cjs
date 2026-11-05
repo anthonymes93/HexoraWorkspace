@@ -19,10 +19,13 @@ test('editor workspace identities remain independent across VS Code tabs',()=>{
   const blank=workspaceForTab(data,9,null);
   assert.deepEqual(JSON.parse(fs.readFileSync(blank,'utf8')).folders,[]);
   const managed=managedWorkspaceOrBlank(data,10,project);
-  assert.equal(path.basename(managed),'tab-10.code-workspace');
+  assert.equal(path.basename(managed),'Test Project.code-workspace');
+  assert.equal(path.basename(path.dirname(managed)),'tab-10');
   const first=workspaceForTab(data,10,project);
   const second=workspaceForTab(data,11,project);
   assert.notEqual(first,second);
+  assert.equal(path.basename(first),path.basename(second),'same project name is shown for both tabs');
+  assert.equal(path.basename(path.dirname(second)),'tab-11','per-tab workspace identity stays isolated');
   assert.equal(fs.existsSync(path.join(project,'.code-workspace')),false,'workspace metadata never goes into a user project');
   for(const file of [first,second]){
    const json=JSON.parse(fs.readFileSync(file,'utf8'));
