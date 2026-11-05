@@ -3,6 +3,12 @@ const $=id=>document.getElementById(id);
 async function command(name,value){try{await window.pcTv.command(name,value);}catch(error){console.error('[PC TV]',error);}}
 function paint(s){
  const tabs=$('tv-tabs');tabs.replaceChildren();
+ for(const [direction,symbol,enabled] of [['back','‹',s.canBack],['forward','›',s.canForward]]){
+  const button=document.createElement('button');
+  button.className='history-nav';button.type='button';button.textContent=symbol;
+  button.title=direction==='back'?'Back':'Forward';button.setAttribute('aria-label',button.title);
+  button.disabled=!enabled;button.onclick=()=>command(direction);tabs.append(button);
+ }
  for(const tab of s.tabs||[]){
   const select=document.createElement('button');select.textContent=tab.title||'YouTube';select.title=tab.url||'YouTube';select.classList.toggle('active',tab.id===s.active);
   select.onclick=()=>command('select-tab',tab.id);tabs.append(select);
