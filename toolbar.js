@@ -259,8 +259,13 @@ function render(p){
  const pos=document.createElement('span');pos.textContent=p.tabs.length?(offset+1)+'–'+(offset+p.tabs.length):'No tabs';nav.append(prev,pos,next);conversations.append(nav);
  // Quick Jump lives outside the collapsible conversations list.
  renderQuickJumps();
- renderSecondTabRow(p);
- renderTabRow($('tabs'),p,null);
+ if(activeWorkspace==='client-work-area'){
+  $('tabs').replaceChildren();
+  $('stack-rows').replaceChildren();
+ }else{
+  renderSecondTabRow(p);
+  renderTabRow($('tabs'),p,null);
+ }
  $('tabs').classList.toggle('compact-titles', $('tabs').querySelectorAll(':scope > .tab').length>=11);
   $('native-code-rail').classList.toggle('selected',!!p.active&&/^hexora-native:\/\/vscode(?:\/\d+)?$/.test(p.active.url));
 }
