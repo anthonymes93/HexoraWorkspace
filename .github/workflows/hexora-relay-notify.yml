@@ -1,0 +1,24 @@
+name: Notify Hexora development clients
+on:
+  push:
+    branches: [develop]
+permissions:
+  contents: read
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Notify connected development instances
+        env:
+          RELAY_SHARED_SECRET: ${{ secrets.HEXORA_RELAY_SHARED_SECRET }}
+          SHA: ${{ github.sha }}
+        run: |
+          if [ -z "$RELAY_SHARED_SECRET" ]; then
+            echo "::error::Missing HEXORA_RELAY_SHARED_SECRET repository secret"
+            exit 1
+          fi
+          curl --fail-with-body --retry 3 --retry-delay 2 \
+            -H "Authorization: Bearer $RELAY_SHARED_SECRET" \
+            -H "Content-Type: application/json" \
+            -d "{\"repository\":\"anthonymes93/HexoraWorkspace\",\"branch\":\"develop\",\"sha\":\"$SHA\"}" \
+            https://hexora-update-relay.itsme-bad.workers.dev/notify

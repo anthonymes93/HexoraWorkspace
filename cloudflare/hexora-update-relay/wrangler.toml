@@ -1,0 +1,11 @@
+name = "hexora-update-relay"
+main = "src/index.js"
+compatibility_date = "2026-11-04"
+
+[[durable_objects.bindings]]
+name = "UPDATE_ROOM"
+class_name = "UpdateRoom"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["UpdateRoom"]
