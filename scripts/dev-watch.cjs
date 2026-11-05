@@ -9,6 +9,7 @@ const RELAY_URL='wss://hexora-update-relay.itsme-bad.workers.dev/connect';
 const RECONNECT_MS=10000;
 let child=null,stopping=false,busy=false,lastHead='',lastDirty='',restartRequested=false;
 let socket=null,reconnectTimer=null,companionSnapshot='';
+let localWatchers=[],localChangeTimer=null,localRestartBusy=false;
 function git(...args){return execFileSync('git',args,{cwd:ROOT,encoding:'utf8',stdio:['ignore','pipe','pipe'],timeout:15000}).trim();}
 function log(message){console.log('[Hexora Dev] '+message);}
 function branch(){return git('branch','--show-current');}
@@ -84,7 +85,36 @@ async function poll(){
  }catch(err){log('Sync skipped: '+String(err.stderr||err.message).trim().slice(0,220));}
  finally{busy=false;}
 }
-async function shutdown(){if(stopping)return;stopping=true;clearTimeout(reconnectTimer);if(socket)socket.close();await stopChild();process.exit(0);}
+async function checkLocalHead(){
+ if(stopping||localRestartBusy||busy)return;
+ localRestartBusy=true;
+ try{
+  const latest=head();
+  if(latest===lastHead)return;
+  const mergePath=git('rev-parse','--git-path','MERGE_HEAD');
+  if(fs.existsSync(path.resolve(ROOT,mergePath)))return;
+  lastHead=latest;
+  await restart('Local Git commit updated');
+ }catch(err){log('Local change check skipped: '+err.message);}
+ finally{localRestartBusy=false;}
+}
+function watchLocalGit(){
+ const gitDir=path.resolve(ROOT,git('rev-parse','--git-dir'));
+ const current=branch();
+ const dirs=[gitDir,path.join(gitDir,'logs'),path.join(gitDir,'refs','heads'),path.join(gitDir,'logs','refs','heads')];
+ const schedule=()=>{clearTimeout(localChangeTimer);localChangeTimer=setTimeout(checkLocalHead,250);};
+ for(const dir of dirs){
+  if(!fs.existsSync(dir))continue;
+  try{localWatchers.push(fs.watch(dir,(_event,file)=>{
+   if(dir===gitDir&&file&&!['HEAD','packed-refs','MERGE_HEAD'].includes(String(file)))return;
+   if(dir===path.join(gitDir,'logs')&&file&&String(file)!=='HEAD')return;
+   if(dir.endsWith(path.join('refs','heads'))&&file&&String(file)!==current)return;
+   schedule();
+  }));}catch(err){log('Local Git watch unavailable for '+dir+': '+err.message);}
+ }
+ log('Watching local Git changes (no GitHub polling).');
+}
+async function shutdown(){if(stopping)return;stopping=true;clearTimeout(reconnectTimer);clearTimeout(localChangeTimer);for(const watcher of localWatchers)watcher.close();if(socket)socket.close();await stopChild();process.exit(0);}
 function connect(){
  if(stopping)return;
  if(typeof WebSocket!=='function'){
@@ -107,4 +137,5 @@ process.on('SIGINT',shutdown);process.on('SIGTERM',shutdown);
 lastHead=head();
 log('Listening for push updates on '+branch()+'. Your logins and local data stay in the existing Hexora profile.');
 launch();
+watchLocalGit();
 connect();
