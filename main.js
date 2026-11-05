@@ -917,6 +917,7 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
  }
  mainViewport=new View();win.contentView.addChildView(mainViewport);
  require('./email-app').register(win);
+ require('./pc-tv').register(win);
  win.on('focus',()=>{const entry=activeCodeEntry();if(entry?.ready&&entry.visible&&!entry.detached){nativeCodeCommand('TRACE HEXORA_FOCUS_BEFORE');nativeCodeCommand('RESTORE');nativeCodeCommand('RECOVER_Z');nativeCodeCommand('WATCH_MOUSE');}});win.on('blur',()=>{const entry=activeCodeEntry();if(entry?.ready&&entry.visible&&!entry.detached)nativeCodeCommand('DIAG HEXORA_BLUR');});win.on('resize',bounds);
  for(const lifecycleEvent of ['restore','maximize','unmaximize','moved','resized']){
   win.on(lifecycleEvent,()=>scheduleNativeCodeLifecycle(lifecycleEvent));
