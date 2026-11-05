@@ -2052,3 +2052,56 @@ $('open-pc-tv')?.addEventListener('click',()=>window.hexora.pcTv.open().catch(er
  checkDue();
  syncQuickLinks();
 })();
+
+
+// Car rail easter egg: self-contained celebration; no IPC or navigation.
+(()=>{
+ const car=document.getElementById('car-placeholder-rail');
+ if(!car)return;
+ car.title='Launch a celebration';
+ car.setAttribute('aria-label','Launch confetti celebration');
+ let active=null;
+ const style=document.createElement('style');
+ style.textContent=`
+ .hexora-car-party{position:fixed;inset:0;z-index:2147483000;pointer-events:none;overflow:hidden;isolation:isolate}
+ .hexora-car-party .party-piece{position:absolute;top:-35px;left:var(--x);width:var(--w);height:var(--h);background:var(--color);border-radius:2px;opacity:0;animation:hexora-party-fall var(--duration) var(--delay) cubic-bezier(.2,.5,.5,1) forwards}
+ .hexora-car-party .party-banner{position:absolute;top:19%;left:50%;transform:translate(-50%,-25%) scale(.7);padding:19px 32px;border:1px solid #9ac4ff88;border-radius:22px;background:linear-gradient(135deg,#0c1737ee,#223c84ed);box-shadow:0 0 75px #4979ff70,0 18px 60px #0009;text-align:center;color:white;font:800 clamp(22px,3vw,42px)/1.15 Inter,system-ui,sans-serif;letter-spacing:.04em;white-space:nowrap;opacity:0;animation:hexora-party-pop 2.3s ease-out forwards}
+ .hexora-car-party .party-banner small{display:block;font-size:clamp(10px,1.1vw,15px);font-weight:600;letter-spacing:.2em;color:#b9d6ff;margin-top:10px}
+ .hexora-car-party .party-glow{position:absolute;inset:0;background:radial-gradient(ellipse at 50% 27%,#376bff35,transparent 55%);animation:hexora-party-glow 2.2s ease-out forwards}
+ @keyframes hexora-party-fall{0%{transform:translate3d(0,-10px,0) rotate(0);opacity:1}85%{opacity:1}100%{transform:translate3d(var(--drift),105vh,0) rotate(var(--spin));opacity:0}}
+ @keyframes hexora-party-pop{0%{opacity:0;transform:translate(-50%,-25%) scale(.7)}18%,72%{opacity:1;transform:translate(-50%,0) scale(1)}100%{opacity:0;transform:translate(-50%,-15%) scale(1.07)}}
+ @keyframes hexora-party-glow{0%{opacity:0}25%{opacity:1}100%{opacity:0}}
+ @media(prefers-reduced-motion:reduce){.hexora-car-party .party-piece,.hexora-car-party .party-glow{display:none}.hexora-car-party .party-banner{animation:none;opacity:1;transform:translate(-50%,0)}}
+ `;
+ document.head.append(style);
+ car.addEventListener('click',()=>{
+  if(active){active.remove();active=null;}
+  const layer=document.createElement('div');
+  layer.className='hexora-car-party';
+  layer.setAttribute('aria-hidden','true');
+  const glow=document.createElement('div');glow.className='party-glow';layer.append(glow);
+  const banner=document.createElement('div');banner.className='party-banner';
+  banner.textContent='🚘 FULL THROTTLE!';
+  const sub=document.createElement('small');sub.textContent='HEXORA • LET’S GO';banner.append(sub);layer.append(banner);
+  if(!window.matchMedia('(prefers-reduced-motion: reduce)').matches){
+   const colors=['#69b9ff','#8c7cff','#f9d66b','#f66cb3','#ffffff','#43e6d2'];
+   const fragment=document.createDocumentFragment();
+   for(let i=0;i<130;i++){
+    const piece=document.createElement('i');piece.className='party-piece';
+    const rand=()=>Math.random();
+    piece.style.setProperty('--x',(rand()*100).toFixed(2)+'%');
+    piece.style.setProperty('--w',(5+rand()*8).toFixed(1)+'px');
+    piece.style.setProperty('--h',(7+rand()*13).toFixed(1)+'px');
+    piece.style.setProperty('--color',colors[i%colors.length]);
+    piece.style.setProperty('--duration',(2.5+rand()*2.3).toFixed(2)+'s');
+    piece.style.setProperty('--delay',(rand()*.8).toFixed(2)+'s');
+    piece.style.setProperty('--drift',((rand()-.5)*320).toFixed(0)+'px');
+    piece.style.setProperty('--spin',((rand()-.5)*1600).toFixed(0)+'deg');
+    fragment.append(piece);
+   }
+   layer.append(fragment);
+  }
+  document.body.append(layer);active=layer;
+  setTimeout(()=>{layer.remove();if(active===layer)active=null;},5200);
+ });
+})();
