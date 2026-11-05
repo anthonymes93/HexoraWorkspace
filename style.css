@@ -1164,3 +1164,15 @@ body.hexora-compact-frame .rail .logo{cursor:pointer}
   overflow-y:hidden;
 }
 .tabsbar .tabs>.tab{flex-shrink:0}
+
+/* Keep all left-rail shortcuts accessible on shorter Hexora windows. */
+.rail{
+  gap:clamp(4px,1vh,10px);
+  padding-top:12px;
+  padding-bottom:12px;
+  overflow-y:auto;
+  overflow-x:hidden;
+  scrollbar-width:none;
+}
+.rail::-webkit-scrollbar{display:none}
+.rail>.logo,.rail>.railbtn{flex-shrink:0}
