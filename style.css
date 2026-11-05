@@ -1249,3 +1249,15 @@ body.hexora-compact-frame .top-main>.top>div:first-child{transform:none}
 /* Same dark-blue horizontal tab scrollbar in expanded and compact workspace views. */
 .tabsbar .tabs, .tabsbar .tabs:hover, body.hexora-compact-frame .tabsbar .tabs, body.hexora-compact-frame .tabsbar .tabs:hover{scrollbar-color:#1c347f #1c347f!important}
 .tabsbar .tabs::-webkit-scrollbar-thumb, .tabsbar .tabs:hover::-webkit-scrollbar-thumb, body.hexora-compact-frame .tabsbar .tabs::-webkit-scrollbar-thumb, body.hexora-compact-frame .tabsbar .tabs:hover::-webkit-scrollbar-thumb{background:#1c347f!important}
+
+
+/* Car celebration: external stylesheet is allowed by toolbar's style-src 'self' CSP. */
+.rail .hexora-car-party{position:absolute;inset:0;z-index:99999;pointer-events:none;overflow:visible;isolation:isolate}
+.rail .hexora-car-party .party-piece{position:absolute;top:-35px;left:var(--x);width:var(--w);height:var(--h);background:var(--color);border-radius:2px;opacity:0;animation:hexora-party-fall var(--duration) var(--delay) cubic-bezier(.2,.5,.5,1) forwards}
+.rail .hexora-car-party .party-banner{position:fixed;top:25px;left:50%;transform:translate(-50%,-25%) scale(.7);padding:12px 25px;border:1px solid #9ac4ff88;border-radius:16px;background:linear-gradient(135deg,#0c1737,#223c84);box-shadow:0 0 55px #4979ff70,0 14px 35px #0009;text-align:center;color:white;font:800 clamp(18px,2vw,30px)/1.15 Inter,system-ui,sans-serif;letter-spacing:.04em;white-space:nowrap;opacity:0;animation:hexora-party-pop 2.3s ease-out forwards}
+.rail .hexora-car-party .party-banner small{display:block;font-size:10px;font-weight:600;letter-spacing:.2em;color:#b9d6ff;margin-top:5px}
+.rail .hexora-car-party .party-glow{position:absolute;inset:0;background:radial-gradient(ellipse at 50% 27%,#376bff66,transparent 65%);animation:hexora-party-glow 2.2s ease-out forwards}
+@keyframes hexora-party-fall{0%{transform:translate3d(0,-10px,0) rotate(0);opacity:1}85%{opacity:1}100%{transform:translate3d(var(--drift),105vh,0) rotate(var(--spin));opacity:0}}
+@keyframes hexora-party-pop{0%{opacity:0;transform:translate(-50%,-25%) scale(.7)}18%,72%{opacity:1;transform:translate(-50%,0) scale(1)}100%{opacity:0;transform:translate(-50%,-15%) scale(1.07)}}
+@keyframes hexora-party-glow{0%{opacity:0}25%{opacity:1}100%{opacity:0}}
+@media(prefers-reduced-motion:reduce){.rail .hexora-car-party .party-piece,.rail .hexora-car-party .party-glow{display:none}.rail .hexora-car-party .party-banner{animation:none;opacity:1;transform:translate(-50%,0)}}
