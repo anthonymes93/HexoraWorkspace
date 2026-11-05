@@ -2,7 +2,6 @@
 const $=id=>document.getElementById(id);
 async function command(name,value){try{await window.pcTv.command(name,value);}catch(error){console.error('[PC TV]',error);}}
 function paint(s){
- const title=$('tv-video-title');title.hidden=!s.youtubeHeaderHidden;title.textContent=s.videoTitle||'YouTube';title.title=s.videoTitle||'YouTube';
  const tabs=$('tv-tabs');tabs.replaceChildren();
  for(const [direction,symbol,enabled] of [['back','‹',s.canBack],['forward','›',s.canForward]]){
   const button=document.createElement('button');
