@@ -506,35 +506,74 @@ function hideNewTabLoader(id){
 }
 // Clip the native web view to the available viewport while keeping its internal layout stable.
 // The right edge stays anchored to the window; the left portion is revealed/hidden by the panel.
-function closeDemoAlert(){
- const popup=demoAlertView;demoAlertView=null;
- if(popup&&!popup.isDestroyed())popup.close();
+const desktopAlerts=new Map();
+let desktopAlertSequence=0;
+const alertExpandedSize={width:560,height:540},alertDockSize={width:300,height:108};
+function alertDisplay(record){return screen.getDisplayMatching(record.window.getBounds());}
+function alertCenter(display){const a=display.workArea;return{x:Math.round(a.x+(a.width-alertExpandedSize.width)/2),y:Math.round(a.y+(a.height-alertExpandedSize.height)/2),...alertExpandedSize};}
+function animateAlert(record,target){
+ const popup=record.window;if(popup.isDestroyed())return;
+ clearInterval(record.animation);
+ const initial=popup.getBounds(),started=Date.now(),duration=300;
+ record.animation=setInterval(()=>{
+  if(popup.isDestroyed()){clearInterval(record.animation);return;}
+  const t=Math.min(1,(Date.now()-started)/duration),ease=1-Math.pow(1-t,3),bounds={};
+  for(const key of ['x','y','width','height'])bounds[key]=Math.round(initial[key]+(target[key]-initial[key])*ease);
+  popup.setBounds(bounds,false);
+  if(t===1){clearInterval(record.animation);record.animation=null;}
+ },16);
+}
+function layoutDockedAlerts(){
+ const groups=new Map();
+ for(const record of desktopAlerts.values()){
+  if(!record.docked||record.window.isDestroyed())continue;
+  const display=screen.getDisplayMatching(record.window.getBounds());
+  const group=groups.get(display.id)||[];group.push(record);groups.set(display.id,group);
+ }
+ for(const group of groups.values()){
+  const area=alertDisplay(group[0]).workArea;
+  group.forEach((record,index)=>{
+   const slot=Math.floor((area.height-12)/(alertDockSize.height+10));
+   const column=Math.floor(index/Math.max(1,slot)),row=index%Math.max(1,slot);
+   animateAlert(record,{x:area.x+12+column*(alertDockSize.width+10),y:area.y+12+row*(alertDockSize.height+10),...alertDockSize});
+  });
+ }
+}
+function closeDemoAlert(popup){
+ const record=desktopAlerts.get(popup?.webContents.id);if(!record)return;
+ clearInterval(record.animation);desktopAlerts.delete(popup.webContents.id);
+ if(!popup.isDestroyed())popup.close();
+ layoutDockedAlerts();
 }
 function openDemoAlert(){
- if(demoAlertView&&!demoAlertView.isDestroyed()){
-  if(demoAlertView.isMinimized())demoAlertView.restore();
-  demoAlertView.show();demoAlertView.focus();return true;
- }
  const display=screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
- const {workArea}=display,width=560,height=540;
  const popup=new BrowserWindow({
-  width,height,x:Math.round(workArea.x+(workArea.width-width)/2),
-  y:Math.round(workArea.y+(workArea.height-height)/2),
-  frame:false,transparent:true,show:false,alwaysOnTop:true,
+  ...alertCenter(display),frame:false,transparent:true,show:false,alwaysOnTop:true,
   skipTaskbar:true,resizable:false,minimizable:false,maximizable:false,
   backgroundColor:'#00000000',
   webPreferences:{sandbox:true,contextIsolation:true,nodeIntegration:false,preload:path.join(__dirname,'demo-alert-preload.js')}
  });
- demoAlertView=popup;
+ const record={window:popup,docked:false,animation:null};
+ desktopAlerts.set(popup.webContents.id,record);
  popup.setAlwaysOnTop(true,'floating');
- popup.on('closed',()=>{if(demoAlertView===popup)demoAlertView=null;});
+ popup.on('closed',()=>{clearInterval(record.animation);desktopAlerts.delete(popup.webContents.id);layoutDockedAlerts();});
  popup.webContents.loadFile(path.join(__dirname,'demo-alert.html')).then(()=>{
   if(!popup.isDestroyed()){popup.show();popup.focus();}
- }).catch(error=>{console.error('[Demo alert]',error);if(!popup.isDestroyed())popup.close();});
+ }).catch(error=>{console.error('[Demo alert]',error);closeDemoAlert(popup);});
  return true;
 }
 ipcMain.on('demo-alert:close',event=>{
- if(demoAlertView&&!demoAlertView.isDestroyed()&&event.sender===demoAlertView.webContents)closeDemoAlert();
+ const record=desktopAlerts.get(event.sender.id);if(record)closeDemoAlert(record.window);
+});
+ipcMain.on('demo-alert:dock',event=>{
+ const record=desktopAlerts.get(event.sender.id);if(!record||record.docked)return;
+ record.docked=true;event.sender.send('demo-alert:mode','docked');layoutDockedAlerts();
+});
+ipcMain.on('demo-alert:expand',event=>{
+ const record=desktopAlerts.get(event.sender.id);if(!record||!record.docked)return;
+ record.docked=false;event.sender.send('demo-alert:mode','expanded');
+ animateAlert(record,alertCenter(alertDisplay(record)));layoutDockedAlerts();
+ record.window.show();record.window.focus();
 });
 function bounds(){
  if(!win||win.isDestroyed()||!mainViewport)return;
