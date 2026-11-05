@@ -509,14 +509,6 @@ function hideNewTabLoader(id){
 const desktopAlerts=new Map();
 const dockIconStrips=new Map();
 const dockVerticalPositions=new Map();
-function configuredDockDisplays(){
- const displays=screen.getAllDisplays().sort((a,b)=>a.bounds.x-b.bounds.x||a.bounds.y-b.bounds.y);
- let ids=[];try{ids=JSON.parse(store.getMeta('dock:monitor-order')||'[]');}catch{}
- if(!Array.isArray(ids))ids=[];
- const byId=new Map(displays.map(d=>[String(d.id),d]));
- return [...ids.map(id=>byId.get(String(id))).filter(Boolean),...displays.filter(d=>!ids.some(id=>String(id)===String(d.id)))];
-}
-
 const dockStripHeight=40,dockStripGap=8;
 let desktopAlertSequence=0;
 const alertExpandedSize={width:560,height:540},alertDockSize={width:300,height:108};
@@ -577,11 +569,6 @@ ipcMain.on('dock-strip:move',(event,direction)=>{
  if(displays.length<2)return;
  const current=displays.findIndex(d=>d.id===source[0]);if(current<0)return;
  const target=displays[(current+direction+displays.length)%displays.length];
- // The dock's top/bottom position belongs to the moving stack, not its old monitor.
- const position=dockVerticalPositions.get(source[0])||'top';
- dockVerticalPositions.set(target.id,position);
- const targetStrip=dockIconStrips.get(target.id);
- if(targetStrip&&!targetStrip.isDestroyed())targetStrip.webContents.send('dock-strip:position',position);
  for(const record of desktopAlerts.values()){
   if(record.docked&&record.dockDisplayId===source[0])record.dockDisplayId=target.id;
  }
@@ -1435,12 +1422,6 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
  ipcMain.handle('tabs:lookup',(_e,id)=>{const row=store.get(Number(id));return row?pageRow(row):null;});
  ipcMain.handle('tabs:action',(event,action,arg)=>{
   const current=store.get(activeId);const wc=live.get(activeId)?.webContents;
-  if(action==='dock:monitors-get')return {displays:screen.getAllDisplays().sort((a,b)=>a.bounds.x-b.bounds.x||a.bounds.y-b.bounds.y).map((d,i)=>({id:String(d.id),label:'Screen '+(i+1)+' ('+d.bounds.width+' × '+d.bounds.height+')'})),order:configuredDockDisplays().map(d=>String(d.id))};
-  if(action==='dock:monitors-set'){
-   const available=screen.getAllDisplays().map(d=>String(d.id));
-   if(!Array.isArray(arg)||arg.length!==available.length||new Set(arg).size!==arg.length||!arg.every(id=>typeof id==='string'&&available.includes(id)))throw Error('Select every connected screen exactly once.');
-   store.setMeta('dock:monitor-order',JSON.stringify(arg));return true;
-  }
   if(action==='demo-alert:open')return openDemoAlert();
   if(action==='sleep-client-workspace')return sleepClientWorkspace(arg);
   if(action==='dual-mirror')return openDualMirror();
