@@ -3,11 +3,12 @@
 // and restart Electron after fast-forward updates. No production updater involved.
 const {spawn,execFileSync}=require('node:child_process');
 const path=require('node:path');
+const fs=require('node:fs');
 const ROOT=path.resolve(__dirname,'..');
 const RELAY_URL='wss://hexora-update-relay.itsme-bad.workers.dev/connect';
 const RECONNECT_MS=10000;
 let child=null,stopping=false,busy=false,lastHead='',lastDirty='',restartRequested=false;
-let socket=null,reconnectTimer=null;
+let socket=null,reconnectTimer=null,companionSnapshot='';
 function git(...args){return execFileSync('git',args,{cwd:ROOT,encoding:'utf8',stdio:['ignore','pipe','pipe'],timeout:15000}).trim();}
 function log(message){console.log('[Hexora Dev] '+message);}
 function branch(){return git('branch','--show-current');}
@@ -16,7 +17,7 @@ function head(){return git('rev-parse','HEAD');}
 function launch(){
  if(stopping)return;
  const electron=require('electron');
- child=spawn(electron,['.'],{cwd:ROOT,env:{...process.env,HEXORA_DEV_WATCH:'1'},stdio:'inherit',windowsHide:false});
+ child=spawn(electron,['.'],{cwd:ROOT,env:{...process.env,HEXORA_DEV_WATCH:'1',HEXORA_COMPANION_SNAPSHOT:companionSnapshot},stdio:'inherit',windowsHide:false});
  const started=child;
  started.on('error',err=>log('Electron launch failed: '+err.message));
  started.on('exit',(code)=>{
@@ -48,6 +49,7 @@ async function stopChild(){
 async function restart(reason){
  if(stopping)return;
  restartRequested=true;
+ try{companionSnapshot=fs.readFileSync(path.join(process.env.APPDATA||path.join(process.env.HOME||'','AppData','Roaming'),'hexora-workspace','dev-companion-windows.json'),'utf8');}catch{companionSnapshot='';}
  log(reason+' — restarting Hexora');
  await stopChild();
  restartRequested=false;
