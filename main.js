@@ -345,6 +345,8 @@ const HEXORA_SCROLLBAR_PALETTES={
 };
 let websiteScrollbarTheme={theme:'classic',color:'blue'};
 function scrollbarColors(){
+ // Keep Omega Blue's website scrollbar consistent with the dark blue frame.
+ if(websiteScrollbarTheme.theme==='omega'&&websiteScrollbarTheme.color==='blue')return HEXORA_SCROLLBAR_PALETTES.blue;
  return websiteScrollbarTheme.theme==='omega'
   ?(websiteScrollbarTheme.thumb&&websiteScrollbarTheme.hover?[websiteScrollbarTheme.thumb,websiteScrollbarTheme.hover]:HEXORA_SCROLLBAR_PALETTES[websiteScrollbarTheme.color]||HEXORA_SCROLLBAR_PALETTES.blue)
   :['#1c347f','#405a9b'];

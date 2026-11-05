@@ -1237,3 +1237,6 @@ body.hexora-compact-frame .rail{top:0!important}
 
 /* Keep the active workspace heading below the compact native titlebar. */
 .top-main>.top>div:first-child{transform:none}
+
+/* Compact mode has no 16px titlebar, so keep its workspace heading below the screen edge. */
+body.hexora-compact-frame .top-main>.top>div:first-child{transform:translateY(8px)}
