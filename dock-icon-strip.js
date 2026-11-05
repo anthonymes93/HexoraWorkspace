@@ -1,0 +1,1 @@
+'use strict';document.getElementById('left').addEventListener('click',()=>window.dockControls.move(-1));document.getElementById('right').addEventListener('click',()=>window.dockControls.move(1));document.getElementById('settings').addEventListener('click',()=>window.dockControls.settings());
