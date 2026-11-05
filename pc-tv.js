@@ -6,13 +6,15 @@ const PARTITION='persist:hexora-chatgpt';
 const HOME='https://www.youtube.com/';
 let windowRef=null,views=new Map(),active=null,serial=0,controlsVisible=true,youtubeHeaderHidden=false;
 const youtubeHeaderCSS=`ytd-masthead, #masthead-container, ytm-mobile-topbar-renderer {display:none !important;}
-#content.ytd-app, ytd-page-manager, #page-manager {margin-top:0 !important;padding-top:0 !important;}
-ytd-watch-flexy[flexy] #columns, ytd-watch-flexy[flexy] #primary, ytd-watch-flexy[flexy] #primary-inner {width:100% !important;max-width:none !important;margin:0 !important;padding:0 !important;}
-ytd-watch-flexy[flexy] #secondary, ytd-watch-flexy[flexy] #below, ytd-watch-flexy[flexy] #related, ytd-watch-flexy[flexy] #comments {display:none !important;}
-ytd-watch-flexy[flexy] #player, ytd-watch-flexy[flexy] #player-container-outer, ytd-watch-flexy[flexy] #player-container-inner, ytd-watch-flexy[flexy] #full-bleed-container {width:100% !important;max-width:none !important;margin:0 !important;}
-ytd-watch-flexy[flexy] #player-container-outer, ytd-watch-flexy[flexy] #player-container-inner {height:calc(100vh - 2px) !important;max-height:none !important;}
-ytd-watch-flexy[flexy] #movie_player, ytd-watch-flexy[flexy] .html5-video-player {width:100% !important;height:100% !important;}
-ytd-watch-flexy[flexy] video {object-fit:contain !important;}`;
+#content.ytd-app, ytd-page-manager, #page-manager {margin:0 !important;padding:0 !important;}
+html:has(ytd-watch-flexy), body:has(ytd-watch-flexy), ytd-app:has(ytd-watch-flexy) {overflow:hidden !important;height:100vh !important;}
+ytd-watch-flexy #below, ytd-watch-flexy #secondary, ytd-watch-flexy #related, ytd-watch-flexy #comments, ytd-watch-flexy #description, ytd-watch-flexy #chat-container, ytd-watch-flexy #panels {display:none !important;}
+ytd-watch-flexy #columns, ytd-watch-flexy #primary, ytd-watch-flexy #primary-inner {margin:0 !important;padding:0 !important;max-width:none !important;width:100% !important;}
+ytd-watch-flexy #player, ytd-watch-flexy #player-theater-container, ytd-watch-flexy #player-container-outer, ytd-watch-flexy #player-container-inner, ytd-watch-flexy #full-bleed-container {
+position:fixed !important;top:0 !important;left:0 !important;width:100vw !important;height:100vh !important;min-height:0 !important;max-width:none !important;max-height:none !important;margin:0 !important;padding:0 !important;z-index:20 !important;
+}
+ytd-watch-flexy #movie_player, ytd-watch-flexy .html5-video-player, ytd-watch-flexy .html5-video-container {width:100% !important;height:100% !important;max-height:none !important;}
+ytd-watch-flexy video {object-fit:contain !important;}`;
 const headerStyleKeys=new Map();
 async function syncYoutubeHeader(wc){
  if(!wc||wc.isDestroyed())return;
