@@ -347,7 +347,7 @@ let websiteScrollbarTheme={theme:'classic',color:'blue'};
 function scrollbarColors(){
  return websiteScrollbarTheme.theme==='omega'
   ?(websiteScrollbarTheme.thumb&&websiteScrollbarTheme.hover?[websiteScrollbarTheme.thumb,websiteScrollbarTheme.hover]:HEXORA_SCROLLBAR_PALETTES[websiteScrollbarTheme.color]||HEXORA_SCROLLBAR_PALETTES.blue)
-  :['#405a9b','#628ce4'];
+  :['#1c347f','#405a9b'];
 }
 function websiteScrollbarCSS(){
  const [base,hover]=scrollbarColors();
