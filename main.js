@@ -926,6 +926,13 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
  mainViewport=new View();win.contentView.addChildView(mainViewport);
  require('./email-app').register(win);
  require('./pc-tv').register(win);
+ // Restore only after an automatic development watcher restart, never on normal launch.
+ if(isDevelopment&&process.env.HEXORA_DEV_WATCH==='1'&&process.env.HEXORA_COMPANION_SNAPSHOT){
+  try{const snapshot=JSON.parse(process.env.HEXORA_COMPANION_SNAPSHOT);
+   if(snapshot.email?.open)require('./email-app').restore(snapshot.email);
+   if(snapshot.pcTv?.open)require('./pc-tv').restore(snapshot.pcTv);
+  }catch(error){console.warn('[Hexora] Companion restore skipped:',error.message);}
+ }
  win.on('focus',()=>{const entry=activeCodeEntry();if(entry?.ready&&entry.visible&&!entry.detached){nativeCodeCommand('TRACE HEXORA_FOCUS_BEFORE');nativeCodeCommand('RESTORE');nativeCodeCommand('RECOVER_Z');nativeCodeCommand('WATCH_MOUSE');}});win.on('blur',()=>{const entry=activeCodeEntry();if(entry?.ready&&entry.visible&&!entry.detached)nativeCodeCommand('DIAG HEXORA_BLUR');});win.on('resize',bounds);
  for(const lifecycleEvent of ['restore','maximize','unmaximize','moved','resized']){
   win.on(lifecycleEvent,()=>scheduleNativeCodeLifecycle(lifecycleEvent));
