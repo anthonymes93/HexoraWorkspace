@@ -286,6 +286,7 @@ function render(p){
  renderQuickJumps();
  if(activeWorkspace==='client-work-area'){
   $('tabs').replaceChildren();
+  delete $('tabs').dataset.rowSignature;
   $('stack-rows').replaceChildren();
  }else{
   renderSecondTabRow(p);
