@@ -1803,6 +1803,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&vaultOpen)vaultClos
 
 // Hexora Apps: native multi-account email companion window.
 $('open-email-app')?.addEventListener('click',()=>window.hexora.email.open().catch(err=>alert('Email: '+err.message)));
+$('open-pc-tv')?.addEventListener('click',()=>window.hexora.pcTv.open().catch(err=>alert('PC TV: '+err.message)));
 
 /* Omega notification drawer. All items are clearly marked as sample data. */
 (() => {
