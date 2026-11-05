@@ -1228,6 +1228,40 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
  win.on('minimize',()=>{if(celebrationWindow&&!celebrationWindow.isDestroyed())celebrationWindow.hide();});
  win.on('restore',syncCelebration);
  win.on('close',()=>{clearTimeout(celebrationTimer);if(celebrationWindow&&!celebrationWindow.isDestroyed())celebrationWindow.close();});
+
+ // Foreground-only usage accounting. A tab contributes to exactly one workspace.
+ let timeDashboard=null;
+ let usageData=(()=>{try{return JSON.parse(store.getMeta('usageTrackingV1')||'{}');}catch{return {};}})();
+ let usageLast=Date.now();
+ const usageFlush=()=>{
+  const now=Date.now(),elapsed=Math.max(0,Math.min(now-usageLast,15000));usageLast=now;
+  const row=store.get(activeId);
+  // Never attribute time while another application is active, minimized or idle.
+  if(!row||!win||win.isDestroyed()||!win.isFocused()||win.isMinimized()||!win.isVisible()||modalVisible||clientZoneVisible)return;
+  const idle=require('electron').powerMonitor.getSystemIdleTime();
+  if(idle>=60)return;
+  const day=new Date(now).toLocaleDateString('en-CA');
+  const key=day+'|'+row.id;
+  const entry=usageData[key]||{date:day,id:row.id,workspace:row.workspace,title:row.title||row.url||'Untitled tab',ms:0};
+  entry.ms+=elapsed;entry.title=row.title||row.url||entry.title;entry.workspace=row.workspace;
+  usageData[key]=entry;
+ };
+ const saveUsage=()=>{usageFlush();store.setMeta('usageTrackingV1',JSON.stringify(usageData));};
+ const usageTimer=setInterval(saveUsage,10000);
+ const usageSnapshot=()=>{saveUsage();return Object.values(usageData);};
+ const openTimeDashboard=()=>{
+  if(timeDashboard&&!timeDashboard.isDestroyed()){timeDashboard.show();timeDashboard.focus();return true;}
+  timeDashboard=new BrowserWindow({parent:win,width:1120,height:780,minWidth:750,minHeight:520,title:'Hexora · Time Intelligence',backgroundColor:'#090e1b',autoHideMenuBar:true,webPreferences:{preload:path.join(__dirname,'preload.js'),contextIsolation:true,sandbox:true,nodeIntegration:false}});
+  timeDashboard.loadFile('time-intelligence.html').catch(console.error);
+  timeDashboard.on('closed',()=>{timeDashboard=null;});
+  return true;
+ };
+ ipcMain.removeHandler('usage:snapshot');
+ ipcMain.handle('usage:snapshot',event=>{
+  if(event.sender!==win.webContents&&event.sender!==timeDashboard?.webContents)throw Error('Unauthorized usage request');
+  return usageSnapshot();
+ });
+ win.on('close',()=>{clearInterval(usageTimer);saveUsage();if(timeDashboard&&!timeDashboard.isDestroyed())timeDashboard.close();});
  safeApplyTaskbar(win,mainTaskbar);
  if(isDevelopment){
   // A loaded HTML title may overwrite BrowserWindow.title; keep the native
@@ -1584,6 +1618,7 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
  ipcMain.handle('tabs:lookup',(_e,id)=>{const row=store.get(Number(id));return row?pageRow(row):null;});
  ipcMain.handle('tabs:action',(event,action,arg)=>{
   const current=store.get(activeId);const wc=live.get(activeId)?.webContents;
+  if(action==='time-intelligence:open')return openTimeDashboard();
   if(action==='car-celebration')return showCarCelebration();
   if(action==='dock-settings:open')return openDockSettings();
   if(action==='demo-alert:open')return openDemoAlert();
