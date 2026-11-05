@@ -1166,7 +1166,11 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
  syncNativeCodeProjects();
  sidebarWidth=Math.max(58,Math.min(560,Number(store.getMeta('sidebarCustomWidth'))||324));
  const mainTaskbar=safeTaskbarIdentity();
- win=new BrowserWindow({width:1360,height:900,minWidth:700,minHeight:400,title:isDevelopment?'Hexora Workspace [DEV]':'Hexora Workspace',icon:mainTaskbar?.iconPath,autoHideMenuBar:true,...(process.platform==='win32'?{frame:false}: {}),backgroundColor:'#111215',webPreferences:{preload:path.join(__dirname,'preload.js'),contextIsolation:true,sandbox:true,nodeIntegration:false}});
+ const savedMainBounds=(()=>{try{return JSON.parse(store.getMeta('mainWindowBounds')||'null');}catch{return null;}})();
+ const validMainBounds=savedMainBounds&&['x','y','width','height'].every(key=>Number.isFinite(savedMainBounds[key]))&&savedMainBounds.width>=700&&savedMainBounds.height>=400;
+ const displayBounds=validMainBounds?screen.getDisplayMatching(savedMainBounds).workArea:null;
+ const restoredBounds=validMainBounds?{x:Math.max(displayBounds.x,Math.min(savedMainBounds.x,displayBounds.x+displayBounds.width-100)),y:Math.max(displayBounds.y,Math.min(savedMainBounds.y,displayBounds.y+displayBounds.height-80)),width:Math.min(savedMainBounds.width,displayBounds.width),height:Math.min(savedMainBounds.height,displayBounds.height)}:{width:1360,height:900};
+ win=new BrowserWindow({...restoredBounds,minWidth:700,minHeight:400,title:isDevelopment?'Hexora Workspace [DEV]':'Hexora Workspace',icon:mainTaskbar?.iconPath,autoHideMenuBar:true,...(process.platform==='win32'?{frame:false}: {}),backgroundColor:'#111215',webPreferences:{preload:path.join(__dirname,'preload.js'),contextIsolation:true,sandbox:true,nodeIntegration:false}});
  if(process.platform==='win32'){
   ipcMain.removeHandler('main-window:control');
   ipcMain.handle('main-window:control',(event,action)=>{
@@ -1178,6 +1182,52 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
    return true;
   });
  }
+ // Persist normal window geometry, not maximized/fullscreen dimensions.
+ let saveMainGeometryTimer=null;
+ const saveMainGeometry=()=>{
+  if(!win||win.isDestroyed()||win.isMinimized())return;
+  const b=win.getNormalBounds();
+  if(b.width>=700&&b.height>=400)store.setMeta('mainWindowBounds',JSON.stringify(b));
+  store.setMeta('mainWindowMaximized',String(win.isMaximized()));
+ };
+ const queueMainGeometry=()=>{
+  clearTimeout(saveMainGeometryTimer);
+  saveMainGeometryTimer=setTimeout(saveMainGeometry,250);
+ };
+ win.on('resize',queueMainGeometry);
+ win.on('move',queueMainGeometry);
+ win.on('maximize',queueMainGeometry);
+ win.on('unmaximize',queueMainGeometry);
+ win.on('close',()=>{clearTimeout(saveMainGeometryTimer);saveMainGeometry();});
+ if(store.getMeta('mainWindowMaximized')==='true')win.maximize();
+ // Separate transparent child window renders above native WebContentsViews.
+ let celebrationWindow=null,celebrationTimer=null;
+ const showCarCelebration=()=>{
+  if(!win||win.isDestroyed())return false;
+  if(celebrationTimer){clearTimeout(celebrationTimer);celebrationTimer=null;}
+  if(celebrationWindow&&!celebrationWindow.isDestroyed()){celebrationWindow.close();celebrationWindow=null;}
+  const b=win.getBounds();
+  celebrationWindow=new BrowserWindow({parent:win,x:b.x,y:b.y,width:b.width,height:b.height,frame:false,transparent:true,show:false,focusable:false,skipTaskbar:true,resizable:false,movable:false,hasShadow:false,backgroundColor:'#00000000',webPreferences:{sandbox:true,contextIsolation:true,nodeIntegration:false}});
+  celebrationWindow.setIgnoreMouseEvents(true,{forward:true});
+  celebrationWindow.loadFile('car-celebration.html').then(()=>{
+   if(celebrationWindow&&!celebrationWindow.isDestroyed()&&!win.isMinimized())celebrationWindow.showInactive();
+  }).catch(error=>console.warn('[Hexora] Celebration overlay:',error));
+  celebrationTimer=setTimeout(()=>{
+   if(celebrationWindow&&!celebrationWindow.isDestroyed())celebrationWindow.close();
+   celebrationWindow=null;celebrationTimer=null;
+  },5200);
+  return true;
+ };
+ const syncCelebration=()=>{
+  if(!celebrationWindow||celebrationWindow.isDestroyed()||!win||win.isDestroyed())return;
+  if(win.isMinimized()){celebrationWindow.hide();return;}
+  celebrationWindow.setBounds(win.getBounds());
+ };
+ win.on('resize',syncCelebration);
+ win.on('move',syncCelebration);
+ win.on('minimize',()=>{if(celebrationWindow&&!celebrationWindow.isDestroyed())celebrationWindow.hide();});
+ win.on('restore',syncCelebration);
+ win.on('close',()=>{clearTimeout(celebrationTimer);if(celebrationWindow&&!celebrationWindow.isDestroyed())celebrationWindow.close();});
  safeApplyTaskbar(win,mainTaskbar);
  if(isDevelopment){
   // A loaded HTML title may overwrite BrowserWindow.title; keep the native
@@ -1534,6 +1584,7 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
  ipcMain.handle('tabs:lookup',(_e,id)=>{const row=store.get(Number(id));return row?pageRow(row):null;});
  ipcMain.handle('tabs:action',(event,action,arg)=>{
   const current=store.get(activeId);const wc=live.get(activeId)?.webContents;
+  if(action==='car-celebration')return showCarCelebration();
   if(action==='dock-settings:open')return openDockSettings();
   if(action==='demo-alert:open')return openDemoAlert();
   if(action==='sleep-client-workspace')return sleepClientWorkspace(arg);
