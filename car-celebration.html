@@ -1,0 +1,17 @@
+<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'"><style>
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:transparent;pointer-events:none}
+#scene{position:fixed;inset:0;overflow:hidden}
+.piece{position:absolute;top:-28px;left:var(--x);width:var(--w);height:var(--h);background:var(--c);border-radius:2px;animation:fall var(--t) var(--d) linear forwards;opacity:0}
+#glow{position:absolute;inset:0;background:radial-gradient(ellipse at 50% 35%,#4b6bff40,transparent 65%);animation:glow 3s ease-out forwards}
+#banner{position:absolute;left:50%;top:23%;transform:translate(-50%,-25%) scale(.7);opacity:0;text-align:center;white-space:nowrap;padding:20px 36px;border-radius:22px;background:linear-gradient(135deg,#101d43ed,#294c9ded);border:1px solid #9ac4ff99;box-shadow:0 0 75px #4979ff88,0 20px 70px #0009;color:#fff;font:900 clamp(24px,4vw,52px)/1.15 system-ui,sans-serif;letter-spacing:.06em;animation:pop 3.6s ease-out forwards}
+#banner small{display:block;margin-top:12px;color:#bcd7ff;font-size:clamp(11px,1.3vw,17px);font-weight:600;letter-spacing:.22em}
+@keyframes fall{0%{opacity:1;transform:translate3d(0,-10px,0) rotate(0)}85%{opacity:1}100%{opacity:0;transform:translate3d(var(--drift),110vh,0) rotate(var(--spin))}}
+@keyframes pop{0%{opacity:0;transform:translate(-50%,-25%) scale(.7)}12%,75%{opacity:1;transform:translate(-50%,0) scale(1)}100%{opacity:0;transform:translate(-50%,-15%) scale(1.08)}}
+@keyframes glow{0%{opacity:0}20%{opacity:1}100%{opacity:0}}
+@media(prefers-reduced-motion:reduce){.piece,#glow{display:none}#banner{animation:none;opacity:1;transform:translate(-50%,0)}}
+</style></head><body><div id="scene"><div id="glow"></div><div id="banner">🚘 FULL THROTTLE!<small>HEXORA · LET'S GO</small></div></div><script>
+if(!matchMedia('(prefers-reduced-motion: reduce)').matches){
+const scene=document.getElementById('scene'),colors=['#69b9ff','#8c7cff','#f9d66b','#f66cb3','#ffffff','#43e6d2'],fragment=document.createDocumentFragment();
+for(let i=0;i<180;i++){const p=document.createElement('i');p.className='piece';const r=Math.random;
+p.style.setProperty('--x',(r()*100).toFixed(2)+'%');p.style.setProperty('--w',(5+r()*8).toFixed(1)+'px');p.style.setProperty('--h',(7+r()*13).toFixed(1)+'px');p.style.setProperty('--c',colors[i%colors.length]);p.style.setProperty('--t',(2.8+r()*2.2).toFixed(2)+'s');p.style.setProperty('--d',(r()*.65).toFixed(2)+'s');p.style.setProperty('--drift',((r()-.5)*380).toFixed(0)+'px');p.style.setProperty('--spin',((r()-.5)*1600).toFixed(0)+'deg');fragment.append(p);}scene.append(fragment);}
+</script></body></html>
