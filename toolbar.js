@@ -235,6 +235,7 @@ function renderQuickJumps(){
 }
 try{const s=JSON.parse(localStorage.getItem('hexora-workspace-settings')||'{}');if(s.workspaces?.length){const saved=s.workspaces.filter(w=>w&&typeof w.id==='string');for(const w of saved){if(w.id==='client-work-area'&&w.name==='Client Work Area')w.name='Client Work Zone';}const additions=workspaces.filter(w=>!saved.some(existing=>existing.id===w.id));workspaces.splice(0,workspaces.length,...saved,...additions);}if(s.selected)activeWorkspace=s.selected;if(s.sidebarOpen===false)sidebarOpen=false;}catch{}
 const save=()=>localStorage.setItem('hexora-workspace-settings',JSON.stringify({workspaces,selected:activeWorkspace,sidebarOpen}));
+if(activeWorkspace==='client-work-area')activeWorkspace='web';
 if(!workspaces.some(w=>w.id===activeWorkspace))activeWorkspace=workspaces[0].id;
 const action=(name,arg)=>window.hexora.action(name,arg);
 async function refresh(){
