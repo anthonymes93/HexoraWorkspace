@@ -49,7 +49,7 @@ async function stopChild(){
 async function restart(reason){
  if(stopping)return;
  restartRequested=true;
- try{companionSnapshot=fs.readFileSync(path.join(process.env.APPDATA||path.join(process.env.HOME||'','AppData','Roaming'),'hexora-workspace','dev-companion-windows.json'),'utf8');}catch{companionSnapshot='';}
+ try{companionSnapshot=fs.readFileSync(path.join(process.env.APPDATA||path.join(process.env.HOME||'','AppData','Roaming'),'hexora-workspace-dev','dev-companion-windows.json'),'utf8');}catch{companionSnapshot='';}
  log(reason+' — restarting Hexora');
  await stopChild();
  restartRequested=false;
