@@ -1231,6 +1231,17 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
  ipcMain.handle('native-code:toggle',async event=>{if(event.sender!==win.webContents)throw Error('Invalid caller');return openCodeTab(store.get(activeId)?.workspace||'web');});
  const openDualMirror=require('./dual-mirror').createDualMirror({getActiveId:()=>activeId,getTab:id=>store.get(id),getView:id=>live.get(id),isCodeTab,getMirrorUrl:id=>store.getMeta('dualPairUrl:'+id),onVisit:url=>{if(url==='https://chatgpt.com/c/6ae96d7a-9d84-83e8-b5df-ae0bfd8b8920'&&!win.webContents.isDestroyed())win.webContents.send('dual:visited-test-url',{message:"You've checked out x"});},getChatgptSource:()=>{for(const view of live.values()){const wc=view.webContents;if(!wc.isDestroyed()&&/^https:\/\/chatgpt\.com(?:\/|$)/.test(wc.getURL()))return wc;}return null;}});
  dualPopupHandler=openDualMirror.handlePopup;
+ ipcMain.on('pctv:youtube-context',(event,payload)=>{
+  // Only regular Hexora website tabs may request this privileged action.
+  if(![...live.values()].some(view=>view.webContents===event.sender))return;
+  const video=require('./pc-tv').safeVideoUrl(payload?.url);
+  if(!video)return;
+  Menu.buildFromTemplate([
+   {label:'Send to PC TV',click:()=>{try{require('./pc-tv').sendVideo(video);}catch(error){console.error('[PC TV] Send failed:',error);}}},
+   {type:'separator'},
+   {label:'Show YouTube menu',click:()=>{if(!event.sender.isDestroyed())event.sender.send('pctv:show-youtube-menu');}}
+  ]).popup({window:win});
+ });
  ipcMain.handle('tabs:page',(_e,arg)=>sendPage(arg));
  ipcMain.handle('tabs:search',(_e,term)=>store.search(term,50).map(pageRow));
  ipcMain.handle('tabs:lookup',(_e,id)=>{const row=store.get(Number(id));return row?pageRow(row):null;});
