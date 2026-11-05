@@ -1,5 +1,6 @@
 'use strict';
-const {BrowserWindow,WebContentsView,ipcMain,screen,shell}=require('electron');
+const {app,BrowserWindow,WebContentsView,ipcMain,screen,shell}=require('electron');
+const {tvTaskbarIdentity,applyTaskbarIdentity,DEV_APP_ID}=require('./taskbar-identity');
 const path=require('node:path');
 const companion=require('./dev-companion-state');
 const PARTITION='persist:hexora-chatgpt';
@@ -79,7 +80,13 @@ function open(restore=null){
  const primary=screen.getPrimaryDisplay();
  const display=screen.getAllDisplays().find(d=>d.id!==primary.id)||primary;
  const area=display.workArea;
- windowRef=new BrowserWindow({x:area.x+20,y:area.y+20,width:Math.max(700,Math.min(1500,area.width-40)),height:Math.max(450,Math.min(900,area.height-40)),minWidth:700,minHeight:450,backgroundColor:'#080b13',title:'Hexora · PC TV',titleBarStyle:'hidden',titleBarOverlay:{color:'#0d1019',symbolColor:'#939aad',height:30},autoHideMenuBar:true,webPreferences:{preload:path.join(__dirname,'pc-tv-preload.js'),sandbox:true,contextIsolation:true,nodeIntegration:false}});
+ const identity=tvTaskbarIdentity(app.getPath('userData'));
+ windowRef=new BrowserWindow({icon:identity?.iconPath,x:area.x+20,y:area.y+20,width:Math.max(700,Math.min(1500,area.width-40)),height:Math.max(450,Math.min(900,area.height-40)),minWidth:700,minHeight:450,backgroundColor:'#080b13',title:'Hexora · PC TV',titleBarStyle:'hidden',titleBarOverlay:{color:'#0d1019',symbolColor:'#939aad',height:30},autoHideMenuBar:true,webPreferences:{preload:path.join(__dirname,'pc-tv-preload.js'),sandbox:true,contextIsolation:true,nodeIntegration:false}});
+ if(identity){
+  identity.appId=app.isPackaged?identity.appId:DEV_APP_ID+'.pctv';
+  applyTaskbarIdentity(windowRef,identity);
+  windowRef.once('ready-to-show',()=>{if(!windowRef.isDestroyed())applyTaskbarIdentity(windowRef,identity);});
+ }
  companion.manageWindow('pcTv',windowRef);
  companion.restoreBounds(windowRef,restore);
  if(restore?.maximized)windowRef.maximize();
