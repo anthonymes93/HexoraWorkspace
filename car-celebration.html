@@ -1,17 +1,32 @@
-<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'"><style>
-html,body{margin:0;width:100%;height:100%;overflow:hidden;background:transparent;pointer-events:none}
-#scene{position:fixed;inset:0;overflow:hidden}
-.piece{position:absolute;top:-28px;left:var(--x);width:var(--w);height:var(--h);background:var(--c);border-radius:2px;animation:fall var(--t) var(--d) linear forwards;opacity:0}
-#glow{position:absolute;inset:0;background:radial-gradient(ellipse at 50% 35%,#4b6bff40,transparent 65%);animation:glow 3s ease-out forwards}
-#banner{position:absolute;left:50%;top:23%;transform:translate(-50%,-25%) scale(.7);opacity:0;text-align:center;white-space:nowrap;padding:20px 36px;border-radius:22px;background:linear-gradient(135deg,#101d43ed,#294c9ded);border:1px solid #9ac4ff99;box-shadow:0 0 75px #4979ff88,0 20px 70px #0009;color:#fff;font:900 clamp(24px,4vw,52px)/1.15 system-ui,sans-serif;letter-spacing:.06em;animation:pop 3.6s ease-out forwards}
-#banner small{display:block;margin-top:12px;color:#bcd7ff;font-size:clamp(11px,1.3vw,17px);font-weight:600;letter-spacing:.22em}
-@keyframes fall{0%{opacity:1;transform:translate3d(0,-10px,0) rotate(0)}85%{opacity:1}100%{opacity:0;transform:translate3d(var(--drift),110vh,0) rotate(var(--spin))}}
-@keyframes pop{0%{opacity:0;transform:translate(-50%,-25%) scale(.7)}12%,75%{opacity:1;transform:translate(-50%,0) scale(1)}100%{opacity:0;transform:translate(-50%,-15%) scale(1.08)}}
-@keyframes glow{0%{opacity:0}20%{opacity:1}100%{opacity:0}}
-@media(prefers-reduced-motion:reduce){.piece,#glow{display:none}#banner{animation:none;opacity:1;transform:translate(-50%,0)}}
-</style></head><body><div id="scene"><div id="glow"></div><div id="banner">🚘 FULL THROTTLE!<small>HEXORA · LET'S GO</small></div></div><script>
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'"><style>
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:transparent;pointer-events:none}
+canvas{position:fixed;inset:0;width:100%;height:100%}
+.glow{position:fixed;inset:0;background:radial-gradient(ellipse at 50% 35%,#5687ff4a,transparent 62%);animation:fade 5s ease-out both}
+.ring{position:fixed;left:50%;top:43%;width:min(50vw,540px);aspect-ratio:1;border:3px solid #9ddcffaa;border-radius:50%;box-shadow:0 0 40px #638cffaa,inset 0 0 50px #638cff55;transform:translate(-50%,-50%) scale(.1);opacity:0;animation:ring 1.25s ease-out both}
+.ring.two{animation-delay:.18s;border-color:#f6a3ffbb}
+.banner{position:fixed;left:50%;top:39%;transform:translate(-50%,-50%) scale(.5);text-align:center;white-space:nowrap;padding:24px 42px;border:1px solid #b8d6ffcc;border-radius:24px;background:linear-gradient(130deg,#081a3bf2,#1f4086ef 55%,#512a89ec);box-shadow:0 0 120px #477dffbb,0 20px 90px #000c;color:#fff;font:900 clamp(26px,4.7vw,68px)/1.06 system-ui,sans-serif;letter-spacing:.035em;text-shadow:0 0 20px #9ad5ff77;opacity:0;animation:banner 4.7s cubic-bezier(.2,1.5,.4,1) both}
+.banner small{display:block;margin-top:15px;color:#d4e9ff;font-size:clamp(11px,1.3vw,18px);font-weight:750;letter-spacing:.24em;text-shadow:none}
+.flash{position:fixed;inset:0;background:white;opacity:0;animation:flash .8s ease-out both}
+@keyframes flash{0%{opacity:.52}100%{opacity:0}}
+@keyframes fade{0%{opacity:0}12%{opacity:1}80%{opacity:.9}100%{opacity:0}}
+@keyframes ring{0%{opacity:.9;transform:translate(-50%,-50%) scale(.12)}100%{opacity:0;transform:translate(-50%,-50%) scale(2.3)}}
+@keyframes banner{0%{opacity:0;transform:translate(-50%,-50%) scale(.5) rotate(-4deg)}14%,76%{opacity:1;transform:translate(-50%,-50%) scale(1) rotate(0)}100%{opacity:0;transform:translate(-50%,-60%) scale(1.12)}}
+@media(prefers-reduced-motion:reduce){canvas,.ring,.glow,.flash{display:none}.banner{animation:none;opacity:1;transform:translate(-50%,-50%)}}
+</style></head><body><div class="glow"></div><div class="flash"></div><div class="ring"></div><div class="ring two"></div><canvas id="party"></canvas><div class="banner">🚘 FULL THROTTLE!<small>HEXORA · LET'S GO</small></div>
+<script>
 if(!matchMedia('(prefers-reduced-motion: reduce)').matches){
-const scene=document.getElementById('scene'),colors=['#69b9ff','#8c7cff','#f9d66b','#f66cb3','#ffffff','#43e6d2'],fragment=document.createDocumentFragment();
-for(let i=0;i<180;i++){const p=document.createElement('i');p.className='piece';const r=Math.random;
-p.style.setProperty('--x',(r()*100).toFixed(2)+'%');p.style.setProperty('--w',(5+r()*8).toFixed(1)+'px');p.style.setProperty('--h',(7+r()*13).toFixed(1)+'px');p.style.setProperty('--c',colors[i%colors.length]);p.style.setProperty('--t',(2.8+r()*2.2).toFixed(2)+'s');p.style.setProperty('--d',(r()*.65).toFixed(2)+'s');p.style.setProperty('--drift',((r()-.5)*380).toFixed(0)+'px');p.style.setProperty('--spin',((r()-.5)*1600).toFixed(0)+'deg');fragment.append(p);}scene.append(fragment);}
+const canvas=document.getElementById('party'),ctx=canvas.getContext('2d'),colors=['#6fd7ff','#658dff','#a78bff','#ff69c7','#ffe66b','#67ffd7','#ffffff','#ff956b'];
+let w=0,h=0,dpr=1;function size(){dpr=Math.min(devicePixelRatio||1,2);w=innerWidth;h=innerHeight;canvas.width=Math.round(w*dpr);canvas.height=Math.round(h*dpr);ctx.setTransform(dpr,0,0,dpr,0,0);}size();addEventListener('resize',size);
+const particles=[],start=performance.now();let last=0;
+function make(x,y,vx,vy,kind,delay=0){particles.push({x,y,vx,vy,kind,delay,life:0,ttl:2.2+Math.random()*2.5,spin:Math.random()*6.28,rot:(Math.random()-.5)*12,width:4+Math.random()*9,height:6+Math.random()*16,color:colors[Math.floor(Math.random()*colors.length)]});}
+function burst(x,y,count,speed,delay=0){for(let i=0;i<count;i++){const a=Math.random()*Math.PI*2,v=speed*(.25+Math.random()*.85);make(x,y,Math.cos(a)*v,Math.sin(a)*v,'burst',delay);}}
+for(let i=0;i<800;i++){const x=Math.random()*w;make(x,-Math.random()*h*.8, (Math.random()-.5)*170,80+Math.random()*210,'rain',Math.random()*.9);}
+burst(w*.5,h*.43,280,570,0);burst(w*.16,h*.27,150,430,.45);burst(w*.84,h*.26,150,430,.7);burst(w*.26,h*.68,110,380,1.35);burst(w*.75,h*.65,110,380,1.7);
+function tick(now){const elapsed=(now-start)/1000,dt=Math.min((now-(last||now))/1000,.04);last=now;ctx.clearRect(0,0,w,h);
+for(const p of particles){if(elapsed<p.delay)continue;p.life+=dt;if(p.life>p.ttl)continue;
+p.vy+=(p.kind==='rain'?38:290)*dt;p.vx*=1-dt*.2;p.x+=p.vx*dt;p.y+=p.vy*dt;p.spin+=p.rot*dt;
+const alpha=Math.min(1,(p.ttl-p.life)*2);ctx.save();ctx.globalAlpha=alpha;ctx.translate(p.x,p.y);ctx.rotate(p.spin);ctx.fillStyle=p.color;ctx.fillRect(-p.width/2,-p.height/2,p.width,p.height);ctx.restore();}
+if(elapsed<5.05)requestAnimationFrame(tick);}
+requestAnimationFrame(tick);
+}
 </script></body></html>
