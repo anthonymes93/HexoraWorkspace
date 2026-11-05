@@ -38,7 +38,15 @@ setInterval(check,1200);
 
  // YouTube handles its own video-player context menu in page JavaScript.
  // Capture the original trusted right-click before YouTube consumes it.
- let allowYouTubeMenu=false;
+ let allowYouTubeMenu=false,lastYouTubeContext=null;
+ ipcRenderer.on('pctv:show-youtube-menu',()=>{
+  if(!lastYouTubeContext)return;
+  const {target,x,y}=lastYouTubeContext;
+  lastYouTubeContext=null;
+  allowYouTubeMenu=true;
+  target.dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,cancelable:true,composed:true,button:2,buttons:2,clientX:x,clientY:y}));
+  allowYouTubeMenu=false;
+ });
  document.addEventListener('contextmenu',event=>{
   if(allowYouTubeMenu){allowYouTubeMenu=false;return;}
   if(!/^(www\.|m\.)?youtube\.com$/.test(location.hostname))return;
@@ -58,11 +66,5 @@ setInterval(check,1200);
   event.stopImmediatePropagation();
   const x=event.clientX,y=event.clientY;
   ipcRenderer.send('pctv:youtube-context',{url:parsed.href});
-  // The native menu includes a choice to show the original YouTube menu.
-  ipcRenderer.once('pctv:show-youtube-menu',()=>{
-   allowYouTubeMenu=true;
-   const next=new MouseEvent('contextmenu',{bubbles:true,cancelable:true,composed:true,button:2,buttons:2,clientX:x,clientY:y});
-   target.dispatchEvent(next);
-   allowYouTubeMenu=false;
-  });
+  lastYouTubeContext={target,x,y};
  },true);
