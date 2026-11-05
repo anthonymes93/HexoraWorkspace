@@ -2,6 +2,7 @@
 document.querySelectorAll('[data-window-action]').forEach(button=>button.addEventListener('click',()=>window.hexora.windowControl(button.dataset.windowAction)));
 const $=id=>document.getElementById(id);
 $('demo-alert-rail')?.addEventListener('click',()=>window.hexora.action('demo-alert:open').catch(console.error));
+$('dock-settings-rail')?.addEventListener('click',()=>window.hexora.action('dock-settings:open').catch(console.error));
 /* A fast upward flick into the screen's top edge enters focus mode.
    A cursor parked at the edge never triggers; no click is needed. */
 let frameCompact=false;
