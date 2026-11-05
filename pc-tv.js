@@ -1,6 +1,7 @@
 'use strict';
 const {BrowserWindow,WebContentsView,ipcMain,screen,shell}=require('electron');
 const path=require('node:path');
+const companion=require('./dev-companion-state');
 const PARTITION='persist:hexora-chatgpt';
 const HOME='https://www.youtube.com/';
 let windowRef=null,views=new Map(),active=null,serial=0,controlsVisible=true,youtubeHeaderHidden=false;
@@ -31,7 +32,8 @@ function state(){
  const wc=views.get(active)?.webContents;
  return {tabs:[...views].map(([id,v])=>({id,title:v.webContents.isDestroyed()?'Video':v.webContents.getTitle()||'YouTube',url:v.webContents.isDestroyed()?'':v.webContents.getURL()})),active,url:wc&&!wc.isDestroyed()?wc.getURL():'',fullscreen:!!windowRef?.isFullScreen(),maximized:!!windowRef?.isMaximized(),controlsVisible,youtubeHeaderHidden,canBack:!!wc?.navigationHistory?.canGoBack(),canForward:!!wc?.navigationHistory?.canGoForward()};
 }
-function notify(){if(windowRef&&!windowRef.isDestroyed()&&!windowRef.webContents.isLoadingMainFrame())windowRef.webContents.send('pctv:state',state());}
+function saveState(){if(!windowRef||windowRef.isDestroyed())return;companion.save('pcTv',{open:true,bounds:windowRef.getBounds(),maximized:windowRef.isMaximized(),tabs:[...views.values()].map(v=>v.webContents.getURL()).filter(u=>/^https:\/\//.test(u)).slice(0,30),activeIndex:Math.max(0,[...views.keys()].indexOf(active)),youtubeHeaderHidden});}
+function notify(){saveState();if(windowRef&&!windowRef.isDestroyed()&&!windowRef.webContents.isLoadingMainFrame())windowRef.webContents.send('pctv:state',state());}
 function layout(){
  if(!windowRef||windowRef.isDestroyed())return;
  const [w,h]=windowRef.getContentSize(),top=30;
@@ -53,17 +55,19 @@ function createTab(url=HOME){
  wc.loadURL(url).catch(error=>console.warn('[PC TV] Load failed:',error.message));
  return id;
 }
-function open(){
+function open(restore=null){
  if(windowRef&&!windowRef.isDestroyed()){windowRef.show();windowRef.focus();return;}
  controlsVisible=true;
  const primary=screen.getPrimaryDisplay();
  const display=screen.getAllDisplays().find(d=>d.id!==primary.id)||primary;
  const area=display.workArea;
  windowRef=new BrowserWindow({x:area.x+20,y:area.y+20,width:Math.max(700,Math.min(1500,area.width-40)),height:Math.max(450,Math.min(900,area.height-40)),minWidth:700,minHeight:450,backgroundColor:'#080b13',title:'Hexora · PC TV',titleBarStyle:'hidden',titleBarOverlay:{color:'#0d1019',symbolColor:'#939aad',height:30},autoHideMenuBar:true,webPreferences:{preload:path.join(__dirname,'pc-tv-preload.js'),sandbox:true,contextIsolation:true,nodeIntegration:false}});
+ companion.restoreBounds(windowRef,restore);
+ if(restore?.maximized)windowRef.maximize();
  windowRef.loadFile(path.join(__dirname,'pc-tv.html'));
- windowRef.on('resize',layout);windowRef.on('enter-full-screen',notify);windowRef.on('leave-full-screen',notify);
- windowRef.on('closed',()=>{for(const v of views.values())if(!v.webContents.isDestroyed())v.webContents.close();views.clear();headerStyleKeys.clear();active=null;windowRef=null;});
- createTab();
+ windowRef.on('move',saveState);windowRef.on('resize',()=>{layout();saveState();});windowRef.on('enter-full-screen',notify);windowRef.on('leave-full-screen',notify);
+ windowRef.on('closed',()=>{companion.save('pcTv',{open:false});for(const v of views.values())if(!v.webContents.isDestroyed())v.webContents.close();views.clear();headerStyleKeys.clear();active=null;windowRef=null;});
+ if(Array.isArray(restore?.tabs)&&restore.tabs.length){for(const url of restore.tabs.slice(0,30)){try{const u=new URL(url);if(u.protocol==='https:'&&['youtube.com','www.youtube.com','m.youtube.com','youtu.be'].includes(u.hostname))createTab(u.href);}catch{}}if(!views.size)createTab();const ids=[...views.keys()];active=ids[Math.min(ids.length-1,Math.max(0,Number(restore.activeIndex)||0))];youtubeHeaderHidden=!!restore.youtubeHeaderHidden;layout();notify();}else createTab();
 }
 function sendVideo(url){
  const safe=safeVideoUrl(url);
@@ -104,4 +108,4 @@ function register(main){
   notify();return true;
  });
 }
-module.exports={register,sendVideo,safeVideoUrl};
+module.exports={register,sendVideo,safeVideoUrl,restore:open};
