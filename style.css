@@ -1245,3 +1245,7 @@ body.hexora-compact-frame .top-main>.top>div:first-child{transform:translateY(8p
 body.hexora-compact-frame .main-titlebar-drag{display:flex!important;height:16px!important}
 body.hexora-compact-frame .top-main,body.hexora-compact-frame .rail{top:16px!important}
 body.hexora-compact-frame .top-main>.top>div:first-child{transform:none}
+
+/* Same dark-blue horizontal tab scrollbar in expanded and compact workspace views. */
+.tabsbar .tabs, .tabsbar .tabs:hover, body.hexora-compact-frame .tabsbar .tabs, body.hexora-compact-frame .tabsbar .tabs:hover{scrollbar-color:#1c347f #1c347f!important}
+.tabsbar .tabs::-webkit-scrollbar-thumb, .tabsbar .tabs:hover::-webkit-scrollbar-thumb, body.hexora-compact-frame .tabsbar .tabs::-webkit-scrollbar-thumb, body.hexora-compact-frame .tabsbar .tabs:hover::-webkit-scrollbar-thumb{background:#1c347f!important}
