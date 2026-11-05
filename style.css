@@ -1176,3 +1176,5 @@ body.hexora-compact-frame .rail .logo{cursor:pointer}
 }
 .rail::-webkit-scrollbar{display:none}
 .rail>.logo,.rail>.railbtn{flex-shrink:0}
+
+.client-zone-search{padding:8px 10px 14px;display:grid;gap:8px}.client-zone-label{font-size:11px;opacity:.7}.client-zone-search input{width:100%;padding:10px;border:1px solid #81739c66;border-radius:9px;background:#171622;color:inherit}.client-zone-results{display:grid;gap:5px;max-height:220px;overflow-y:auto}.client-zone-result,.client-zone-add{border:1px solid #81739c36;border-radius:8px;background:#a991ef12;color:inherit;text-align:left;padding:9px;cursor:pointer}.client-zone-result strong,.client-zone-result small{display:block}.client-zone-result small,.client-zone-empty{font-size:11px;opacity:.7}

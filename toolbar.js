@@ -61,6 +61,34 @@ if(new URLSearchParams(window.location.search).get('hexoraDev')==='1'){
  if(indicator)indicator.hidden=false;
 }
 const workspaces=[{id:'client-work-area',name:'Client Work Zone',emoji:'▦'},{id:'web',name:'Web Development',emoji:'◈'},{id:'business',name:'Business',emoji:'▤'},{id:'personal',name:'Personal',emoji:'☼'},{id:'ideas',name:'Ideas Lab',emoji:'✦'},{id:'dual',name:'Dual Workspace (Test)',emoji:'◫'}];
+const clientZoneKey='hexora:client-work-zone:clients:v1';
+function clientZoneClients(){try{const data=JSON.parse(localStorage.getItem(clientZoneKey)||'[]');return Array.isArray(data)?data.filter(c=>c&&typeof c.name==='string'):[];}catch{return [];}}
+function renderClientZone(){
+ const input=$('client-zone-query'),results=$('client-zone-results');if(!input||!results)return;
+ const q=input.value.trim().toLocaleLowerCase(),clients=clientZoneClients().filter(c=>[c.name,c.domain,c.contact,c.phone].some(v=>String(v||'').toLocaleLowerCase().includes(q)));
+ results.replaceChildren();
+ for(const client of clients.slice(0,25)){
+  const item=document.createElement('button');item.type='button';item.className='client-zone-result';
+  const name=document.createElement('strong');name.textContent=client.name;
+  const detail=document.createElement('small');detail.textContent=[client.contact,client.domain,client.phone].filter(Boolean).join(' · ');
+  item.append(name,detail);
+  item.onclick=()=>{const details=[client.name,client.contact,client.domain,client.phone].filter(Boolean).join('\\n');window.alert(details);};
+  results.append(item);
+ }
+ if(!clients.length){const empty=document.createElement('div');empty.className='client-zone-empty';empty.textContent=q?'No matching clients':'No clients yet';results.append(empty);}
+ const add=document.createElement('button');add.type='button';add.className='client-zone-add';add.textContent='＋ Add client';
+ add.onclick=()=>{
+  const name=window.prompt('Client or business name');if(!name?.trim())return;
+  const domain=window.prompt('Website or domain (optional)')||'';
+  const contact=window.prompt('Contact name (optional)')||'';
+  const phone=window.prompt('Phone (optional)')||'';
+  const saved=clientZoneClients();saved.push({id:Date.now().toString(36),name:name.trim(),domain:domain.trim(),contact:contact.trim(),phone:phone.trim()});
+  localStorage.setItem(clientZoneKey,JSON.stringify(saved));input.value='';renderClientZone();
+ };
+ results.append(add);
+}
+$('client-zone-query')?.addEventListener('input',renderClientZone);
+renderClientZone();
 const conversationsCollapsedKey='hexora-conversations-collapsed';
 function setConversationsCollapsed(collapsed){
  const list=document.getElementById('conversations'),toggle=document.getElementById('toggle-conversations');
@@ -207,6 +235,7 @@ function renderQuickJumps(){
 }
 try{const s=JSON.parse(localStorage.getItem('hexora-workspace-settings')||'{}');if(s.workspaces?.length){const saved=s.workspaces.filter(w=>w&&typeof w.id==='string');for(const w of saved){if(w.id==='client-work-area'&&w.name==='Client Work Area')w.name='Client Work Zone';}const additions=workspaces.filter(w=>!saved.some(existing=>existing.id===w.id));workspaces.splice(0,workspaces.length,...saved,...additions);}if(s.selected)activeWorkspace=s.selected;if(s.sidebarOpen===false)sidebarOpen=false;}catch{}
 const save=()=>localStorage.setItem('hexora-workspace-settings',JSON.stringify({workspaces,selected:activeWorkspace,sidebarOpen}));
+if(activeWorkspace==='client-work-area')activeWorkspace='web';
 if(!workspaces.some(w=>w.id===activeWorkspace))activeWorkspace=workspaces[0].id;
 const action=(name,arg)=>window.hexora.action(name,arg);
 async function refresh(){
@@ -223,7 +252,7 @@ function render(p){
  // Ensure the experimental entry is visible even if an older saved workspace list was restored.
  if(!workspaces.some(w=>w.id==='dual'))workspaces.push({id:'dual',name:'Dual Workspace (Test)',emoji:'◫'});
  const container=$('workspaces');container.replaceChildren();
- $('client-work-area').replaceChildren();
+
  console.info('[Hexora Dual Workspace]',{workspaceIds:workspaces.map(w=>w.id),savedIds:(()=>{try{return JSON.parse(localStorage.getItem('hexora-workspace-settings')||'{}').workspaces?.map(w=>w.id)||[];}catch{return ['invalid saved JSON'];}})(),renderedAt:Date.now()});
  for(const w of orderSidebarItems(workspaces,sidebarWorkspaceOrderKey,w=>w.id)){
   const el=document.createElement('button');el.className='workspace'+(w.id===activeWorkspace?' selected':'');
@@ -231,7 +260,7 @@ function render(p){
   const label=document.createElement('span');label.className='name';label.textContent=w.name;
   const count=document.createElement('span');count.className='count';count.textContent=p.counts.find(x=>x.workspace===w.id)?.count||0;
   const edit=document.createElement('span');edit.className='workspace-edit';edit.title='Edit workspace';edit.textContent='⋯';edit.onclick=e=>{e.stopPropagation();openWorkspaceEditor(w.id);};
-  el.append(symbol,label,count,edit);attachWorkspaceHoverTip(el,w,Number(count.textContent)||0);el.addEventListener('contextmenu',e=>showWorkspaceMenu(e,w));el.onclick=async()=>{activeWorkspace=w.id;offset=0;save();await action('switch-workspace',w.id);if(w.id==='dual'){await action('dual-setup');await action('dual-mirror');}refresh();};if(w.id==='client-work-area'){$('client-work-area').append(el);}else{enableSidebarDrag(el,w.id,sidebarWorkspaceOrderKey);container.append(el);}
+  el.append(symbol,label,count,edit);attachWorkspaceHoverTip(el,w,Number(count.textContent)||0);el.addEventListener('contextmenu',e=>showWorkspaceMenu(e,w));el.onclick=async()=>{activeWorkspace=w.id;offset=0;save();await action('switch-workspace',w.id);if(w.id==='dual'){await action('dual-setup');await action('dual-mirror');}refresh();};if(w.id!=='client-work-area'){enableSidebarDrag(el,w.id,sidebarWorkspaceOrderKey);container.append(el);}
  }
  const conversations=$('conversations');conversations.replaceChildren();
  renderStackTree(conversations,p);
