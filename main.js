@@ -1448,6 +1448,18 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
   }
   else if(action==='quick-toast-visible'){quickToastOpen=!!arg;bounds();return true;}
   else if(action==='notifications-drawer'){notificationsOpen=!!arg;bounds();return true;}
+  else if(action==='tab-menu-preview'){
+   // The toolbar is behind native WebContentsViews. Preserve a temporary visual
+   // snapshot before 'modal' removes the live view so the menu is not over black.
+   const view=live.get(activeId);
+   if(!view||isCodeTab(store.get(activeId))||view.webContents.isDestroyed())return null;
+   const tabId=activeId;
+   const rect=mainViewport.getBounds();
+   return view.webContents.capturePage().then(image=>{
+    if(activeId!==tabId||image.isEmpty())return null;
+    return {image:image.toDataURL(),bounds:rect,tabId};
+   }).catch(error=>{console.warn('[Hexora] Tab menu preview unavailable:',error.message);return null;});
+  }
   else if(action==='modal'){
    modalVisible=!!arg;
    if(isCodeTab(store.get(activeId))){if(modalVisible){hideNativeCode();win.webContents.focus();}else showNativeCode();return true;}
