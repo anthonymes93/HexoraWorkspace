@@ -1,0 +1,24 @@
+*{box-sizing:border-box}html,body{margin:0;height:100%;background:#080b13;color:#e5e8f2;font-family:Inter,"Segoe UI",Arial,sans-serif}
+#tv-tabs{height:30px;display:flex;align-items:center;gap:3px;padding:3px 8px;background:#0d1019;border-bottom:1px solid #ffffff0b;overflow-x:auto;white-space:nowrap;scrollbar-width:none}
+#tv-tabs::-webkit-scrollbar{display:none}
+#tv-tabs button{height:23px;flex:0 1 auto;max-width:190px;min-width:35px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:11px "Segoe UI",Arial,sans-serif;color:#939aad;background:transparent;border:1px solid transparent;border-radius:5px;padding:3px 9px;cursor:pointer}
+#tv-tabs button:hover{color:#e9edff;background:#ffffff0b}
+#tv-tabs button.active{color:#f2f4ff;background:#252b3c;border-color:#ffffff12}
+#tv-tabs .close-tab{flex:0 0 20px;min-width:20px;width:20px;padding:1px 4px;margin-left:-3px;color:#778094;font-size:15px}
+#tv-tabs .close-tab:hover{color:#fff;background:#a33945}
+#tv-tabs .new-tab{flex:0 0 25px;min-width:25px;padding:1px 4px;color:#8792b1;font-size:17px}
+
+/* The 30px strip replaces Windows' separate title bar. */
+#tv-tabs{-webkit-app-region:drag;padding-right:145px}
+#tv-tabs button{-webkit-app-region:no-drag}
+
+#tv-tabs .youtube-header-toggle{flex:0 0 auto;min-width:83px;max-width:none;color:#b8d5ff;border:1px solid #3b577b;background:#17263c;padding:3px 7px}
+#tv-tabs .youtube-header-toggle:hover{background:#243a58;color:#fff}
+
+/* Compact history controls, deliberately quieter than the active tab. */
+#tv-tabs .history-nav{flex:0 0 22px;min-width:22px;max-width:22px;padding:0;color:#8993aa;font-size:20px;line-height:20px;text-align:center}
+#tv-tabs .history-nav:hover:not(:disabled){color:#e9edff;background:#ffffff12}
+#tv-tabs .history-nav:disabled{opacity:.28;cursor:default}
+
+#tv-video-title{position:absolute;bottom:0;left:0;right:0;height:28px;line-height:28px;padding:0 14px;background:#0d1019;border-top:1px solid #ffffff12;color:#b9c1d2;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none}
+#tv-video-title[hidden]{display:none}

@@ -375,6 +375,14 @@ function applyHexoraWebsiteScrollbars(wc){
  }).catch(error=>console.warn('[Hexora] Website scrollbar style unavailable:',error.message));
 }
 function wire(t){const view=new WebContentsView({webPreferences:{partition:'persist:hexora-chatgpt',preload:path.join(__dirname,'site-vault-preload.js'),sandbox:true,contextIsolation:true,nodeIntegration:false,webSecurity:true,javascript:true}});const wc=view.webContents;
+ wc.on('context-menu',(_event,params)=>{
+  const candidate=params.linkURL||wc.getURL();
+  const video=require('./pc-tv').safeVideoUrl(candidate);
+  if(!video)return;
+  Menu.buildFromTemplate([{label:'Send to PC TV',click:()=>{
+   try{require('./pc-tv').sendVideo(video);}catch(error){console.error('[PC TV] Send video failed:',error);}
+  }}]).popup({window:win});
+ });
  wc.setAudioMuted(!!t.muted);
  if(chromeMode(t.id))wc.setUserAgent(chromeUserAgent(wc));
  // Use a neutral white backing for transparent areas in third-party websites.
@@ -916,7 +924,30 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
   console.info('[Hexora DEV] Electron development build; app:',app.getAppPath(),'; profile:',app.getPath('userData'));
  }
  mainViewport=new View();win.contentView.addChildView(mainViewport);
+ require('./dev-companion-state').manageWindow('main',win);
  require('./email-app').register(win);
+ require('./pc-tv').register(win);
+ // Preserve saved companion state when Electron exits for an automatic development restart.
+ if(isDevelopment&&process.env.HEXORA_DEV_WATCH==='1'){
+  app.on('before-quit',()=>require('./dev-companion-state').markRestarting());
+ }
+ // The watcher may restart Electron without successfully forwarding its snapshot.
+ // The persisted state is the fallback, so open companion windows survive that handoff.
+ if(isDevelopment&&process.env.HEXORA_DEV_WATCH==='1'){
+  try{
+   const companion=require('./dev-companion-state');
+   let snapshot=companion.read();
+   if(process.env.HEXORA_COMPANION_SNAPSHOT){
+    try{const passed=JSON.parse(process.env.HEXORA_COMPANION_SNAPSHOT);
+     if(passed&&typeof passed==='object')snapshot={...snapshot,...passed};
+    }catch(error){console.warn('[Hexora] Invalid watcher companion snapshot:',error.message);}
+   }
+   console.info('[Hexora] Companion restore state:',{email:!!snapshot.email?.open,pcTv:!!snapshot.pcTv?.open});
+   if(snapshot.email?.open)require('./email-app').restore(snapshot.email);
+   if(snapshot.pcTv?.open)require('./pc-tv').restore(snapshot.pcTv);
+   companion.restoreStacking(snapshot);
+  }catch(error){console.warn('[Hexora] Companion restore skipped:',error.message);}
+ }
  win.on('focus',()=>{const entry=activeCodeEntry();if(entry?.ready&&entry.visible&&!entry.detached){nativeCodeCommand('TRACE HEXORA_FOCUS_BEFORE');nativeCodeCommand('RESTORE');nativeCodeCommand('RECOVER_Z');nativeCodeCommand('WATCH_MOUSE');}});win.on('blur',()=>{const entry=activeCodeEntry();if(entry?.ready&&entry.visible&&!entry.detached)nativeCodeCommand('DIAG HEXORA_BLUR');});win.on('resize',bounds);
  for(const lifecycleEvent of ['restore','maximize','unmaximize','moved','resized']){
   win.on(lifecycleEvent,()=>scheduleNativeCodeLifecycle(lifecycleEvent));
@@ -1222,6 +1253,17 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
  ipcMain.handle('native-code:toggle',async event=>{if(event.sender!==win.webContents)throw Error('Invalid caller');return openCodeTab(store.get(activeId)?.workspace||'web');});
  const openDualMirror=require('./dual-mirror').createDualMirror({getActiveId:()=>activeId,getTab:id=>store.get(id),getView:id=>live.get(id),isCodeTab,getMirrorUrl:id=>store.getMeta('dualPairUrl:'+id),onVisit:url=>{if(url==='https://chatgpt.com/c/6ae96d7a-9d84-83e8-b5df-ae0bfd8b8920'&&!win.webContents.isDestroyed())win.webContents.send('dual:visited-test-url',{message:"You've checked out x"});},getChatgptSource:()=>{for(const view of live.values()){const wc=view.webContents;if(!wc.isDestroyed()&&/^https:\/\/chatgpt\.com(?:\/|$)/.test(wc.getURL()))return wc;}return null;}});
  dualPopupHandler=openDualMirror.handlePopup;
+ ipcMain.on('pctv:youtube-context',(event,payload)=>{
+  // Only regular Hexora website tabs may request this privileged action.
+  if(![...live.values()].some(view=>view.webContents===event.sender))return;
+  const video=require('./pc-tv').safeVideoUrl(payload?.url);
+  if(!video)return;
+  Menu.buildFromTemplate([
+   {label:'Send to PC TV',click:()=>{try{require('./pc-tv').sendVideo(video);}catch(error){console.error('[PC TV] Send failed:',error);}}},
+   {type:'separator'},
+   {label:'Show YouTube menu',click:()=>{if(!event.sender.isDestroyed())event.sender.send('pctv:show-youtube-menu');}}
+  ]).popup({window:win});
+ });
  ipcMain.handle('tabs:page',(_e,arg)=>sendPage(arg));
  ipcMain.handle('tabs:search',(_e,term)=>store.search(term,50).map(pageRow));
  ipcMain.handle('tabs:lookup',(_e,id)=>{const row=store.get(Number(id));return row?pageRow(row):null;});

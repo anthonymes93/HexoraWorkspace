@@ -1,0 +1,33 @@
+name: Develop integration checks
+on:
+  pull_request:
+    branches: [develop]
+    types: [opened, synchronize, reopened, ready_for_review]
+permissions:
+  contents: write
+  pull-requests: write
+jobs:
+  validate-and-integrate:
+    if: github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Syntax and regression checks
+        run: |
+          node --check main.js
+          node --check pc-tv.js
+          node --check pc-tv-ui.js
+          node --check scripts/dev-watch.cjs
+          npm run test:links
+      - name: Integrate passing internal PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+        run: gh pr merge "$PR" --repo "$GITHUB_REPOSITORY" --squash
