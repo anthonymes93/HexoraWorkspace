@@ -926,6 +926,10 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
  mainViewport=new View();win.contentView.addChildView(mainViewport);
  require('./email-app').register(win);
  require('./pc-tv').register(win);
+ // Preserve saved companion state when Electron exits for an automatic development restart.
+ if(isDevelopment&&process.env.HEXORA_DEV_WATCH==='1'){
+  app.on('before-quit',()=>require('./dev-companion-state').markRestarting());
+ }
  // Restore only after an automatic development watcher restart, never on normal launch.
  if(isDevelopment&&process.env.HEXORA_DEV_WATCH==='1'&&process.env.HEXORA_COMPANION_SNAPSHOT){
   try{const snapshot=JSON.parse(process.env.HEXORA_COMPANION_SNAPSHOT);
