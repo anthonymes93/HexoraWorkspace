@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { APP_ID, DEV_APP_ID, taskbarIdentity, applyTaskbarIdentity } = require('../taskbar-identity');
+const { APP_ID, DEV_APP_ID, taskbarIdentity, tvTaskbarIdentity, applyTaskbarIdentity } = require('../taskbar-identity');
 
 test('each actual Hexora tab window has its own Windows taskbar identity and icon', () => {
   const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'hexora-taskbar-test-'));
@@ -17,17 +17,17 @@ test('each actual Hexora tab window has its own Windows taskbar identity and ico
     assert.equal(main.appId, APP_ID);
     assert.equal(first.appId, APP_ID + '.tab.17');
     assert.equal(second.appId, APP_ID + '.tab.18');
-    const devMain = taskbarIdentity(folder, null, 'win32', DEV_APP_ID);
-    const devTab = taskbarIdentity(folder, 17, 'win32', DEV_APP_ID);
     assert.equal(DEV_APP_ID, APP_ID + '.dev');
-    assert.equal(devMain.appId, DEV_APP_ID);
-    assert.equal(devTab.appId, DEV_APP_ID + '.tab.17');
-    assert.notEqual(devMain.appId, main.appId);
-    assert.notEqual(devTab.appId, first.appId);
+    assert.equal(taskbarIdentity(folder, null, 'win32', DEV_APP_ID), null);
+    assert.equal(taskbarIdentity(folder, 17, 'win32', DEV_APP_ID), null);
+    const tv=tvTaskbarIdentity(folder,'win32');
+    assert.equal(tv.appId, APP_ID+'.pctv');
+    assert.notEqual(tv.iconPath, main.iconPath);
+    assert.equal(taskbarIdentity(folder,null,'linux'),null);
     assert.equal(new Set([main.appId, first.appId, second.appId]).size, 3);
     assert.equal(new Set([main.iconPath, first.iconPath, second.iconPath]).size, 3);
 
-    for (const file of [main.iconPath, first.iconPath, second.iconPath]) {
+    for (const file of [main.iconPath, first.iconPath, second.iconPath, tv.iconPath]) {
       const data = fs.readFileSync(file);
       assert.equal(data.readUInt16LE(2), 1); // .ico
       assert.equal(data.readUInt16LE(4), 1); // one PNG
