@@ -508,6 +508,7 @@ function hideNewTabLoader(id){
 // The right edge stays anchored to the window; the left portion is revealed/hidden by the panel.
 const desktopAlerts=new Map();
 const dockIconStrips=new Map();
+const dockVerticalPositions=new Map();
 const dockStripHeight=40,dockStripGap=8;
 let desktopAlertSequence=0;
 const alertExpandedSize={width:560,height:540},alertDockSize={width:300,height:108};
@@ -545,17 +546,19 @@ function layoutDockedAlerts(){
     backgroundColor:'#00000000',webPreferences:{sandbox:true,contextIsolation:true,nodeIntegration:false,preload:path.join(__dirname,'dock-icon-strip-preload.js')}});
    dockIconStrips.set(displayId,strip);
    strip.setAlwaysOnTop(true,'floating');
-   strip.webContents.loadFile(path.join(__dirname,'dock-icon-strip.html')).then(()=>{if(!strip.isDestroyed())strip.showInactive();}).catch(console.error);
+   strip.webContents.loadFile(path.join(__dirname,'dock-icon-strip.html')).then(()=>{if(!strip.isDestroyed()){strip.webContents.send('dock-strip:position',dockVerticalPositions.get(displayId)||'top');strip.showInactive();}}).catch(console.error);
   }
   const capacity=Math.max(1,Math.floor((area.height-dockStripHeight-dockStripGap-24)/(alertDockSize.height+10)));
+  const bottom=dockVerticalPositions.get(displayId)==='bottom';
   const firstColumnCount=Math.min(group.length,capacity);
-  const stripY=area.y+12+firstColumnCount*(alertDockSize.height+10);
-  strip.setBounds({x:area.x+12,y:Math.min(stripY,area.y+area.height-dockStripHeight-8),width:alertDockSize.width,height:dockStripHeight});
-
+  const topY=area.y+12;
+  const bottomY=area.y+area.height-12;
+  const stripY=bottom?bottomY-dockStripHeight:firstColumnCount*(alertDockSize.height+10)+topY;
+  strip.setBounds({x:area.x+12,y:stripY,width:alertDockSize.width,height:dockStripHeight});
   group.forEach((record,index)=>{
-   const slot=Math.max(1,Math.floor((area.height-dockStripHeight-dockStripGap-24)/(alertDockSize.height+10)));
-   const column=Math.floor(index/Math.max(1,slot)),row=index%Math.max(1,slot);
-   animateAlert(record,{x:area.x+12+column*(alertDockSize.width+10),y:area.y+12+row*(alertDockSize.height+10),...alertDockSize});
+   const column=Math.floor(index/capacity),row=index%capacity;
+   const y=bottom?bottomY-dockStripHeight-dockStripGap-alertDockSize.height-row*(alertDockSize.height+10):topY+row*(alertDockSize.height+10);
+   animateAlert(record,{x:area.x+12+column*(alertDockSize.width+10),y,...alertDockSize});
   });
  }
 }
@@ -571,9 +574,13 @@ ipcMain.on('dock-strip:move',(event,direction)=>{
  }
  layoutDockedAlerts();
 });
-ipcMain.on('dock-strip:settings',event=>{
- const source=[...dockIconStrips.values()].some(win=>!win.isDestroyed()&&win.webContents===event.sender);
- if(source)console.log('[Dock] Settings placeholder clicked');
+ipcMain.on('dock-strip:vertical',event=>{
+ const source=[...dockIconStrips.entries()].find(([,win])=>!win.isDestroyed()&&win.webContents===event.sender);
+ if(!source)return;
+ const next=dockVerticalPositions.get(source[0])==='bottom'?'top':'bottom';
+ dockVerticalPositions.set(source[0],next);
+ event.sender.send('dock-strip:position',next);
+ layoutDockedAlerts();
 });
 function closeDemoAlert(popup){
  const record=desktopAlerts.get(popup?.webContents.id);if(!record)return;
