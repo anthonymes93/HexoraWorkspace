@@ -507,6 +507,30 @@ function hideNewTabLoader(id){
 // Clip the native web view to the available viewport while keeping its internal layout stable.
 // The right edge stays anchored to the window; the left portion is revealed/hidden by the panel.
 const desktopAlerts=new Map();
+let preservingAlertsForQuit=false;
+function saveDesktopAlerts(){
+ if(preservingAlertsForQuit||!store)return;
+ const alerts=[...desktopAlerts.values()].filter(r=>!r.window.isDestroyed()).map(r=>{
+  const display=screen.getAllDisplays().find(d=>d.id===r.dockDisplayId)||screen.getDisplayMatching(r.window.getBounds());
+  return {docked:r.docked,displayId:String(display.id),bounds:r.window.getBounds(),
+   vertical:dockVerticalPositions.get(display.id)||'top',horizontal:dockHorizontalPositions.get(display.id)||'left'};
+ });
+ store.setMeta('desktop-alerts:session',JSON.stringify(alerts));
+}
+function restoreDesktopAlerts(){
+ let saved=[];try{saved=JSON.parse(store.getMeta('desktop-alerts:session')||'[]');}catch{}
+ if(!Array.isArray(saved))return;
+ for(const item of saved.slice(0,30)){
+  if(!item||typeof item!=='object')continue;
+  const displays=screen.getAllDisplays();
+  const display=displays.find(d=>String(d.id)===item.displayId)||screen.getPrimaryDisplay();
+  dockVerticalPositions.set(display.id,item.vertical==='bottom'?'bottom':'top');
+  dockHorizontalPositions.set(display.id,item.horizontal==='right'?'right':'left');
+  openDemoAlert({restore:item,display});
+ }
+}
+app.on('before-quit',()=>{saveDesktopAlerts();preservingAlertsForQuit=true;});
+
 const dockIconStrips=new Map();
 const dockVerticalPositions=new Map();
 const dockHorizontalPositions=new Map();
@@ -609,7 +633,7 @@ ipcMain.on('dock-strip:move',(event,direction)=>{
  for(const record of desktopAlerts.values()){
   if(record.docked&&record.dockDisplayId===source[0])record.dockDisplayId=target.id;
  }
- layoutDockedAlerts();
+ layoutDockedAlerts();saveDesktopAlerts();
 });
 ipcMain.on('dock-strip:rotate',event=>{
  const source=[...dockIconStrips.entries()].find(([,win])=>!win.isDestroyed()&&win.webContents===event.sender);
@@ -624,7 +648,7 @@ ipcMain.on('dock-strip:rotate',event=>{
  else dockVerticalPositions.set(id,'top');
  const strip=dockIconStrips.get(id);
  if(strip&&!strip.isDestroyed())strip.webContents.send('dock-strip:position',dockVerticalPositions.get(id)||'top');
- layoutDockedAlerts();
+ layoutDockedAlerts();saveDesktopAlerts();
 });
 ipcMain.on('dock-strip:vertical',event=>{
  const source=[...dockIconStrips.entries()].find(([,win])=>!win.isDestroyed()&&win.webContents===event.sender);
@@ -632,28 +656,32 @@ ipcMain.on('dock-strip:vertical',event=>{
  const next=dockVerticalPositions.get(source[0])==='bottom'?'top':'bottom';
  dockVerticalPositions.set(source[0],next);
  event.sender.send('dock-strip:position',next);
- layoutDockedAlerts();
+ layoutDockedAlerts();saveDesktopAlerts();
 });
 function closeDemoAlert(popup){
  const record=desktopAlerts.get(popup?.webContents.id);if(!record)return;
  clearInterval(record.animation);desktopAlerts.delete(popup.webContents.id);
  if(!popup.isDestroyed())popup.close();
- layoutDockedAlerts();
+ layoutDockedAlerts();saveDesktopAlerts();
 }
-function openDemoAlert(){
- const display=screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
+function openDemoAlert(options={}){
+ const display=options?.display||screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
  const popup=new BrowserWindow({
   ...alertCenter(display),frame:false,transparent:true,show:false,alwaysOnTop:true,
   skipTaskbar:true,resizable:false,minimizable:false,maximizable:false,
   backgroundColor:'#00000000',
   webPreferences:{sandbox:true,contextIsolation:true,nodeIntegration:false,preload:path.join(__dirname,'demo-alert-preload.js')}
  });
- const record={window:popup,docked:false,dockDisplayId:null,animation:null};
+ const record={window:popup,docked:Boolean(options.restore?.docked),dockDisplayId:options.restore?.docked?display.id:null,animation:null};
  desktopAlerts.set(popup.webContents.id,record);
  popup.setAlwaysOnTop(true,'floating');
- popup.on('closed',()=>{clearInterval(record.animation);desktopAlerts.delete(popup.webContents.id);layoutDockedAlerts();});
+ popup.on('closed',()=>{clearInterval(record.animation);desktopAlerts.delete(popup.webContents.id);layoutDockedAlerts();saveDesktopAlerts();});
  popup.webContents.loadFile(path.join(__dirname,'demo-alert.html')).then(()=>{
-  if(!popup.isDestroyed()){popup.show();popup.focus();}
+  if(!popup.isDestroyed()){
+   if(record.docked){popup.webContents.send('demo-alert:mode','docked');layoutDockedAlerts();popup.showInactive();}
+   else {const b=options.restore?.bounds,a=display.workArea;if(b&&Number.isFinite(b.x)&&Number.isFinite(b.y)&&Number.isFinite(b.width)&&Number.isFinite(b.height)){popup.setBounds({x:Math.max(a.x,Math.min(b.x,a.x+a.width-alertExpandedSize.width)),y:Math.max(a.y,Math.min(b.y,a.y+a.height-alertExpandedSize.height)),...alertExpandedSize});}popup.show();popup.focus();}
+   if(!options.restore)saveDesktopAlerts();
+  }
  }).catch(error=>{console.error('[Demo alert]',error);closeDemoAlert(popup);});
  return true;
 }
@@ -662,13 +690,13 @@ ipcMain.on('demo-alert:close',event=>{
 });
 ipcMain.on('demo-alert:dock',event=>{
  const record=desktopAlerts.get(event.sender.id);if(!record||record.docked)return;
- record.docked=true;record.dockDisplayId=screen.getDisplayMatching(record.window.getBounds()).id;event.sender.send('demo-alert:mode','docked');layoutDockedAlerts();
+ record.docked=true;record.dockDisplayId=screen.getDisplayMatching(record.window.getBounds()).id;event.sender.send('demo-alert:mode','docked');layoutDockedAlerts();saveDesktopAlerts();
 });
 ipcMain.on('demo-alert:expand',event=>{
  const record=desktopAlerts.get(event.sender.id);if(!record||!record.docked)return;
  record.docked=false;event.sender.send('demo-alert:mode','expanded');
  animateAlert(record,alertCenter(alertDisplay(record)));layoutDockedAlerts();
- record.window.show();record.window.focus();
+ record.window.show();record.window.focus();saveDesktopAlerts();
 });
 function bounds(){
  if(!win||win.isDestroyed()||!mainViewport)return;
@@ -1101,6 +1129,7 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
  restoreExtensions().catch(err=>console.error('Extension initialization failed:',err));
  store=new TabStore(dataDir);
  store.importLegacy(path.join(app.getPath('userData'),'hexora-tabs.json'));
+ restoreDesktopAlerts();
  // Apply any project saved by VS Code immediately before the prior shutdown,
  // before activating its native tab and regenerating its workspace file.
  syncNativeCodeProjects();
