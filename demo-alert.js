@@ -1,0 +1,1 @@
+'use strict';const close=()=>window.hexoraDemoAlert.close();for(const id of ['close','later','gotit'])document.getElementById(id).addEventListener('click',close);document.addEventListener('keydown',event=>{if(event.key==='Escape')close();});
