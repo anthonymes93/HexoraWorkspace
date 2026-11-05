@@ -19,6 +19,7 @@ $('delete').onclick=async()=>{if(!active||!confirm('Delete this note permanently
 $('toggle').onclick=()=>{preview=!preview;document.body.classList.toggle('preview-mode',preview);$('toggle').textContent=preview?'Edit':'Preview';renderPreview()};
 document.querySelectorAll('[data-insert]').forEach(b=>b.onclick=()=>insert(b.dataset.insert));document.querySelectorAll('[data-wrap]').forEach(b=>b.onclick=()=>insert(b.dataset.wrap,b.dataset.wrap));
 document.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='s'){e.preventDefault();save()}});
+window.addEventListener('blur',()=>{if(dirty)save()});
 window.addEventListener('beforeunload',()=>{if(dirty)save()});
 (async()=>{try{notes=await window.hexora.notes.request('list');if(notes.length)select(sorted()[0].id);else fresh();}catch(e){showStatus('Unable to load notes');console.error(e)}})();
 </script></body></html>
