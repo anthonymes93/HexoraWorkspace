@@ -392,9 +392,9 @@ body.reordering-tabs,body.reordering-tabs *{cursor:grabbing!important;user-selec
 /* First-row overflow preview: tiny full-title hint above truncated label. */
 #tabs>.tab .tab-title-lines{display:flex;flex:1;min-width:0;flex-direction:column;align-items:stretch;justify-content:center;gap:2px;text-align:left}
 #tabs>.tab .tab-title-lines>.name{display:block;width:100%;min-width:0;flex:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.2}
-#tabs>.tab .tab-micro-title{display:block;width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:8px;line-height:10px;font-weight:400;letter-spacing:0;color:#000;pointer-events:none}
+#tabs>.tab .tab-micro-title{display:block;width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:8px;line-height:10px;font-weight:400;letter-spacing:0;color:#fff;pointer-events:none}
 #tabs>.tab .tab-micro-title[hidden]{display:none}
-#tabs>.tab.active .tab-micro-title{color:#000}
+#tabs>.tab.active .tab-micro-title{color:#fff}
 #tabs>.tab.has-micro-title .tab-title-lines{gap:2px}
 #tabs>.tab .tab-favicon{flex-shrink:0}
 
