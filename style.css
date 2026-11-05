@@ -1229,3 +1229,8 @@ body.hexora-compact-frame .tabsbar .tabs>.tab{
  flex:0 0 auto;
 }
 body.hexora-compact-frame .tabsbar .tabs::-webkit-scrollbar{height:7px}
+
+/* Compact frame removes the 16px titlebar: override the normal !important top offset.
+   Otherwise the header extends below the native content viewport and clips tab bottoms/scrollbar. */
+body.hexora-compact-frame .top-main,
+body.hexora-compact-frame .rail{top:0!important}
