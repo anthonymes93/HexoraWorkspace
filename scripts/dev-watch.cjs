@@ -49,7 +49,7 @@ async function stopChild(){
 async function restart(reason){
  if(stopping)return;
  restartRequested=true;
- try{companionSnapshot=fs.readFileSync(path.join(process.env.APPDATA||path.join(process.env.HOME||'','AppData','Roaming'),'hexora-workspace-dev','dev-companion-windows.json'),'utf8');}catch{companionSnapshot='';}
+ try{companionSnapshot=fs.readFileSync(path.join(process.env.APPDATA||path.join(process.env.HOME||'','AppData','Roaming'),'hexora-workspace-dev','dev-companion-windows.json'),'utf8');const state=JSON.parse(companionSnapshot);log('Companion snapshot: Email '+(state.email?.open?'open':'closed')+', PC TV '+(state.pcTv?.open?'open':'closed'));}catch(error){companionSnapshot='';log('No companion snapshot: '+error.message);}
  log(reason+' — restarting Hexora');
  await stopChild();
  restartRequested=false;
