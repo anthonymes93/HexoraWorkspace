@@ -2054,42 +2054,11 @@ $('open-pc-tv')?.addEventListener('click',()=>window.hexora.pcTv.open().catch(er
 })();
 
 
-// Car rail easter egg: self-contained celebration; no IPC or navigation.
+// Render above embedded websites through a transparent Electron child window.
 (()=>{
  const car=document.getElementById('car-placeholder-rail');
  if(!car)return;
- car.title='Launch a celebration';
+ car.title='Launch a full-window celebration';
  car.setAttribute('aria-label','Launch confetti celebration');
- let active=null;
-
- car.addEventListener('click',()=>{
-  if(active){active.remove();active=null;}
-  const layer=document.createElement('div');
-  layer.className='hexora-car-party';
-  layer.setAttribute('aria-hidden','true');
-  const glow=document.createElement('div');glow.className='party-glow';layer.append(glow);
-  const banner=document.createElement('div');banner.className='party-banner';
-  banner.textContent='🚘 FULL THROTTLE!';
-  const sub=document.createElement('small');sub.textContent='HEXORA • LET’S GO';banner.append(sub);layer.append(banner);
-  if(!window.matchMedia('(prefers-reduced-motion: reduce)').matches){
-   const colors=['#69b9ff','#8c7cff','#f9d66b','#f66cb3','#ffffff','#43e6d2'];
-   const fragment=document.createDocumentFragment();
-   for(let i=0;i<130;i++){
-    const piece=document.createElement('i');piece.className='party-piece';
-    const rand=()=>Math.random();
-    piece.style.setProperty('--x',(rand()*100).toFixed(2)+'%');
-    piece.style.setProperty('--w',(5+rand()*8).toFixed(1)+'px');
-    piece.style.setProperty('--h',(7+rand()*13).toFixed(1)+'px');
-    piece.style.setProperty('--color',colors[i%colors.length]);
-    piece.style.setProperty('--duration',(2.5+rand()*2.3).toFixed(2)+'s');
-    piece.style.setProperty('--delay',(rand()*.8).toFixed(2)+'s');
-    piece.style.setProperty('--drift',((rand()-.5)*320).toFixed(0)+'px');
-    piece.style.setProperty('--spin',((rand()-.5)*1600).toFixed(0)+'deg');
-    fragment.append(piece);
-   }
-   layer.append(fragment);
-  }
-  car.closest('.rail').append(layer);active=layer;
-  setTimeout(()=>{layer.remove();if(active===layer)active=null;},5200);
- });
+ car.addEventListener('click',()=>window.hexora.action('car-celebration').catch(error=>console.error('[Hexora] Car celebration:',error)));
 })();
