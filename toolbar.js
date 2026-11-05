@@ -1,6 +1,8 @@
 // Window controls are restricted to the main Hexora window by the main-process IPC handler.
 document.querySelectorAll('[data-window-action]').forEach(button=>button.addEventListener('click',()=>window.hexora.windowControl(button.dataset.windowAction)));
 const $=id=>document.getElementById(id);
+$('demo-alert-rail')?.addEventListener('click',()=>window.hexora.action('demo-alert:open').catch(console.error));
+$('dock-settings-rail')?.addEventListener('click',()=>window.hexora.action('dock-settings:open').catch(console.error));
 /* A fast upward flick into the screen's top edge enters focus mode.
    A cursor parked at the edge never triggers; no click is needed. */
 let frameCompact=false;
@@ -60,7 +62,43 @@ if(new URLSearchParams(window.location.search).get('hexoraDev')==='1'){
  const indicator=$('hexora-dev-indicator');
  if(indicator)indicator.hidden=false;
 }
-const workspaces=[{id:'web',name:'Web Development',emoji:'◈'},{id:'business',name:'Business',emoji:'▤'},{id:'personal',name:'Personal',emoji:'☼'},{id:'ideas',name:'Ideas Lab',emoji:'✦'},{id:'dual',name:'Dual Workspace (Test)',emoji:'◫'}];
+const workspaces=[{id:'client-work-area',name:'Client Work Zone',emoji:'▦'},{id:'web',name:'Web Development',emoji:'◈'},{id:'business',name:'Business',emoji:'▤'},{id:'personal',name:'Personal',emoji:'☼'},{id:'ideas',name:'Ideas Lab',emoji:'✦'},{id:'dual',name:'Dual Workspace (Test)',emoji:'◫'}];
+const clientWorkspaceNames=new Map(Object.entries((()=>{try{return JSON.parse(localStorage.getItem('hexora:client-workspace-names')||'{}');}catch{return {};}})()));
+const clientFavoritesKey='hexora:client-favorites:v1';
+function getClientFavorites(){try{const v=JSON.parse(localStorage.getItem(clientFavoritesKey)||'[]');return Array.isArray(v)?v.filter(id=>typeof id==='string'&&id.startsWith('client:')):[];}catch{return [];}}
+function renderClientFavorites(){
+ const host=$('client-favorites'),button=$('favorite-client');if(!host||!button)return;
+ const isClient=activeWorkspace.startsWith('client:');
+ button.hidden=!isClient;
+ const sleepButton=$('sleep-client');if(sleepButton)sleepButton.hidden=!isClient;
+ const favorites=getClientFavorites();
+ button.textContent=favorites.includes(activeWorkspace)?'★ Favorited':'☆ Favorite client';
+ button.title=favorites.includes(activeWorkspace)?'Remove client from favorites':'Add client to sidebar favorites';
+ button.setAttribute('aria-pressed',String(isClient&&favorites.includes(activeWorkspace)));
+ host.replaceChildren();
+ for(const id of favorites){
+  const row=document.createElement('button');row.type='button';row.className='client-favorite'+(id===activeWorkspace?' selected':'');
+  row.textContent='★  '+(clientWorkspaceNames.get(id)||'Client');
+  row.onclick=async()=>{activeWorkspace=id;offset=0;save();await action('switch-workspace',id);refresh();};
+  host.append(row);
+ }
+}
+$('sleep-client')?.addEventListener('click',async()=>{
+ if(!activeWorkspace.startsWith('client:'))return;
+ const button=$('sleep-client');button.disabled=true;
+ try{
+  const result=await action('sleep-client-workspace',activeWorkspace);
+  if(!result?.ok){window.alert('Close detached or native VS Code windows in this client workspace before sleeping it.');return;}
+  activeWorkspace='client-work-area';offset=0;save();refresh();
+ }catch(error){console.error('Could not sleep client workspace',error);}
+ finally{button.disabled=false;}
+});
+$('favorite-client')?.addEventListener('click',()=>{
+ if(!activeWorkspace.startsWith('client:'))return;
+ const current=getClientFavorites(),index=current.indexOf(activeWorkspace);
+ if(index>=0)current.splice(index,1);else current.push(activeWorkspace);
+ localStorage.setItem(clientFavoritesKey,JSON.stringify(current));renderClientFavorites();
+});
 const conversationsCollapsedKey='hexora-conversations-collapsed';
 function setConversationsCollapsed(collapsed){
  const list=document.getElementById('conversations'),toggle=document.getElementById('toggle-conversations');
@@ -205,10 +243,16 @@ function renderQuickJumps(){
  add.onclick=()=>showQuickJumpEditor().catch(err=>alert('Quick Jump: '+err.message));
  host.append(add);
 }
-try{const s=JSON.parse(localStorage.getItem('hexora-workspace-settings')||'{}');if(s.workspaces?.length){const saved=s.workspaces.filter(w=>w&&typeof w.id==='string');const additions=workspaces.filter(w=>!saved.some(existing=>existing.id===w.id));workspaces.splice(0,workspaces.length,...saved,...additions);}if(s.selected)activeWorkspace=s.selected;if(s.sidebarOpen===false)sidebarOpen=false;}catch{}
+try{const s=JSON.parse(localStorage.getItem('hexora-workspace-settings')||'{}');if(s.workspaces?.length){const saved=s.workspaces.filter(w=>w&&typeof w.id==='string');for(const w of saved){if(w.id==='client-work-area'&&w.name==='Client Work Area')w.name='Client Work Zone';}const additions=workspaces.filter(w=>!saved.some(existing=>existing.id===w.id));workspaces.splice(0,workspaces.length,...saved,...additions);}if(s.selected)activeWorkspace=s.selected;if(s.sidebarOpen===false)sidebarOpen=false;}catch{}
 const save=()=>localStorage.setItem('hexora-workspace-settings',JSON.stringify({workspaces,selected:activeWorkspace,sidebarOpen}));
 if(!workspaces.some(w=>w.id===activeWorkspace))activeWorkspace=workspaces[0].id;
 const action=(name,arg)=>window.hexora.action(name,arg);
+window.hexora.onClientSelected(({workspace,name})=>{
+ if(!workspace?.startsWith('client:'))return;
+ activeWorkspace=workspace;clientWorkspaceNames.set(workspace,name||'Client');localStorage.setItem('hexora:client-workspace-names',JSON.stringify(Object.fromEntries(clientWorkspaceNames)));offset=0;save();refresh();
+});
+
+if(activeWorkspace==='client-work-area')action('switch-workspace','client-work-area').catch(console.error);
 async function refresh(){
  if(tabPointer?.moving)return;
  if(refreshing){refreshPending=true;return;}refreshing=true;
@@ -218,11 +262,15 @@ async function refresh(){
 }
 function render(p){
  if(p.activeId&&p.activePanelMode){const desired=p.activePanelMode==='wide';if(sidebarOpen!==desired){sidebarOpen=desired;updateSidebar(false);}}
- const workspace=workspaces.find(w=>w.id===activeWorkspace)||workspaces[0];
+ const workspace=workspaces.find(w=>w.id===activeWorkspace)||{id:activeWorkspace,name:clientWorkspaceNames.get(activeWorkspace)||'Client Workspace',emoji:'▦'};
  $('current-workspace').textContent=workspace.emoji+'  '+workspace.name;
+ document.body.classList.toggle('client-zone-hub',activeWorkspace==='client-work-area');
+ renderClientFavorites();
  // Ensure the experimental entry is visible even if an older saved workspace list was restored.
  if(!workspaces.some(w=>w.id==='dual'))workspaces.push({id:'dual',name:'Dual Workspace (Test)',emoji:'◫'});
  const container=$('workspaces');container.replaceChildren();
+ $('client-work-area').replaceChildren();
+
  console.info('[Hexora Dual Workspace]',{workspaceIds:workspaces.map(w=>w.id),savedIds:(()=>{try{return JSON.parse(localStorage.getItem('hexora-workspace-settings')||'{}').workspaces?.map(w=>w.id)||[];}catch{return ['invalid saved JSON'];}})(),renderedAt:Date.now()});
  for(const w of orderSidebarItems(workspaces,sidebarWorkspaceOrderKey,w=>w.id)){
   const el=document.createElement('button');el.className='workspace'+(w.id===activeWorkspace?' selected':'');
@@ -230,11 +278,11 @@ function render(p){
   const label=document.createElement('span');label.className='name';label.textContent=w.name;
   const count=document.createElement('span');count.className='count';count.textContent=p.counts.find(x=>x.workspace===w.id)?.count||0;
   const edit=document.createElement('span');edit.className='workspace-edit';edit.title='Edit workspace';edit.textContent='⋯';edit.onclick=e=>{e.stopPropagation();openWorkspaceEditor(w.id);};
-  el.append(symbol,label,count,edit);attachWorkspaceHoverTip(el,w,Number(count.textContent)||0);el.addEventListener('contextmenu',e=>showWorkspaceMenu(e,w));el.onclick=async()=>{activeWorkspace=w.id;offset=0;save();await action('switch-workspace',w.id);if(w.id==='dual'){await action('dual-setup');await action('dual-mirror');}refresh();};enableSidebarDrag(el,w.id,sidebarWorkspaceOrderKey);container.append(el);
+  el.append(symbol,label,count,edit);attachWorkspaceHoverTip(el,w,Number(count.textContent)||0);el.addEventListener('contextmenu',e=>showWorkspaceMenu(e,w));el.onclick=async()=>{activeWorkspace=w.id;offset=0;save();await action('switch-workspace',w.id);if(w.id==='dual'){await action('dual-setup');await action('dual-mirror');}refresh();};if(w.id==='client-work-area'){$('client-work-area').append(el);}else{enableSidebarDrag(el,w.id,sidebarWorkspaceOrderKey);container.append(el);}
  }
  const conversations=$('conversations');conversations.replaceChildren();
- renderStackTree(conversations,p);
- for(const item of p.tabs){
+ if(activeWorkspace!=='client-work-area')renderStackTree(conversations,p);
+ for(const item of (activeWorkspace==='client-work-area'?[]:p.tabs)){
   const el=document.createElement('button');el.className='chat-row'+(item.active?' active':'');
   const symbol=document.createElement('span');symbol.className='symbol';symbol.textContent=item.nativeCodeProjectMissing?'⚠':item.nativeCode?'⌘':item.suspended?'☾':'▤';
   const name=document.createElement('span');name.className='label';name.textContent=item.title||'New tab';
@@ -249,8 +297,14 @@ function render(p){
  const pos=document.createElement('span');pos.textContent=p.tabs.length?(offset+1)+'–'+(offset+p.tabs.length):'No tabs';nav.append(prev,pos,next);conversations.append(nav);
  // Quick Jump lives outside the collapsible conversations list.
  renderQuickJumps();
- renderSecondTabRow(p);
- renderTabRow($('tabs'),p,null);
+ if(activeWorkspace==='client-work-area'){
+  $('tabs').replaceChildren();
+  delete $('tabs').dataset.rowSignature;
+  $('stack-rows').replaceChildren();
+ }else{
+  renderSecondTabRow(p);
+  renderTabRow($('tabs'),p,null);
+ }
  $('tabs').classList.toggle('compact-titles', $('tabs').querySelectorAll(':scope > .tab').length>=11);
   $('native-code-rail').classList.toggle('selected',!!p.active&&/^hexora-native:\/\/vscode(?:\/\d+)?$/.test(p.active.url));
 }

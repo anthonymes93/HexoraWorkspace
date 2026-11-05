@@ -52,7 +52,7 @@ function nativeCodeCommand(message,tabId=activeId){
 function nativeCodeBounds(tabId=activeId){
  if(!win||win.isDestroyed()||!nativeCodeHosts.get(tabId)?.ready)return;
  const [w,h]=win.getContentSize();
- nativeCodeCommand('RECT '+sidebarWidth+' '+(TOP_HEIGHT+(compactFrame?0:MAIN_TITLEBAR_HEIGHT))+' '+Math.max(1,w-sidebarWidth)+' '+Math.max(1,h-TOP_HEIGHT-(compactFrame?0:MAIN_TITLEBAR_HEIGHT)),tabId);
+ nativeCodeCommand('RECT '+sidebarWidth+' '+(TOP_HEIGHT+MAIN_TITLEBAR_HEIGHT)+' '+Math.max(1,w-sidebarWidth)+' '+Math.max(1,h-TOP_HEIGHT-MAIN_TITLEBAR_HEIGHT),tabId);
 }
 let nativeCodeLifecycleTimer=null;
 function scheduleNativeCodeLifecycle(reason){
@@ -116,6 +116,7 @@ function savedDetachedIds(){try{const values=JSON.parse(store.getMeta(LAYOUT_KEY
 function setDetachedSaved(id,present){const ids=new Set(savedDetachedIds());if(present)ids.add(id);else ids.delete(id);store.setMeta(LAYOUT_KEY,JSON.stringify([...ids]));}
 let dualPopupHandler=null;
 let tabLoadingOverlay=null,tabLoadingFor=null,tabLoadingTimer=null;
+let clientZoneView=null,clientZoneVisible=false,demoAlertView=null;
 let mainViewport=null,win,store,activeId=null,sidebarWidth=324,live=new Map(),favicons=new Map(),loading=new Map(),stateTimer=null,modalVisible=false,notificationsOpen=false,quickToastOpen=false,recoveryPassword=null,recoveryDir=null,recoveryTimer=null,recoveryBusy=false,lastBackup=null;
 const extensionPartition='persist:hexora-chatgpt';
 let deepLinkReady=false;
@@ -344,9 +345,11 @@ const HEXORA_SCROLLBAR_PALETTES={
 };
 let websiteScrollbarTheme={theme:'classic',color:'blue'};
 function scrollbarColors(){
+ // Keep Omega Blue's website scrollbar consistent with the dark blue frame.
+ if(websiteScrollbarTheme.theme==='omega'&&websiteScrollbarTheme.color==='blue')return HEXORA_SCROLLBAR_PALETTES.blue;
  return websiteScrollbarTheme.theme==='omega'
   ?(websiteScrollbarTheme.thumb&&websiteScrollbarTheme.hover?[websiteScrollbarTheme.thumb,websiteScrollbarTheme.hover]:HEXORA_SCROLLBAR_PALETTES[websiteScrollbarTheme.color]||HEXORA_SCROLLBAR_PALETTES.blue)
-  :['#405a9b','#628ce4'];
+  :['#1c347f','#405a9b'];
 }
 function websiteScrollbarCSS(){
  const [base,hover]=scrollbarColors();
@@ -505,12 +508,235 @@ function hideNewTabLoader(id){
 }
 // Clip the native web view to the available viewport while keeping its internal layout stable.
 // The right edge stays anchored to the window; the left portion is revealed/hidden by the panel.
+const desktopAlerts=new Map();
+let preservingAlertsForQuit=false;
+function saveDesktopAlerts(){
+ if(preservingAlertsForQuit||!store)return;
+ const alerts=[...desktopAlerts.values()].filter(r=>!r.window.isDestroyed()).map(r=>{
+  const display=screen.getAllDisplays().find(d=>d.id===r.dockDisplayId)||screen.getDisplayMatching(r.window.getBounds());
+  return {docked:r.docked,displayId:String(display.id),bounds:r.window.getBounds(),
+   vertical:dockVerticalPositions.get(display.id)||'top',horizontal:dockHorizontalPositions.get(display.id)||'left'};
+ });
+ store.setMeta('desktop-alerts:session',JSON.stringify(alerts));
+}
+function restoreDesktopAlerts(){
+ let saved=[];try{saved=JSON.parse(store.getMeta('desktop-alerts:session')||'[]');}catch{}
+ if(!Array.isArray(saved))return;
+ for(const item of saved.slice(0,30)){
+  if(!item||typeof item!=='object')continue;
+  const displays=screen.getAllDisplays();
+  const display=displays.find(d=>String(d.id)===item.displayId)||screen.getPrimaryDisplay();
+  dockVerticalPositions.set(display.id,item.vertical==='bottom'?'bottom':'top');
+  dockHorizontalPositions.set(display.id,item.horizontal==='right'?'right':'left');
+  openDemoAlert({restore:item,display});
+ }
+}
+app.on('before-quit',()=>{saveDesktopAlerts();preservingAlertsForQuit=true;});
+
+const dockIconStrips=new Map();
+const dockVerticalPositions=new Map();
+const dockHorizontalPositions=new Map();
+let dockSettingsWindow=null;
+function dockDisplays(){
+ return screen.getAllDisplays().sort((a,b)=>a.bounds.x-b.bounds.x||a.bounds.y-b.bounds.y);
+}
+function dockDisplayOrder(){
+ const displays=dockDisplays();
+ let saved=[];try{saved=JSON.parse(store.getMeta('dock:monitor-order')||'[]');}catch{}
+ if(!Array.isArray(saved))saved=[];
+ const lookup=new Map(displays.map(d=>[String(d.id),d]));
+ const ordered=[],seen=new Set();
+ for(const id of saved){const key=String(id);if(lookup.has(key)&&!seen.has(key)){ordered.push(lookup.get(key));seen.add(key);}}
+ return ordered.concat(displays.filter(d=>!seen.has(String(d.id))));
+}
+function openDockSettings(){
+ if(dockSettingsWindow&&!dockSettingsWindow.isDestroyed()){dockSettingsWindow.show();dockSettingsWindow.focus();return true;}
+ const popup=new BrowserWindow({width:430,height:520,minWidth:390,minHeight:400,title:'Hexora · Dock monitor order',backgroundColor:'#1c1a2b',autoHideMenuBar:true,
+  webPreferences:{sandbox:true,contextIsolation:true,nodeIntegration:false,preload:path.join(__dirname,'dock-monitor-settings-preload.js')}});
+ dockSettingsWindow=popup;
+ popup.on('closed',()=>{if(dockSettingsWindow===popup)dockSettingsWindow=null;});
+ popup.loadFile(path.join(__dirname,'dock-monitor-settings.html')).catch(console.error);
+ return true;
+}
+ipcMain.handle('dock-settings:get',event=>{
+ if(event.sender!==dockSettingsWindow?.webContents)throw Error('Unauthorized settings request');
+ return {displays:dockDisplays().map((d,i)=>({id:String(d.id),label:'Screen '+(i+1)+' · '+d.bounds.width+' × '+d.bounds.height})),order:dockDisplayOrder().map(d=>String(d.id))};
+});
+ipcMain.handle('dock-settings:save',(event,ids)=>{
+ if(event.sender!==dockSettingsWindow?.webContents)throw Error('Unauthorized settings request');
+ const actual=dockDisplays().map(d=>String(d.id));
+ if(!Array.isArray(ids)||ids.length!==actual.length||new Set(ids).size!==actual.length||!ids.every(id=>typeof id==='string'&&actual.includes(id)))throw Error('Select each connected screen exactly once.');
+ store.setMeta('dock:monitor-order',JSON.stringify(ids));return true;
+});
+ipcMain.on('dock-settings:close',event=>{if(event.sender===dockSettingsWindow?.webContents)dockSettingsWindow.close();});
+
+const dockStripHeight=40,dockStripGap=8;
+let desktopAlertSequence=0;
+const alertExpandedSize={width:560,height:540},alertDockSize={width:300,height:108};
+function alertDisplay(record){return screen.getDisplayMatching(record.window.getBounds());}
+function alertCenter(display){const a=display.workArea;return{x:Math.round(a.x+(a.width-alertExpandedSize.width)/2),y:Math.round(a.y+(a.height-alertExpandedSize.height)/2),...alertExpandedSize};}
+function animateAlert(record,target){
+ const popup=record.window;if(popup.isDestroyed())return;
+ clearInterval(record.animation);
+ const initial=popup.getBounds(),started=Date.now(),duration=300;
+ record.animation=setInterval(()=>{
+  if(popup.isDestroyed()){clearInterval(record.animation);return;}
+  const t=Math.min(1,(Date.now()-started)/duration),ease=1-Math.pow(1-t,3),bounds={};
+  for(const key of ['x','y','width','height'])bounds[key]=Math.round(initial[key]+(target[key]-initial[key])*ease);
+  popup.setBounds(bounds,false);
+  if(t===1){clearInterval(record.animation);record.animation=null;}
+ },16);
+}
+function layoutDockedAlerts(){
+ const groups=new Map();
+ for(const record of desktopAlerts.values()){
+  if(!record.docked||record.window.isDestroyed())continue;
+  const display=screen.getAllDisplays().find(d=>d.id===record.dockDisplayId)||screen.getDisplayMatching(record.window.getBounds());
+  const group=groups.get(display.id)||[];group.push(record);groups.set(display.id,group);
+ }
+ for(const [displayId,strip] of dockIconStrips){
+  if(!groups.has(displayId)){dockIconStrips.delete(displayId);if(!strip.isDestroyed())strip.close();}
+ }
+ for(const [displayId,group] of groups){
+  const area=(screen.getAllDisplays().find(d=>d.id===displayId)||alertDisplay(group[0])).workArea;
+  let strip=dockIconStrips.get(displayId);
+  if(!strip||strip.isDestroyed()){
+   strip=new BrowserWindow({width:alertDockSize.width,height:dockStripHeight,x:area.x+12,y:area.y+12,
+    frame:false,transparent:true,show:false,alwaysOnTop:true,skipTaskbar:true,
+    resizable:false,minimizable:false,maximizable:false,focusable:true,
+    backgroundColor:'#00000000',webPreferences:{sandbox:true,contextIsolation:true,nodeIntegration:false,preload:path.join(__dirname,'dock-icon-strip-preload.js')}});
+   dockIconStrips.set(displayId,strip);
+   strip.setAlwaysOnTop(true,'floating');
+   strip.webContents.loadFile(path.join(__dirname,'dock-icon-strip.html')).then(()=>{if(!strip.isDestroyed()){strip.webContents.send('dock-strip:position',dockVerticalPositions.get(displayId)||'top');strip.showInactive();}}).catch(console.error);
+  }
+  const capacity=Math.max(1,Math.floor((area.height-dockStripHeight-dockStripGap-24)/(alertDockSize.height+10)));
+  const bottom=dockVerticalPositions.get(displayId)==='bottom';
+  const right=dockHorizontalPositions.get(displayId)==='right';
+  const edgeX=right?area.x+area.width-alertDockSize.width-12:area.x+12;
+  const firstColumnCount=Math.min(group.length,capacity);
+  const topY=area.y+12;
+  const bottomY=area.y+area.height-12;
+  const stripY=bottom?bottomY-dockStripHeight:firstColumnCount*(alertDockSize.height+10)+topY;
+  strip.setBounds({x:edgeX,y:stripY,width:alertDockSize.width,height:dockStripHeight});
+  group.forEach((record,index)=>{
+   const column=Math.floor(index/capacity),row=index%capacity;
+   const y=bottom?bottomY-dockStripHeight-dockStripGap-alertDockSize.height-row*(alertDockSize.height+10):topY+row*(alertDockSize.height+10);
+   animateAlert(record,{x:edgeX+(right?-1:1)*column*(alertDockSize.width+10),y,...alertDockSize});
+  });
+ }
+}
+ipcMain.on('dock-strip:move',(event,direction)=>{
+ const source=[...dockIconStrips.entries()].find(([,win])=>!win.isDestroyed()&&win.webContents===event.sender);
+ if(!source||![-1,1].includes(direction))return;
+ const displays=dockDisplayOrder();
+ if(displays.length<2)return;
+ const current=displays.findIndex(d=>d.id===source[0]);if(current<0)return;
+ const target=displays[(current+direction+displays.length)%displays.length];
+ for(const record of desktopAlerts.values()){
+  if(record.docked&&record.dockDisplayId===source[0])record.dockDisplayId=target.id;
+ }
+ layoutDockedAlerts();saveDesktopAlerts();
+});
+ipcMain.on('dock-strip:rotate',event=>{
+ const source=[...dockIconStrips.entries()].find(([,win])=>!win.isDestroyed()&&win.webContents===event.sender);
+ if(!source)return;
+ const id=source[0];
+ const bottom=dockVerticalPositions.get(id)==='bottom';
+ const right=dockHorizontalPositions.get(id)==='right';
+ // Clockwise: top-left → top-right → bottom-right → bottom-left.
+ if(!bottom&&!right)dockHorizontalPositions.set(id,'right');
+ else if(!bottom&&right)dockVerticalPositions.set(id,'bottom');
+ else if(bottom&&right)dockHorizontalPositions.set(id,'left');
+ else dockVerticalPositions.set(id,'top');
+ const strip=dockIconStrips.get(id);
+ if(strip&&!strip.isDestroyed())strip.webContents.send('dock-strip:position',dockVerticalPositions.get(id)||'top');
+ layoutDockedAlerts();saveDesktopAlerts();
+});
+ipcMain.on('dock-strip:vertical',event=>{
+ const source=[...dockIconStrips.entries()].find(([,win])=>!win.isDestroyed()&&win.webContents===event.sender);
+ if(!source)return;
+ const next=dockVerticalPositions.get(source[0])==='bottom'?'top':'bottom';
+ dockVerticalPositions.set(source[0],next);
+ event.sender.send('dock-strip:position',next);
+ layoutDockedAlerts();saveDesktopAlerts();
+});
+let closingAllDesktopAlerts=false;
+function closeDemoAlert(popup){
+ if(!popup||popup.isDestroyed())return;
+ const record=[...desktopAlerts.values()].find(item=>item.window===popup);
+ if(!record)return;
+ clearInterval(record.animation);
+ desktopAlerts.delete(record.webContentsId);
+ popup.close();
+ if(!closingAllDesktopAlerts){layoutDockedAlerts();saveDesktopAlerts();}
+}
+function closeAllDemoAlerts(){
+ closingAllDesktopAlerts=true;
+ try{
+  for(const record of [...desktopAlerts.values()]){
+   clearInterval(record.animation);
+   desktopAlerts.delete(record.webContentsId);
+   if(!record.window.isDestroyed())record.window.close();
+  }
+ }finally{
+  closingAllDesktopAlerts=false;
+  layoutDockedAlerts();
+  saveDesktopAlerts();
+ }
+}
+function openDemoAlert(options={}){
+ const display=options?.display||screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
+ const popup=new BrowserWindow({
+  ...alertCenter(display),frame:false,transparent:true,show:false,alwaysOnTop:true,
+  skipTaskbar:true,resizable:false,minimizable:false,maximizable:false,
+  backgroundColor:'#00000000',
+  webPreferences:{sandbox:true,contextIsolation:true,nodeIntegration:false,preload:path.join(__dirname,'demo-alert-preload.js')}
+ });
+ const record={window:popup,webContentsId:popup.webContents.id,docked:Boolean(options.restore?.docked),dockDisplayId:options.restore?.docked?display.id:null,animation:null};
+ desktopAlerts.set(popup.webContents.id,record);
+ popup.setAlwaysOnTop(true,'floating');
+ popup.on('closed',()=>{clearInterval(record.animation);desktopAlerts.delete(record.webContentsId);if(!closingAllDesktopAlerts){layoutDockedAlerts();saveDesktopAlerts();}});
+ popup.webContents.loadFile(path.join(__dirname,'demo-alert.html')).then(()=>{
+  if(!popup.isDestroyed()){
+   if(record.docked){popup.webContents.send('demo-alert:mode','docked');layoutDockedAlerts();popup.showInactive();}
+   else {const b=options.restore?.bounds,a=display.workArea;if(b&&Number.isFinite(b.x)&&Number.isFinite(b.y)&&Number.isFinite(b.width)&&Number.isFinite(b.height)){popup.setBounds({x:Math.max(a.x,Math.min(b.x,a.x+a.width-alertExpandedSize.width)),y:Math.max(a.y,Math.min(b.y,a.y+a.height-alertExpandedSize.height)),...alertExpandedSize});}popup.show();popup.focus();}
+   if(!options.restore)saveDesktopAlerts();
+  }
+ }).catch(error=>{console.error('[Demo alert]',error);closeDemoAlert(popup);});
+ return true;
+}
+ipcMain.on('demo-alert:close-menu',event=>{
+ const record=desktopAlerts.get(event.sender.id);
+ if(!record||!record.docked||record.window.isDestroyed())return;
+ Menu.buildFromTemplate([
+  {label:'Close alert',click:()=>closeDemoAlert(record.window)},
+  {type:'separator'},
+  {label:'Close all alerts',click:()=>{
+   closeAllDemoAlerts();
+  }}
+ ]).popup({window:record.window});
+});
+ipcMain.on('demo-alert:close',event=>{
+ const record=desktopAlerts.get(event.sender.id);if(record)closeDemoAlert(record.window);
+});
+ipcMain.on('demo-alert:dock',event=>{
+ const record=desktopAlerts.get(event.sender.id);if(!record||record.docked)return;
+ record.docked=true;record.dockDisplayId=screen.getDisplayMatching(record.window.getBounds()).id;event.sender.send('demo-alert:mode','docked');layoutDockedAlerts();saveDesktopAlerts();
+});
+ipcMain.on('demo-alert:expand',event=>{
+ const record=desktopAlerts.get(event.sender.id);if(!record||!record.docked)return;
+ record.docked=false;event.sender.send('demo-alert:mode','expanded');
+ animateAlert(record,alertCenter(alertDisplay(record)));layoutDockedAlerts();
+ record.window.show();record.window.focus();saveDesktopAlerts();
+});
 function bounds(){
  if(!win||win.isDestroyed()||!mainViewport)return;
  const [w,h]=win.getContentSize();
- const visibleWidth=Math.max(0,w-sidebarWidth-((notificationsOpen||quickToastOpen)?412:0)),visibleHeight=Math.max(0,h-TOP_HEIGHT-(compactFrame?0:MAIN_TITLEBAR_HEIGHT));
- mainViewport.setBounds({x:sidebarWidth,y:TOP_HEIGHT+(compactFrame?0:MAIN_TITLEBAR_HEIGHT),width:visibleWidth,height:visibleHeight});
+ const headerHeight=clientZoneVisible?42:TOP_HEIGHT;
+ const visibleWidth=Math.max(0,w-sidebarWidth-((notificationsOpen||quickToastOpen)?412:0)),visibleHeight=Math.max(0,h-headerHeight-MAIN_TITLEBAR_HEIGHT);
+ mainViewport.setBounds({x:sidebarWidth,y:headerHeight+MAIN_TITLEBAR_HEIGHT,width:visibleWidth,height:visibleHeight});
  if(tabLoadingOverlay)tabLoadingOverlay.setBounds({x:0,y:0,width:visibleWidth,height:visibleHeight});
+ if(clientZoneVisible&&clientZoneView)clientZoneView.setBounds({x:0,y:0,width:visibleWidth,height:visibleHeight});
  const view=live.get(activeId);
  if(view){
   // Fill the visible viewport exactly: no negative offsets, clipped gray gaps,
@@ -548,7 +774,45 @@ function pageRow(r){const codeProject=isCodeTab(r)?store.getCodeProject(r.id)?.p
  return{id:r.id,url:r.url,nativeCode:isCodeTab(r),nativeCodeProject:codeProject,nativeCodeProjectMissing:!!codeProject&&!fs.existsSync(codeProject),title:store.getMeta('tabCustomTitle:'+r.id)||r.title,workspace:r.workspace,pinned:!!r.pinned,muted:!!r.muted,lastActive:r.last_active,ordinal:r.ordinal,favicon:(favicons.get(r.id)?.origin===originOf(r.url)?favicons.get(r.id)?.url:null)||store.getMeta('favicon:'+originOf(r.url))||null,faviconFallback:(()=>{try{const u=new URL(r.url);return ['http:','https:'].includes(u.protocol)?u.origin+'/favicon.ico':null;}catch{return null;}})(),active:r.id===activeId,detached:detached.has(r.id),loading:!!loading.get(r.id),suspended:isCodeTab(r)?false:!live.has(r.id),chromeMode:chromeMode(r.id),panelMode:panelMode(r.id),panelPreference:panelPreference(r.id)};}
 function state(workspace='web',offset=0){const active=activeId?store.get(activeId):null;return{activeId,total:store.total(),counts:store.counts(),tabs:store.page(workspace,offset,50).map(pageRow),active:active?.workspace===workspace?active:null,activePanelMode:activeId?panelMode(activeId):'wide',stackData:store.stacks(workspace),offset};}
 function emit(){if(!win||win.isDestroyed())return;clearTimeout(stateTimer);stateTimer=setTimeout(()=>{if(!win||win.isDestroyed())return;win.webContents.send('tabs:changed');},70);}
+function showClientZone(){
+ if(!win||win.isDestroyed()||!mainViewport)return;
+ if(isCodeTab(store.get(activeId)))hideNativeCode(activeId);
+ for(const view of live.values())mainViewport.removeChildView(view);
+ if(!clientZoneView){
+  clientZoneView=new WebContentsView({webPreferences:{nodeIntegration:false,contextIsolation:true,sandbox:true,preload:path.join(__dirname,'client-zone-preload.js')}});
+  clientZoneView.webContents.loadFile(path.join(__dirname,'client-zone.html')).catch(err=>console.error('[Client Zone] load failed:',err));
+ }
+ mainViewport.addChildView(clientZoneView);
+ clientZoneVisible=true;bounds();emit();
+}
+function sleepClientWorkspace(workspace){
+ if(typeof workspace!=='string'||!workspace.startsWith('client:'))return {ok:false,reason:'not-client'};
+ const rows=store.page(workspace,0,100000);
+ // Detached windows and native VS Code hosts cannot be safely unloaded as ordinary web views.
+ if(rows.some(row=>detached.has(row.id)||isCodeTab(row)||nativeCodeHosts.has(row.id)))return {ok:false,reason:'detached-or-native'};
+ if(tabLoadingFor&&rows.some(row=>row.id===tabLoadingFor))hideNewTabLoader(tabLoadingFor);
+ for(const row of rows)discard(row.id);
+ showClientZone();
+ return {ok:true};
+}
+ipcMain.handle('client-zone:open',(event,id,name)=>{
+ if(!clientZoneView||event.sender!==clientZoneView.webContents)return false;
+ if(!/^[a-zA-Z0-9_-]{1,80}$/.test(id))return false;
+ const workspace='client:'+id;
+ const selected=Number(store.getMeta('workspaceActive:'+workspace));
+ const candidate=(selected&&store.get(selected)?.workspace===workspace?selected:null)||store.page(workspace,0,1)[0]?.id;
+ if(candidate)activate(candidate);else newTab(workspace);
+ win.webContents.send('client-zone:selected',{id,name:String(name).slice(0,120),workspace});
+ return true;
+});
+function hideClientZone(){
+ if(!clientZoneVisible)return;
+ clientZoneVisible=false;
+ if(clientZoneView&&mainViewport)mainViewport.removeChildView(clientZoneView);
+ bounds();
+}
 function activate(id){
+ hideClientZone();
  const row=store.get(Number(id));if(!row)return false;
  if(detached.has(row.id)){const popup=detached.get(row.id);if(!popup.isDestroyed()){if(popup.isMinimized())popup.restore();popup.focus();return true;}}
  if(isCodeTab(store.get(activeId))&&activeId!==row.id)hideNativeCode(activeId);
@@ -896,6 +1160,7 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
  restoreExtensions().catch(err=>console.error('Extension initialization failed:',err));
  store=new TabStore(dataDir);
  store.importLegacy(path.join(app.getPath('userData'),'hexora-tabs.json'));
+ restoreDesktopAlerts();
  // Apply any project saved by VS Code immediately before the prior shutdown,
  // before activating its native tab and regenerating its workspace file.
  syncNativeCodeProjects();
@@ -1269,6 +1534,9 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
  ipcMain.handle('tabs:lookup',(_e,id)=>{const row=store.get(Number(id));return row?pageRow(row):null;});
  ipcMain.handle('tabs:action',(event,action,arg)=>{
   const current=store.get(activeId);const wc=live.get(activeId)?.webContents;
+  if(action==='dock-settings:open')return openDockSettings();
+  if(action==='demo-alert:open')return openDemoAlert();
+  if(action==='sleep-client-workspace')return sleepClientWorkspace(arg);
   if(action==='dual-mirror')return openDualMirror();
   if(action==='dual-pair-get'){
    const row=store.get(Number(arg));
@@ -1324,6 +1592,7 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
   else if(action==='activate')activate(Number(arg));
   else if(action==='switch-workspace'){
    const workspace=typeof arg==='string'?arg:'web';
+   if(workspace==='client-work-area'){showClientZone();return true;}
    const selected=Number(store.getMeta('workspaceActive:'+workspace));
    const candidate=(selected&&store.get(selected)?.workspace===workspace?selected:null)||store.page(workspace,0,1)[0]?.id;
    if(candidate)activate(candidate);else newTab(workspace);
@@ -1509,6 +1778,27 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
  setInterval(sweep,60*1000).unref();
  syncNativeCodeProjects();
  setInterval(syncNativeCodeProjects,1000).unref();
+ let nativeCodeShutdownPending=false,nativeCodeShutdownReady=false;
+ win.on('close',event=>{
+  if(nativeCodeShutdownReady||nativeCodeShutdownPending||nativeCodeHosts.size===0)return;
+  event.preventDefault();
+  nativeCodeShutdownPending=true;
+  // A reparented VS Code HWND must be restored before Electron destroys its parent.
+  // Otherwise Windows can close the VS Code window along with Hexora.
+  const hosts=[...nativeCodeHosts.values()].map(entry=>entry.proc).filter(Boolean);
+  stopAllNativeCode();
+  Promise.all(hosts.map(proc=>new Promise(resolve=>{
+   if(proc.exitCode!==null||proc.signalCode!==null)return resolve();
+   const timeout=setTimeout(()=>{console.warn('[Native VS Code] Host detach timeout; keeping Hexora open to protect VS Code.');resolve(false);},5000);
+   proc.once('exit',()=>{clearTimeout(timeout);resolve(true);});
+   proc.once('error',()=>{clearTimeout(timeout);resolve(false);});
+  }))).then(results=>{
+   nativeCodeShutdownPending=false;
+   if(results.some(result=>result===false))return;
+   nativeCodeShutdownReady=true;
+   if(win&&!win.isDestroyed())win.close();
+  });
+ });
  win.on('closed',()=>{if(nativeCodeLifecycleTimer){clearTimeout(nativeCodeLifecycleTimer);nativeCodeLifecycleTimer=null;}quitting=true;if(nativeCodeInstaller&&nativeCodeInstaller.exitCode===null)nativeCodeInstaller.kill();stopAllNativeCode();for(const folder of [...extensionPopups.keys()])closeExtensionPopup(folder);if(sidebarAnimation)clearInterval(sidebarAnimation);for(const popup of detached.values())if(!popup.isDestroyed())popup.close();detached.clear();clearInterval(recoveryTimer);recoveryPassword=null;clearTimeout(stateTimer);win=null;for(const id of Array.from(live.keys()))discard(id);vault?.lock();tabStoreClosing=true;store.close();});
  // Register every IPC handler before the renderer can issue actions.
  const stopCornerGoogleGesture=require('./corner-google-gesture').startCornerGoogleGesture();

@@ -1,0 +1,1 @@
+'use strict';const {contextBridge,ipcRenderer}=require('electron');contextBridge.exposeInMainWorld('dockMonitorSettings',{get:()=>ipcRenderer.invoke('dock-settings:get'),save:order=>ipcRenderer.invoke('dock-settings:save',order),close:()=>ipcRenderer.send('dock-settings:close')});
