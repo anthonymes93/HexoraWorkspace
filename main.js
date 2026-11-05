@@ -566,7 +566,7 @@ function sleepClientWorkspace(workspace){
  if(typeof workspace!=='string'||!workspace.startsWith('client:'))return {ok:false,reason:'not-client'};
  const rows=store.page(workspace,0,100000);
  // Detached windows and native VS Code hosts cannot be safely unloaded as ordinary web views.
- if(rows.some(row=>detached.has(row.id)||nativeCodeHosts.has(row.id)))return {ok:false,reason:'detached-or-native'};
+ if(rows.some(row=>detached.has(row.id)||isCodeTab(row)||nativeCodeHosts.has(row.id)))return {ok:false,reason:'detached-or-native'};
  if(tabLoadingFor&&rows.some(row=>row.id===tabLoadingFor))hideNewTabLoader(tabLoadingFor);
  for(const row of rows)discard(row.id);
  showClientZone();
