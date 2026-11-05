@@ -924,6 +924,7 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
   console.info('[Hexora DEV] Electron development build; app:',app.getAppPath(),'; profile:',app.getPath('userData'));
  }
  mainViewport=new View();win.contentView.addChildView(mainViewport);
+ require('./dev-companion-state').manageWindow('main',win);
  require('./email-app').register(win);
  require('./pc-tv').register(win);
  // Preserve saved companion state when Electron exits for an automatic development restart.
@@ -944,6 +945,7 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
    console.info('[Hexora] Companion restore state:',{email:!!snapshot.email?.open,pcTv:!!snapshot.pcTv?.open});
    if(snapshot.email?.open)require('./email-app').restore(snapshot.email);
    if(snapshot.pcTv?.open)require('./pc-tv').restore(snapshot.pcTv);
+   companion.restoreStacking(snapshot);
   }catch(error){console.warn('[Hexora] Companion restore skipped:',error.message);}
  }
  win.on('focus',()=>{const entry=activeCodeEntry();if(entry?.ready&&entry.visible&&!entry.detached){nativeCodeCommand('TRACE HEXORA_FOCUS_BEFORE');nativeCodeCommand('RESTORE');nativeCodeCommand('RECOVER_Z');nativeCodeCommand('WATCH_MOUSE');}});win.on('blur',()=>{const entry=activeCodeEntry();if(entry?.ready&&entry.visible&&!entry.detached)nativeCodeCommand('DIAG HEXORA_BLUR');});win.on('resize',bounds);
