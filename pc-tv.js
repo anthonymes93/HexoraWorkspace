@@ -22,7 +22,7 @@ function open(){
   else if(input.key==='F11'){event.preventDefault();windowRef.setFullScreen(!windowRef.isFullScreen());}
  });
  // Match normal Hexora Chrome-compatible website identity.
- const ua=wc.getUserAgent().replace(/\\s+(?:Electron|hexora-workspace)\\/[^\\s]+/gi,'').replace(/\\s{2,}/g,' ').trim();
+ const ua=wc.getUserAgent().replace(/\s+(?:Electron|hexora-workspace)\/[^\s]+/gi,'').replace(/\s{2,}/g,' ').trim();
  wc.setUserAgent(ua);
  wc.setWindowOpenHandler(({url})=>{if(/^https:\/\//i.test(url))shell.openExternal(url);return {action:'deny'};});
  for(const event of ['did-navigate','did-navigate-in-page','page-title-updated','did-finish-load'])wc.on(event,notify);
