@@ -62,6 +62,7 @@ function open(restore=null){
  const display=screen.getAllDisplays().find(d=>d.id!==primary.id)||primary;
  const area=display.workArea;
  windowRef=new BrowserWindow({x:area.x+20,y:area.y+20,width:Math.max(700,Math.min(1500,area.width-40)),height:Math.max(450,Math.min(900,area.height-40)),minWidth:700,minHeight:450,backgroundColor:'#080b13',title:'Hexora · PC TV',titleBarStyle:'hidden',titleBarOverlay:{color:'#0d1019',symbolColor:'#939aad',height:30},autoHideMenuBar:true,webPreferences:{preload:path.join(__dirname,'pc-tv-preload.js'),sandbox:true,contextIsolation:true,nodeIntegration:false}});
+ companion.manageWindow('pcTv',windowRef);
  companion.restoreBounds(windowRef,restore);
  if(restore?.maximized)windowRef.maximize();
  windowRef.loadFile(path.join(__dirname,'pc-tv.html'));
