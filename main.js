@@ -52,7 +52,7 @@ function nativeCodeCommand(message,tabId=activeId){
 function nativeCodeBounds(tabId=activeId){
  if(!win||win.isDestroyed()||!nativeCodeHosts.get(tabId)?.ready)return;
  const [w,h]=win.getContentSize();
- nativeCodeCommand('RECT '+sidebarWidth+' '+(TOP_HEIGHT+(compactFrame?0:MAIN_TITLEBAR_HEIGHT))+' '+Math.max(1,w-sidebarWidth)+' '+Math.max(1,h-TOP_HEIGHT-(compactFrame?0:MAIN_TITLEBAR_HEIGHT)),tabId);
+ nativeCodeCommand('RECT '+sidebarWidth+' '+(TOP_HEIGHT+MAIN_TITLEBAR_HEIGHT)+' '+Math.max(1,w-sidebarWidth)+' '+Math.max(1,h-TOP_HEIGHT-MAIN_TITLEBAR_HEIGHT),tabId);
 }
 let nativeCodeLifecycleTimer=null;
 function scheduleNativeCodeLifecycle(reason){
@@ -733,8 +733,8 @@ function bounds(){
  if(!win||win.isDestroyed()||!mainViewport)return;
  const [w,h]=win.getContentSize();
  const headerHeight=clientZoneVisible?42:TOP_HEIGHT;
- const visibleWidth=Math.max(0,w-sidebarWidth-((notificationsOpen||quickToastOpen)?412:0)),visibleHeight=Math.max(0,h-headerHeight-(compactFrame?0:MAIN_TITLEBAR_HEIGHT));
- mainViewport.setBounds({x:sidebarWidth,y:headerHeight+(compactFrame?0:MAIN_TITLEBAR_HEIGHT),width:visibleWidth,height:visibleHeight});
+ const visibleWidth=Math.max(0,w-sidebarWidth-((notificationsOpen||quickToastOpen)?412:0)),visibleHeight=Math.max(0,h-headerHeight-MAIN_TITLEBAR_HEIGHT);
+ mainViewport.setBounds({x:sidebarWidth,y:headerHeight+MAIN_TITLEBAR_HEIGHT,width:visibleWidth,height:visibleHeight});
  if(tabLoadingOverlay)tabLoadingOverlay.setBounds({x:0,y:0,width:visibleWidth,height:visibleHeight});
  if(clientZoneVisible&&clientZoneView)clientZoneView.setBounds({x:0,y:0,width:visibleWidth,height:visibleHeight});
  const view=live.get(activeId);
