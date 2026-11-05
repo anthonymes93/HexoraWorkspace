@@ -14,3 +14,8 @@
 
 #tv-tabs .youtube-header-toggle{flex:0 0 auto;min-width:83px;max-width:none;color:#b8d5ff;border:1px solid #3b577b;background:#17263c;padding:3px 7px}
 #tv-tabs .youtube-header-toggle:hover{background:#243a58;color:#fff}
+
+/* Compact history controls, deliberately quieter than the active tab. */
+#tv-tabs .history-nav{flex:0 0 22px;min-width:22px;max-width:22px;padding:0;color:#8993aa;font-size:20px;line-height:20px;text-align:center}
+#tv-tabs .history-nav:hover:not(:disabled){color:#e9edff;background:#ffffff12}
+#tv-tabs .history-nav:disabled{opacity:.28;cursor:default}
