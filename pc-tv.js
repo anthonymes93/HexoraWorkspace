@@ -1,5 +1,5 @@
 'use strict';
-const {app,BrowserWindow,WebContentsView,ipcMain,screen,shell}=require('electron');
+const {app,BrowserWindow,WebContentsView,ipcMain,screen}=require('electron');
 const {tvTaskbarIdentity,applyTaskbarIdentity,DEV_APP_ID}=require('./taskbar-identity');
 const path=require('node:path');
 const companion=require('./dev-companion-state');
@@ -64,10 +64,18 @@ function createTab(url=HOME){
  const id=++serial;
  const v=new WebContentsView({webPreferences:{partition:PARTITION,sandbox:true,contextIsolation:true,nodeIntegration:false,webSecurity:true}});
  const wc=v.webContents;
- const ua=wc.getUserAgent().replace(/\s+(?:Electron|hexora-workspace)\/[^\s]+/gi,'').replace(/\s{2,}/g,' ').trim();
- wc.setUserAgent(ua);
+ // Keep the exact browser identity of regular Hexora tabs. Both views already
+ // use PARTITION, so their Google/YouTube cookies remain shared.
+ // Unlike ordinary tabs, PC TV previously changed only its User-Agent.
+
  wc.on('before-input-event',(event,input)=>{if(input.type!=='keyDown')return;if(input.key==='F10'){event.preventDefault();toggleControls(!controlsVisible);}else if(input.key==='F11'){event.preventDefault();windowRef.setFullScreen(!windowRef.isFullScreen());}});
- wc.setWindowOpenHandler(({url:target})=>{if(/^https:\/\//i.test(target))shell.openExternal(target);return {action:'deny'};});
+ // Sign-in popups must stay inside Hexora's shared persistent session,
+ // not launch an unrelated default-browser profile.
+ wc.setWindowOpenHandler(({url:target})=>{
+  if(!/^https:\/\//i.test(target))return {action:'deny'};
+  return {action:'allow',overrideBrowserWindowOptions:{width:540,height:750,autoHideMenuBar:true,
+   webPreferences:{partition:PARTITION,sandbox:true,contextIsolation:true,nodeIntegration:false,webSecurity:true}}};
+ });
  for(const event of ['did-navigate','did-navigate-in-page','page-title-updated','did-finish-load'])wc.on(event,notify);
  wc.on('did-finish-load',()=>{void syncYoutubeHeader(wc);});
  views.set(id,v);windowRef.contentView.addChildView(v);active=id;layout();notify();

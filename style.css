@@ -1150,3 +1150,17 @@ body.hexora-compact-frame .rail .logo{cursor:pointer}
 
 /* Only the literal screen-edge strip receives flick events; the rest of the blue frame stays draggable. */
 .frame-top-edge{position:absolute;top:0;left:0;right:132px;height:3px;-webkit-app-region:no-drag;pointer-events:auto;z-index:2}
+
+/* Keep the tab strip's scrollbar lane inside the blue header when the
+   workspace sidebar collapses and the native content viewport expands. */
+.tabsbar .tabs{
+  align-self:stretch;
+  align-items:flex-start;
+  min-height:0;
+  padding-top:4px;
+  padding-bottom:5px;
+  box-sizing:border-box;
+  overflow-x:auto;
+  overflow-y:hidden;
+}
+.tabsbar .tabs>.tab{flex-shrink:0}
