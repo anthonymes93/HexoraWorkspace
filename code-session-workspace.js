@@ -23,7 +23,7 @@ function workspaceForTab(userData,tabId,projectFolder){
  const tabDir=path.join(dir,'tab-'+tabId);
  fs.mkdirSync(tabDir,{recursive:true});
  const displayName=projectFolder
-  ? path.basename(path.normalize(projectFolder)).replace(/[<>:"/\\|?*\x00-\x1f]/g,'_').replace(/[. ]+$/g,'') || 'Project'
+  ? path.basename(path.normalize(projectFolder)).replace(/[<>:"|?*\x00-\x1f]/g,'_').replace(/[. ]+$/g,'') || 'Project'
   : 'Hexora';
  const workspace=path.join(tabDir,displayName+'.code-workspace');
  // Empty descriptors are intentional: new tabs can launch into their own
