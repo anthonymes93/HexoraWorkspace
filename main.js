@@ -633,7 +633,7 @@ ipcMain.on('dock-strip:move',(event,direction)=>{
  for(const record of desktopAlerts.values()){
   if(record.docked&&record.dockDisplayId===source[0])record.dockDisplayId=target.id;
  }
- layoutDockedAlerts();
+ layoutDockedAlerts();saveDesktopAlerts();
 });
 ipcMain.on('dock-strip:rotate',event=>{
  const source=[...dockIconStrips.entries()].find(([,win])=>!win.isDestroyed()&&win.webContents===event.sender);
@@ -648,7 +648,7 @@ ipcMain.on('dock-strip:rotate',event=>{
  else dockVerticalPositions.set(id,'top');
  const strip=dockIconStrips.get(id);
  if(strip&&!strip.isDestroyed())strip.webContents.send('dock-strip:position',dockVerticalPositions.get(id)||'top');
- layoutDockedAlerts();
+ layoutDockedAlerts();saveDesktopAlerts();
 });
 ipcMain.on('dock-strip:vertical',event=>{
  const source=[...dockIconStrips.entries()].find(([,win])=>!win.isDestroyed()&&win.webContents===event.sender);
@@ -656,7 +656,7 @@ ipcMain.on('dock-strip:vertical',event=>{
  const next=dockVerticalPositions.get(source[0])==='bottom'?'top':'bottom';
  dockVerticalPositions.set(source[0],next);
  event.sender.send('dock-strip:position',next);
- layoutDockedAlerts();
+ layoutDockedAlerts();saveDesktopAlerts();
 });
 function closeDemoAlert(popup){
  const record=desktopAlerts.get(popup?.webContents.id);if(!record)return;
