@@ -22,10 +22,10 @@ function state(){
 function notify(){if(windowRef&&!windowRef.isDestroyed()&&!windowRef.webContents.isLoadingMainFrame())windowRef.webContents.send('pctv:state',state());}
 function layout(){
  if(!windowRef||windowRef.isDestroyed())return;
- const [w,h]=windowRef.getContentSize(),top=controlsVisible?116:0;
+ const [w,h]=windowRef.getContentSize(),top=30;
  for(const [id,v] of views){v.setBounds({x:0,y:top,width:Math.max(1,w),height:Math.max(1,h-top)});v.setVisible(id===active);}
 }
-function toggleControls(show){controlsVisible=!!show;layout();notify();}
+function toggleControls(show){controlsVisible=!!show;notify();}
 function createTab(url=HOME){
  if(!windowRef||windowRef.isDestroyed())return;
  const id=++serial;
