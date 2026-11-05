@@ -529,20 +529,20 @@ function layoutDockedAlerts(){
  const groups=new Map();
  for(const record of desktopAlerts.values()){
   if(!record.docked||record.window.isDestroyed())continue;
-  const display=screen.getDisplayMatching(record.window.getBounds());
+  const display=screen.getAllDisplays().find(d=>d.id===record.dockDisplayId)||screen.getDisplayMatching(record.window.getBounds());
   const group=groups.get(display.id)||[];group.push(record);groups.set(display.id,group);
  }
  for(const [displayId,strip] of dockIconStrips){
   if(!groups.has(displayId)){dockIconStrips.delete(displayId);if(!strip.isDestroyed())strip.close();}
  }
  for(const [displayId,group] of groups){
-  const area=alertDisplay(group[0]).workArea;
+  const area=(screen.getAllDisplays().find(d=>d.id===displayId)||alertDisplay(group[0])).workArea;
   let strip=dockIconStrips.get(displayId);
   if(!strip||strip.isDestroyed()){
    strip=new BrowserWindow({width:alertDockSize.width,height:dockStripHeight,x:area.x+12,y:area.y+12,
     frame:false,transparent:true,show:false,alwaysOnTop:true,skipTaskbar:true,
-    resizable:false,minimizable:false,maximizable:false,focusable:false,
-    backgroundColor:'#00000000',webPreferences:{sandbox:true,contextIsolation:true,nodeIntegration:false}});
+    resizable:false,minimizable:false,maximizable:false,focusable:true,
+    backgroundColor:'#00000000',webPreferences:{sandbox:true,contextIsolation:true,nodeIntegration:false,preload:path.join(__dirname,'dock-icon-strip-preload.js')}});
    dockIconStrips.set(displayId,strip);
    strip.setAlwaysOnTop(true,'floating');
    strip.webContents.loadFile(path.join(__dirname,'dock-icon-strip.html')).then(()=>{if(!strip.isDestroyed())strip.showInactive();}).catch(console.error);
@@ -559,6 +559,22 @@ function layoutDockedAlerts(){
   });
  }
 }
+ipcMain.on('dock-strip:move',(event,direction)=>{
+ const source=[...dockIconStrips.entries()].find(([,win])=>!win.isDestroyed()&&win.webContents===event.sender);
+ if(!source||![-1,1].includes(direction))return;
+ const displays=screen.getAllDisplays().sort((a,b)=>a.bounds.x-b.bounds.x||a.bounds.y-b.bounds.y);
+ if(displays.length<2)return;
+ const current=displays.findIndex(d=>d.id===source[0]);if(current<0)return;
+ const target=displays[(current+direction+displays.length)%displays.length];
+ for(const record of desktopAlerts.values()){
+  if(record.docked&&record.dockDisplayId===source[0])record.dockDisplayId=target.id;
+ }
+ layoutDockedAlerts();
+});
+ipcMain.on('dock-strip:settings',event=>{
+ const source=[...dockIconStrips.values()].some(win=>!win.isDestroyed()&&win.webContents===event.sender);
+ if(source)console.log('[Dock] Settings placeholder clicked');
+});
 function closeDemoAlert(popup){
  const record=desktopAlerts.get(popup?.webContents.id);if(!record)return;
  clearInterval(record.animation);desktopAlerts.delete(popup.webContents.id);
@@ -573,7 +589,7 @@ function openDemoAlert(){
   backgroundColor:'#00000000',
   webPreferences:{sandbox:true,contextIsolation:true,nodeIntegration:false,preload:path.join(__dirname,'demo-alert-preload.js')}
  });
- const record={window:popup,docked:false,animation:null};
+ const record={window:popup,docked:false,dockDisplayId:null,animation:null};
  desktopAlerts.set(popup.webContents.id,record);
  popup.setAlwaysOnTop(true,'floating');
  popup.on('closed',()=>{clearInterval(record.animation);desktopAlerts.delete(popup.webContents.id);layoutDockedAlerts();});
@@ -587,7 +603,7 @@ ipcMain.on('demo-alert:close',event=>{
 });
 ipcMain.on('demo-alert:dock',event=>{
  const record=desktopAlerts.get(event.sender.id);if(!record||record.docked)return;
- record.docked=true;event.sender.send('demo-alert:mode','docked');layoutDockedAlerts();
+ record.docked=true;record.dockDisplayId=screen.getDisplayMatching(record.window.getBounds()).id;event.sender.send('demo-alert:mode','docked');layoutDockedAlerts();
 });
 ipcMain.on('demo-alert:expand',event=>{
  const record=desktopAlerts.get(event.sender.id);if(!record||!record.docked)return;
