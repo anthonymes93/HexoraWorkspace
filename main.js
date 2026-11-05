@@ -509,6 +509,7 @@ function hideNewTabLoader(id){
 const desktopAlerts=new Map();
 const dockIconStrips=new Map();
 const dockVerticalPositions=new Map();
+const dockHorizontalPositions=new Map();
 let dockSettingsWindow=null;
 function dockDisplays(){
  return screen.getAllDisplays().sort((a,b)=>a.bounds.x-b.bounds.x||a.bounds.y-b.bounds.y);
@@ -584,15 +585,17 @@ function layoutDockedAlerts(){
   }
   const capacity=Math.max(1,Math.floor((area.height-dockStripHeight-dockStripGap-24)/(alertDockSize.height+10)));
   const bottom=dockVerticalPositions.get(displayId)==='bottom';
+  const right=dockHorizontalPositions.get(displayId)==='right';
+  const edgeX=right?area.x+area.width-alertDockSize.width-12:area.x+12;
   const firstColumnCount=Math.min(group.length,capacity);
   const topY=area.y+12;
   const bottomY=area.y+area.height-12;
   const stripY=bottom?bottomY-dockStripHeight:firstColumnCount*(alertDockSize.height+10)+topY;
-  strip.setBounds({x:area.x+12,y:stripY,width:alertDockSize.width,height:dockStripHeight});
+  strip.setBounds({x:edgeX,y:stripY,width:alertDockSize.width,height:dockStripHeight});
   group.forEach((record,index)=>{
    const column=Math.floor(index/capacity),row=index%capacity;
    const y=bottom?bottomY-dockStripHeight-dockStripGap-alertDockSize.height-row*(alertDockSize.height+10):topY+row*(alertDockSize.height+10);
-   animateAlert(record,{x:area.x+12+column*(alertDockSize.width+10),y,...alertDockSize});
+   animateAlert(record,{x:edgeX+(right?-1:1)*column*(alertDockSize.width+10),y,...alertDockSize});
   });
  }
 }
@@ -606,6 +609,21 @@ ipcMain.on('dock-strip:move',(event,direction)=>{
  for(const record of desktopAlerts.values()){
   if(record.docked&&record.dockDisplayId===source[0])record.dockDisplayId=target.id;
  }
+ layoutDockedAlerts();
+});
+ipcMain.on('dock-strip:rotate',event=>{
+ const source=[...dockIconStrips.entries()].find(([,win])=>!win.isDestroyed()&&win.webContents===event.sender);
+ if(!source)return;
+ const id=source[0];
+ const bottom=dockVerticalPositions.get(id)==='bottom';
+ const right=dockHorizontalPositions.get(id)==='right';
+ // Clockwise: top-left → top-right → bottom-right → bottom-left.
+ if(!bottom&&!right)dockHorizontalPositions.set(id,'right');
+ else if(!bottom&&right)dockVerticalPositions.set(id,'bottom');
+ else if(bottom&&right)dockHorizontalPositions.set(id,'left');
+ else dockVerticalPositions.set(id,'top');
+ const strip=dockIconStrips.get(id);
+ if(strip&&!strip.isDestroyed())strip.webContents.send('dock-strip:position',dockVerticalPositions.get(id)||'top');
  layoutDockedAlerts();
 });
 ipcMain.on('dock-strip:vertical',event=>{
