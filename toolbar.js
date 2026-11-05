@@ -60,7 +60,7 @@ if(new URLSearchParams(window.location.search).get('hexoraDev')==='1'){
  const indicator=$('hexora-dev-indicator');
  if(indicator)indicator.hidden=false;
 }
-const workspaces=[{id:'client-work-area',name:'Client Work Area',emoji:'▦'},{id:'web',name:'Web Development',emoji:'◈'},{id:'business',name:'Business',emoji:'▤'},{id:'personal',name:'Personal',emoji:'☼'},{id:'ideas',name:'Ideas Lab',emoji:'✦'},{id:'dual',name:'Dual Workspace (Test)',emoji:'◫'}];
+const workspaces=[{id:'client-work-area',name:'Client Work Zone',emoji:'▦'},{id:'web',name:'Web Development',emoji:'◈'},{id:'business',name:'Business',emoji:'▤'},{id:'personal',name:'Personal',emoji:'☼'},{id:'ideas',name:'Ideas Lab',emoji:'✦'},{id:'dual',name:'Dual Workspace (Test)',emoji:'◫'}];
 const conversationsCollapsedKey='hexora-conversations-collapsed';
 function setConversationsCollapsed(collapsed){
  const list=document.getElementById('conversations'),toggle=document.getElementById('toggle-conversations');
@@ -205,7 +205,7 @@ function renderQuickJumps(){
  add.onclick=()=>showQuickJumpEditor().catch(err=>alert('Quick Jump: '+err.message));
  host.append(add);
 }
-try{const s=JSON.parse(localStorage.getItem('hexora-workspace-settings')||'{}');if(s.workspaces?.length){const saved=s.workspaces.filter(w=>w&&typeof w.id==='string');const additions=workspaces.filter(w=>!saved.some(existing=>existing.id===w.id));workspaces.splice(0,workspaces.length,...saved,...additions);}if(s.selected)activeWorkspace=s.selected;if(s.sidebarOpen===false)sidebarOpen=false;}catch{}
+try{const s=JSON.parse(localStorage.getItem('hexora-workspace-settings')||'{}');if(s.workspaces?.length){const saved=s.workspaces.filter(w=>w&&typeof w.id==='string');for(const w of saved){if(w.id==='client-work-area'&&w.name==='Client Work Area')w.name='Client Work Zone';}const additions=workspaces.filter(w=>!saved.some(existing=>existing.id===w.id));workspaces.splice(0,workspaces.length,...saved,...additions);}if(s.selected)activeWorkspace=s.selected;if(s.sidebarOpen===false)sidebarOpen=false;}catch{}
 const save=()=>localStorage.setItem('hexora-workspace-settings',JSON.stringify({workspaces,selected:activeWorkspace,sidebarOpen}));
 if(!workspaces.some(w=>w.id===activeWorkspace))activeWorkspace=workspaces[0].id;
 const action=(name,arg)=>window.hexora.action(name,arg);
