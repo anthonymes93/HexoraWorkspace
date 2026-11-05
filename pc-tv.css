@@ -7,3 +7,7 @@
 #tv-tabs .close-tab{flex:0 0 20px;min-width:20px;width:20px;padding:1px 4px;margin-left:-3px;color:#778094;font-size:15px}
 #tv-tabs .close-tab:hover{color:#fff;background:#a33945}
 #tv-tabs .new-tab{flex:0 0 25px;min-width:25px;padding:1px 4px;color:#8792b1;font-size:17px}
+
+/* The 30px strip replaces Windows' separate title bar. */
+#tv-tabs{-webkit-app-region:drag;padding-right:145px}
+#tv-tabs button{-webkit-app-region:no-drag}
