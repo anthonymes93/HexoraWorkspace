@@ -1,5 +1,6 @@
 const {contextBridge,ipcRenderer}=require('electron');
 contextBridge.exposeInMainWorld('hexora',{
+ notes:{request:(action,payload)=>ipcRenderer.invoke('notes:request',action,payload)},
  usageSnapshot:()=>ipcRenderer.invoke('usage:snapshot'),
  startPushwardAlarm:()=>ipcRenderer.invoke('pushward:alarm:start'),
  windowControl:action=>ipcRenderer.invoke('main-window:control',action),

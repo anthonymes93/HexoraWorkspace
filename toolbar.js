@@ -2064,3 +2064,5 @@ $('open-pc-tv')?.addEventListener('click',()=>window.hexora.pcTv.open().catch(er
 })();
 
 $('time-intelligence-rail')?.addEventListener('click',()=>window.hexora.action('time-intelligence:open').catch(console.error));
+
+$('notes-studio-rail')?.addEventListener('click',()=>window.hexora.action('notes-studio:open').catch(console.error));
