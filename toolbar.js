@@ -61,7 +61,7 @@ if(new URLSearchParams(window.location.search).get('hexoraDev')==='1'){
  if(indicator)indicator.hidden=false;
 }
 const workspaces=[{id:'client-work-area',name:'Client Work Zone',emoji:'▦'},{id:'web',name:'Web Development',emoji:'◈'},{id:'business',name:'Business',emoji:'▤'},{id:'personal',name:'Personal',emoji:'☼'},{id:'ideas',name:'Ideas Lab',emoji:'✦'},{id:'dual',name:'Dual Workspace (Test)',emoji:'◫'}];
-const clientWorkspaceNames=new Map();
+const clientWorkspaceNames=new Map(Object.entries((()=>{try{return JSON.parse(localStorage.getItem('hexora:client-workspace-names')||'{}');}catch{return {};}})()));
 const conversationsCollapsedKey='hexora-conversations-collapsed';
 function setConversationsCollapsed(collapsed){
  const list=document.getElementById('conversations'),toggle=document.getElementById('toggle-conversations');
@@ -212,7 +212,7 @@ if(!workspaces.some(w=>w.id===activeWorkspace))activeWorkspace=workspaces[0].id;
 const action=(name,arg)=>window.hexora.action(name,arg);
 window.hexora.onClientSelected(({workspace,name})=>{
  if(!workspace?.startsWith('client:'))return;
- activeWorkspace=workspace;clientWorkspaceNames.set(workspace,name||'Client');offset=0;save();refresh();
+ activeWorkspace=workspace;clientWorkspaceNames.set(workspace,name||'Client');localStorage.setItem('hexora:client-workspace-names',JSON.stringify(Object.fromEntries(clientWorkspaceNames)));offset=0;save();refresh();
 });
 
 if(activeWorkspace==='client-work-area')action('switch-workspace','client-work-area').catch(console.error);
