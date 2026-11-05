@@ -1,1 +1,1 @@
-'use strict';const {contextBridge,ipcRenderer}=require('electron');contextBridge.exposeInMainWorld('hexoraDemoAlert',{close:()=>ipcRenderer.send('demo-alert:close')});
+'use strict';const {contextBridge,ipcRenderer}=require('electron');contextBridge.exposeInMainWorld('hexoraDemoAlert',{close:()=>ipcRenderer.send('demo-alert:close'),dock:()=>ipcRenderer.send('demo-alert:dock'),expand:()=>ipcRenderer.send('demo-alert:expand'),onMode:callback=>ipcRenderer.on('demo-alert:mode',(_event,mode)=>callback(mode))});
