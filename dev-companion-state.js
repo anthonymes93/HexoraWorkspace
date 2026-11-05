@@ -4,7 +4,7 @@ const path=require('node:path');
 const {app}=require('electron');
 let restarting=false;
 const managedWindows=new Map();
-let restoringOrder=false;
+let restoringOrder=process.env.HEXORA_DEV_WATCH==='1';
 let restoreTimer=null;
 function markRestarting(){restarting=true;}
 function isRestarting(){return restarting;}
@@ -32,7 +32,11 @@ function restoreStacking(snapshot){
   for(const [,window] of ordered){if(window.isMinimized())continue;window.showInactive();}
   // Focus only the previously foreground window; do not make any window always-on-top.
   const foreground=ordered.at(-1)?.[1];
-  if(foreground&&!foreground.isDestroyed()&&!foreground.isMinimized())foreground.focus();
+  if(foreground&&!foreground.isDestroyed()&&!foreground.isMinimized()){
+   foreground.show();
+   foreground.moveTop();
+   foreground.focus();
+  }
   restoringOrder=false;
  },650);
 }
