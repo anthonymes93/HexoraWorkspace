@@ -1240,3 +1240,8 @@ body.hexora-compact-frame .rail{top:0!important}
 
 /* Compact mode has no 16px titlebar, so keep its workspace heading below the screen edge. */
 body.hexora-compact-frame .top-main>.top>div:first-child{transform:translateY(8px)}
+
+/* Reserve the micro titlebar in compact view so minimize/maximize/close are fully visible. */
+body.hexora-compact-frame .main-titlebar-drag{display:flex!important;height:16px!important}
+body.hexora-compact-frame .top-main,body.hexora-compact-frame .rail{top:16px!important}
+body.hexora-compact-frame .top-main>.top>div:first-child{transform:none}
