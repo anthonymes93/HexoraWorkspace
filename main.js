@@ -811,7 +811,9 @@ function hideClientZone(){
  if(clientZoneView&&mainViewport)mainViewport.removeChildView(clientZoneView);
  bounds();
 }
+let usageBeforeTabSwitch=null;
 function activate(id){
+ usageBeforeTabSwitch?.();
  hideClientZone();
  const row=store.get(Number(id));if(!row)return false;
  if(detached.has(row.id)){const popup=detached.get(row.id);if(!popup.isDestroyed()){if(popup.isMinimized())popup.restore();popup.focus();return true;}}
@@ -1233,6 +1235,7 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
  let timeDashboard=null;
  let usageData=(()=>{try{return JSON.parse(store.getMeta('usageTrackingV1')||'{}');}catch{return {};}})();
  let usageLast=Date.now();
+ usageBeforeTabSwitch=()=>usageFlush();
  const usageFlush=()=>{
   const now=Date.now(),elapsed=Math.max(0,Math.min(now-usageLast,15000));usageLast=now;
   const row=store.get(activeId);
@@ -1247,7 +1250,9 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
   usageData[key]=entry;
  };
  const saveUsage=()=>{usageFlush();store.setMeta('usageTrackingV1',JSON.stringify(usageData));};
- const usageTimer=setInterval(saveUsage,10000);
+ const usageTimer=setInterval(saveUsage,1000);
+ win.on('blur',saveUsage);
+ win.on('minimize',saveUsage);
  const usageSnapshot=()=>{saveUsage();return Object.values(usageData);};
  const openTimeDashboard=()=>{
   if(timeDashboard&&!timeDashboard.isDestroyed()){timeDashboard.show();timeDashboard.focus();return true;}
