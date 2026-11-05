@@ -930,9 +930,18 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
  if(isDevelopment&&process.env.HEXORA_DEV_WATCH==='1'){
   app.on('before-quit',()=>require('./dev-companion-state').markRestarting());
  }
- // Restore only after an automatic development watcher restart, never on normal launch.
- if(isDevelopment&&process.env.HEXORA_DEV_WATCH==='1'&&process.env.HEXORA_COMPANION_SNAPSHOT){
-  try{const snapshot=JSON.parse(process.env.HEXORA_COMPANION_SNAPSHOT);
+ // The watcher may restart Electron without successfully forwarding its snapshot.
+ // The persisted state is the fallback, so open companion windows survive that handoff.
+ if(isDevelopment&&process.env.HEXORA_DEV_WATCH==='1'){
+  try{
+   const companion=require('./dev-companion-state');
+   let snapshot=companion.read();
+   if(process.env.HEXORA_COMPANION_SNAPSHOT){
+    try{const passed=JSON.parse(process.env.HEXORA_COMPANION_SNAPSHOT);
+     if(passed&&typeof passed==='object')snapshot={...snapshot,...passed};
+    }catch(error){console.warn('[Hexora] Invalid watcher companion snapshot:',error.message);}
+   }
+   console.info('[Hexora] Companion restore state:',{email:!!snapshot.email?.open,pcTv:!!snapshot.pcTv?.open});
    if(snapshot.email?.open)require('./email-app').restore(snapshot.email);
    if(snapshot.pcTv?.open)require('./pc-tv').restore(snapshot.pcTv);
   }catch(error){console.warn('[Hexora] Companion restore skipped:',error.message);}
