@@ -1133,7 +1133,22 @@ tabStrip.addEventListener('drop',e=>{
 });
 
 // Right-click any tab to turn it into a website, or open a website in a separate tab.
-function hideTabMenu(restore=true){ $('tab-workspace-submenu').classList.add('hidden');$('tab-menu-move').setAttribute('aria-expanded','false'); const wasOpen=!$('tab-context-menu').classList.contains('hidden');$('tab-context-menu').classList.add('hidden');contextTab=null;if(wasOpen&&restore&&!websiteTarget)action('modal',false); }
+let tabMenuRequest=0,tabMenuPreview=null;
+function clearTabMenuPreview(){
+ if(tabMenuPreview){tabMenuPreview.remove();tabMenuPreview=null;}
+}
+function hideTabMenu(restore=true){
+ ++tabMenuRequest;
+ $('tab-workspace-submenu').classList.add('hidden');
+ $('tab-menu-move').setAttribute('aria-expanded','false');
+ const wasOpen=!$('tab-context-menu').classList.contains('hidden');
+ $('tab-context-menu').classList.add('hidden');
+ contextTab=null;
+ if(wasOpen&&restore&&!websiteTarget){
+  // Restore the native view before removing its temporary snapshot.
+  action('modal',false).finally(clearTabMenuPreview);
+ }else clearTabMenuPreview();
+}
 function ensureDualPairMenu(){
  let button=document.getElementById('hexora-dual-pair-menu');
  if(button)return button;
@@ -1152,15 +1167,33 @@ function ensureDualPairMenu(){
  $('tab-context-menu').append(button);
  return button;
 }
-function showTabMenu(x,y,item){
+async function showTabMenu(x,y,item){
+ const request=++tabMenuRequest;
  contextTab=item;
+ // A WebContentsView renders above toolbar HTML. Temporarily detach it for
+ // the context menu, but retain a frozen visual until the menu closes.
+ let preview=null;
+ try{preview=await action('tab-menu-preview');}catch(error){console.warn('[Hexora] Tab menu preview:',error);}
+ if(request!==tabMenuRequest||contextTab?.id!==item.id)return;
+ clearTabMenuPreview();
+ if(preview?.image&&preview.bounds){
+  const {x:left,y:top,width,height}=preview.bounds;
+  const image=document.createElement('img');
+  image.setAttribute('aria-hidden','true');
+  image.style.cssText='position:fixed;z-index:2;pointer-events:none;object-fit:fill;user-select:none;';
+  Object.assign(image.style,{left:left+'px',top:top+'px',width:width+'px',height:height+'px'});
+  image.src=preview.image;
+  document.body.append(image);
+  tabMenuPreview=image;
+ }
+ await action('modal',true);
+ if(request!==tabMenuRequest){await action('modal',false);clearTabMenuPreview();return;}
  const multi=selectedTabIds.size>1;
  $('tab-menu-close-selected').classList.toggle('hidden',!multi);
  $('tab-menu-close-selected').textContent='×  Close '+selectedTabIds.size+' selected tabs';
  $('tab-menu-current-title').textContent=item.title||'Untitled tab';
  $('tab-menu-url').value=item.nativeCode?'':item.url||'';
  $('tab-menu-url-error').textContent='';
- action('modal',true);
  $('tab-menu-chrome').textContent=item.chromeMode?'✓ Disable Chrome compatibility':'◉ Enable Chrome compatibility';
   $('tab-menu-chrome').disabled=!!item.nativeCode;
  const projectName=item.nativeCodeProject?.split(/[\\/]/).filter(Boolean).pop();
