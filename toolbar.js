@@ -209,6 +209,7 @@ try{const s=JSON.parse(localStorage.getItem('hexora-workspace-settings')||'{}');
 const save=()=>localStorage.setItem('hexora-workspace-settings',JSON.stringify({workspaces,selected:activeWorkspace,sidebarOpen}));
 if(!workspaces.some(w=>w.id===activeWorkspace))activeWorkspace=workspaces[0].id;
 const action=(name,arg)=>window.hexora.action(name,arg);
+if(activeWorkspace==='client-work-area')action('switch-workspace','client-work-area').catch(console.error);
 async function refresh(){
  if(tabPointer?.moving)return;
  if(refreshing){refreshPending=true;return;}refreshing=true;
