@@ -62,6 +62,30 @@ if(new URLSearchParams(window.location.search).get('hexoraDev')==='1'){
 }
 const workspaces=[{id:'client-work-area',name:'Client Work Zone',emoji:'▦'},{id:'web',name:'Web Development',emoji:'◈'},{id:'business',name:'Business',emoji:'▤'},{id:'personal',name:'Personal',emoji:'☼'},{id:'ideas',name:'Ideas Lab',emoji:'✦'},{id:'dual',name:'Dual Workspace (Test)',emoji:'◫'}];
 const clientWorkspaceNames=new Map(Object.entries((()=>{try{return JSON.parse(localStorage.getItem('hexora:client-workspace-names')||'{}');}catch{return {};}})()));
+const clientFavoritesKey='hexora:client-favorites:v1';
+function getClientFavorites(){try{const v=JSON.parse(localStorage.getItem(clientFavoritesKey)||'[]');return Array.isArray(v)?v.filter(id=>typeof id==='string'&&id.startsWith('client:')):[];}catch{return [];}}
+function renderClientFavorites(){
+ const host=$('client-favorites'),button=$('favorite-client');if(!host||!button)return;
+ const isClient=activeWorkspace.startsWith('client:');
+ button.hidden=!isClient;
+ const favorites=getClientFavorites();
+ button.textContent=favorites.includes(activeWorkspace)?'★ Favorited':'☆ Favorite client';
+ button.title=favorites.includes(activeWorkspace)?'Remove client from favorites':'Add client to sidebar favorites';
+ button.setAttribute('aria-pressed',String(isClient&&favorites.includes(activeWorkspace)));
+ host.replaceChildren();
+ for(const id of favorites){
+  const row=document.createElement('button');row.type='button';row.className='client-favorite'+(id===activeWorkspace?' selected':'');
+  row.textContent='★  '+(clientWorkspaceNames.get(id)||'Client');
+  row.onclick=async()=>{activeWorkspace=id;offset=0;save();await action('switch-workspace',id);refresh();};
+  host.append(row);
+ }
+}
+$('favorite-client')?.addEventListener('click',()=>{
+ if(!activeWorkspace.startsWith('client:'))return;
+ const current=getClientFavorites(),index=current.indexOf(activeWorkspace);
+ if(index>=0)current.splice(index,1);else current.push(activeWorkspace);
+ localStorage.setItem(clientFavoritesKey,JSON.stringify(current));renderClientFavorites();
+});
 const conversationsCollapsedKey='hexora-conversations-collapsed';
 function setConversationsCollapsed(collapsed){
  const list=document.getElementById('conversations'),toggle=document.getElementById('toggle-conversations');
@@ -228,6 +252,7 @@ function render(p){
  const workspace=workspaces.find(w=>w.id===activeWorkspace)||{id:activeWorkspace,name:clientWorkspaceNames.get(activeWorkspace)||'Client Workspace',emoji:'▦'};
  $('current-workspace').textContent=workspace.emoji+'  '+workspace.name;
  document.body.classList.toggle('client-zone-hub',activeWorkspace==='client-work-area');
+ renderClientFavorites();
  // Ensure the experimental entry is visible even if an older saved workspace list was restored.
  if(!workspaces.some(w=>w.id==='dual'))workspaces.push({id:'dual',name:'Dual Workspace (Test)',emoji:'◫'});
  const container=$('workspaces');container.replaceChildren();
