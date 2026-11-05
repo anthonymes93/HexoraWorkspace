@@ -1210,3 +1210,22 @@ body.hexora-compact-frame .tabsbar .tabs>.tab{
 body.hexora-compact-frame .tabsbar .tabs::-webkit-scrollbar{height:9px}
 body.hexora-compact-frame .tabsbar .tabs::-webkit-scrollbar-thumb{background:#b9c9ef;border-radius:6px}
 body.hexora-compact-frame .tabsbar .tabs::-webkit-scrollbar-track{background:#1c347f}
+
+/* Compact mode must not shrink tab cards to make room for the scroll lane. */
+body.hexora-compact-frame .tabsbar{align-items:stretch}
+body.hexora-compact-frame .tabsbar .tabs{
+ height:53px;
+ max-height:53px;
+ padding:0;
+ align-items:flex-start;
+ overflow-x:auto;
+ overflow-y:hidden;
+ scrollbar-width:thin;
+}
+body.hexora-compact-frame .tabsbar .tabs>.tab{
+ height:44px;
+ min-height:44px;
+ max-height:44px;
+ flex:0 0 auto;
+}
+body.hexora-compact-frame .tabsbar .tabs::-webkit-scrollbar{height:7px}
