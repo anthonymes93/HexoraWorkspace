@@ -116,7 +116,7 @@ function savedDetachedIds(){try{const values=JSON.parse(store.getMeta(LAYOUT_KEY
 function setDetachedSaved(id,present){const ids=new Set(savedDetachedIds());if(present)ids.add(id);else ids.delete(id);store.setMeta(LAYOUT_KEY,JSON.stringify([...ids]));}
 let dualPopupHandler=null;
 let tabLoadingOverlay=null,tabLoadingFor=null,tabLoadingTimer=null;
-let clientZoneView=null,clientZoneVisible=false;
+let clientZoneView=null,clientZoneVisible=false,demoAlertView=null;
 let mainViewport=null,win,store,activeId=null,sidebarWidth=324,live=new Map(),favicons=new Map(),loading=new Map(),stateTimer=null,modalVisible=false,notificationsOpen=false,quickToastOpen=false,recoveryPassword=null,recoveryDir=null,recoveryTimer=null,recoveryBusy=false,lastBackup=null;
 const extensionPartition='persist:hexora-chatgpt';
 let deepLinkReady=false;
@@ -506,6 +506,21 @@ function hideNewTabLoader(id){
 }
 // Clip the native web view to the available viewport while keeping its internal layout stable.
 // The right edge stays anchored to the window; the left portion is revealed/hidden by the panel.
+function closeDemoAlert(){
+ if(!demoAlertView)return;
+ const view=demoAlertView;demoAlertView=null;
+ try{mainViewport?.removeChildView(view);}catch{}
+ if(!view.webContents.isDestroyed())view.webContents.close();
+}
+function openDemoAlert(){
+ if(!mainViewport||!win||win.isDestroyed())return false;
+ if(demoAlertView){mainViewport.removeChildView(demoAlertView);mainViewport.addChildView(demoAlertView);return true;}
+ const view=new WebContentsView({webPreferences:{sandbox:true,contextIsolation:true,nodeIntegration:false,preload:path.join(__dirname,'demo-alert-preload.js')}});
+ demoAlertView=view;
+ view.webContents.loadFile(path.join(__dirname,'demo-alert.html')).catch(error=>{console.error('[Demo alert]',error);closeDemoAlert();});
+ mainViewport.addChildView(view);bounds();return true;
+}
+ipcMain.on('demo-alert:close',event=>{if(demoAlertView&&event.sender===demoAlertView.webContents)closeDemoAlert();});
 function bounds(){
  if(!win||win.isDestroyed()||!mainViewport)return;
  const [w,h]=win.getContentSize();
@@ -514,6 +529,7 @@ function bounds(){
  mainViewport.setBounds({x:sidebarWidth,y:headerHeight+(compactFrame?0:MAIN_TITLEBAR_HEIGHT),width:visibleWidth,height:visibleHeight});
  if(tabLoadingOverlay)tabLoadingOverlay.setBounds({x:0,y:0,width:visibleWidth,height:visibleHeight});
  if(clientZoneVisible&&clientZoneView)clientZoneView.setBounds({x:0,y:0,width:visibleWidth,height:visibleHeight});
+ if(demoAlertView)demoAlertView.setBounds({x:0,y:0,width:visibleWidth,height:visibleHeight});
  const view=live.get(activeId);
  if(view){
   // Fill the visible viewport exactly: no negative offsets, clipped gray gaps,
@@ -1310,6 +1326,7 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
  ipcMain.handle('tabs:lookup',(_e,id)=>{const row=store.get(Number(id));return row?pageRow(row):null;});
  ipcMain.handle('tabs:action',(event,action,arg)=>{
   const current=store.get(activeId);const wc=live.get(activeId)?.webContents;
+  if(action==='demo-alert:open')return openDemoAlert();
   if(action==='sleep-client-workspace')return sleepClientWorkspace(arg);
   if(action==='dual-mirror')return openDualMirror();
   if(action==='dual-pair-get'){
