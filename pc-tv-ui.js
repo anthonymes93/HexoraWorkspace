@@ -8,6 +8,7 @@ function paint(s){
   select.onclick=()=>command('select-tab',tab.id);tabs.append(select);
   const close=document.createElement('button');close.className='close-tab';close.textContent='×';close.title='Close tab';close.onclick=()=>command('close-tab',tab.id);tabs.append(close);
  }
+ const toggle=document.createElement('button');toggle.className='youtube-header-toggle';toggle.type='button';toggle.textContent=s.youtubeHeaderHidden?'Show YT bar':'Hide YT bar';toggle.title=s.youtubeHeaderHidden?'Show YouTube top bar':'Hide YouTube top bar';toggle.setAttribute('aria-pressed',String(!!s.youtubeHeaderHidden));toggle.onclick=()=>command('toggle-youtube-header');tabs.append(toggle);
  const add=document.createElement('button');add.className='new-tab';add.textContent='+';add.title='New YouTube tab';add.onclick=()=>command('new-tab');tabs.append(add);
 }
 
