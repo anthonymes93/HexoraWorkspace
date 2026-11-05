@@ -520,9 +520,9 @@ function openDemoAlert(){
  const popup=new BrowserWindow({
   width,height,x:Math.round(workArea.x+(workArea.width-width)/2),
   y:Math.round(workArea.y+(workArea.height-height)/2),
-  frame:false,transparent:false,show:false,alwaysOnTop:true,
+  frame:false,transparent:true,show:false,alwaysOnTop:true,
   skipTaskbar:true,resizable:false,minimizable:false,maximizable:false,
-  backgroundColor:'#10101b',
+  backgroundColor:'#00000000',
   webPreferences:{sandbox:true,contextIsolation:true,nodeIntegration:false,preload:path.join(__dirname,'demo-alert-preload.js')}
  });
  demoAlertView=popup;
