@@ -507,20 +507,35 @@ function hideNewTabLoader(id){
 // Clip the native web view to the available viewport while keeping its internal layout stable.
 // The right edge stays anchored to the window; the left portion is revealed/hidden by the panel.
 function closeDemoAlert(){
- if(!demoAlertView)return;
- const view=demoAlertView;demoAlertView=null;
- try{mainViewport?.removeChildView(view);}catch{}
- if(!view.webContents.isDestroyed())view.webContents.close();
+ const popup=demoAlertView;demoAlertView=null;
+ if(popup&&!popup.isDestroyed())popup.close();
 }
 function openDemoAlert(){
- if(!mainViewport||!win||win.isDestroyed())return false;
- if(demoAlertView){mainViewport.removeChildView(demoAlertView);mainViewport.addChildView(demoAlertView);return true;}
- const view=new WebContentsView({webPreferences:{sandbox:true,contextIsolation:true,nodeIntegration:false,preload:path.join(__dirname,'demo-alert-preload.js')}});
- demoAlertView=view;
- view.webContents.loadFile(path.join(__dirname,'demo-alert.html')).catch(error=>{console.error('[Demo alert]',error);closeDemoAlert();});
- mainViewport.addChildView(view);bounds();return true;
+ if(demoAlertView&&!demoAlertView.isDestroyed()){
+  if(demoAlertView.isMinimized())demoAlertView.restore();
+  demoAlertView.show();demoAlertView.focus();return true;
+ }
+ const display=screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
+ const {workArea}=display,width=560,height=540;
+ const popup=new BrowserWindow({
+  width,height,x:Math.round(workArea.x+(workArea.width-width)/2),
+  y:Math.round(workArea.y+(workArea.height-height)/2),
+  frame:false,transparent:false,show:false,alwaysOnTop:true,
+  skipTaskbar:true,resizable:false,minimizable:false,maximizable:false,
+  backgroundColor:'#10101b',
+  webPreferences:{sandbox:true,contextIsolation:true,nodeIntegration:false,preload:path.join(__dirname,'demo-alert-preload.js')}
+ });
+ demoAlertView=popup;
+ popup.setAlwaysOnTop(true,'floating');
+ popup.on('closed',()=>{if(demoAlertView===popup)demoAlertView=null;});
+ popup.webContents.loadFile(path.join(__dirname,'demo-alert.html')).then(()=>{
+  if(!popup.isDestroyed()){popup.show();popup.focus();}
+ }).catch(error=>{console.error('[Demo alert]',error);if(!popup.isDestroyed())popup.close();});
+ return true;
 }
-ipcMain.on('demo-alert:close',event=>{if(demoAlertView&&event.sender===demoAlertView.webContents)closeDemoAlert();});
+ipcMain.on('demo-alert:close',event=>{
+ if(demoAlertView&&!demoAlertView.isDestroyed()&&event.sender===demoAlertView.webContents)closeDemoAlert();
+});
 function bounds(){
  if(!win||win.isDestroyed()||!mainViewport)return;
  const [w,h]=win.getContentSize();
@@ -529,7 +544,6 @@ function bounds(){
  mainViewport.setBounds({x:sidebarWidth,y:headerHeight+(compactFrame?0:MAIN_TITLEBAR_HEIGHT),width:visibleWidth,height:visibleHeight});
  if(tabLoadingOverlay)tabLoadingOverlay.setBounds({x:0,y:0,width:visibleWidth,height:visibleHeight});
  if(clientZoneVisible&&clientZoneView)clientZoneView.setBounds({x:0,y:0,width:visibleWidth,height:visibleHeight});
- if(demoAlertView)demoAlertView.setBounds({x:0,y:0,width:visibleWidth,height:visibleHeight});
  const view=live.get(activeId);
  if(view){
   // Fill the visible viewport exactly: no negative offsets, clipped gray gaps,
