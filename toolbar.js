@@ -68,6 +68,7 @@ function renderClientFavorites(){
  const host=$('client-favorites'),button=$('favorite-client');if(!host||!button)return;
  const isClient=activeWorkspace.startsWith('client:');
  button.hidden=!isClient;
+ const sleepButton=$('sleep-client');if(sleepButton)sleepButton.hidden=!isClient;
  const favorites=getClientFavorites();
  button.textContent=favorites.includes(activeWorkspace)?'★ Favorited':'☆ Favorite client';
  button.title=favorites.includes(activeWorkspace)?'Remove client from favorites':'Add client to sidebar favorites';
@@ -80,6 +81,16 @@ function renderClientFavorites(){
   host.append(row);
  }
 }
+$('sleep-client')?.addEventListener('click',async()=>{
+ if(!activeWorkspace.startsWith('client:'))return;
+ const button=$('sleep-client');button.disabled=true;
+ try{
+  const result=await action('sleep-client-workspace',activeWorkspace);
+  if(!result?.ok){window.alert('Close detached or native VS Code windows in this client workspace before sleeping it.');return;}
+  activeWorkspace='client-work-area';offset=0;save();refresh();
+ }catch(error){console.error('Could not sleep client workspace',error);}
+ finally{button.disabled=false;}
+});
 $('favorite-client')?.addEventListener('click',()=>{
  if(!activeWorkspace.startsWith('client:'))return;
  const current=getClientFavorites(),index=current.indexOf(activeWorkspace);
