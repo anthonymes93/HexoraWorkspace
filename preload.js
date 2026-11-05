@@ -6,6 +6,7 @@ contextBridge.exposeInMainWorld('hexora',{
  nativeCode:{chooseProject:id=>ipcRenderer.invoke('native-code:choose-project',id),clearProject:id=>ipcRenderer.invoke('native-code:clear-project',id),repair:()=>ipcRenderer.invoke('native-code:repair'),toggle:()=>ipcRenderer.invoke('native-code:toggle'),detach:()=>ipcRenderer.invoke('native-code:detach'),onStopped:callback=>ipcRenderer.on('native-code:stopped',callback)},
  action:(name,arg)=>ipcRenderer.invoke('tabs:action',name,arg),
  email:{open:()=>ipcRenderer.invoke('email:open')},
+ pcTv:{open:()=>ipcRenderer.invoke('pctv:open')},
  page:(workspace,offset=0)=>ipcRenderer.invoke('tabs:page',{workspace,offset}),
  search:term=>ipcRenderer.invoke('tabs:search',term),
  lookupTab:id=>ipcRenderer.invoke('tabs:lookup',id),
