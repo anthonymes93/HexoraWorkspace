@@ -1181,3 +1181,8 @@ body.hexora-compact-frame .rail .logo{cursor:pointer}
 
 /* Client search hub retains the blue tab bar frame without browser tabs. */
 body.client-zone-hub .tabsbar #tabs,body.client-zone-hub .tabsbar #add-tab,body.client-zone-hub .tabsbar .nav,body.client-zone-hub .tabsbar #extension-actions{visibility:hidden;pointer-events:none}
+
+/* The Client Work Zone hub uses only the blue title row, not an empty tab strip. */
+body.client-zone-hub .top-main{height:42px}
+body.client-zone-hub .tabsbar{display:none}
+body.client-zone-hub #stack-rows{display:none}
