@@ -403,25 +403,26 @@ function wire(t){const view=new WebContentsView({webPreferences:{partition:'pers
  wc.on('did-start-loading',()=>{loading.set(t.id,true);emit();});
  wc.on('did-stop-loading',()=>{loading.delete(t.id);emit();if(tabLoadingFor===t.id)setTimeout(()=>hideNewTabLoader(t.id),180);});
 
- // Persist the top-level document scroll for each tab and exact URL.
- // Avoid storing form values or page content; only numeric x/y coordinates.
+ // Save top-level scroll per tab and URL. Wait for asynchronous page layout on restore.
  const scrollMetaKey='pageScroll:'+t.id;
- let scrollReady=false,scrollBusy=false,lastScroll='';
+ let scrollReady=false,scrollBusy=false,lastScroll='',restoreGeneration=0;
  const capturePageScroll=async()=>{
-  if(!scrollReady||scrollBusy||wc.isDestroyed()||!wc.getURL().startsWith('http'))return;
+  if(!scrollReady||scrollBusy||wc.isDestroyed()||!/^https?:/.test(wc.getURL()))return;
   scrollBusy=true;
   try{
+   const url=wc.getURL();
    const position=await wc.executeJavaScript('({x:window.scrollX,y:window.scrollY})',true);
-   if(!Number.isFinite(position?.x)||!Number.isFinite(position?.y))return;
-   const next=JSON.stringify({url:wc.getURL(),x:position.x,y:position.y});
+   if(url!==wc.getURL()||!Number.isFinite(position?.x)||!Number.isFinite(position?.y))return;
+   const next=JSON.stringify({url,x:position.x,y:position.y});
    if(next!==lastScroll){store.setMeta(scrollMetaKey,next);lastScroll=next;}
   }catch{}finally{scrollBusy=false;}
  };
  const scrollCaptureTimer=setInterval(()=>{
   if(activeId===t.id||detached.has(t.id))capturePageScroll();
- },650);
- wc.once('destroyed',()=>{clearInterval(scrollCaptureTimer);capturePageScroll();});
+ },250);
+ wc.once('destroyed',()=>clearInterval(scrollCaptureTimer));
  const restorePageScroll=()=>{
+  const generation=++restoreGeneration;
   scrollReady=false;
   let saved;
   try{saved=JSON.parse(store.getMeta(scrollMetaKey)||'null');}catch{}
@@ -430,12 +431,21 @@ function wire(t){const view=new WebContentsView({webPreferences:{partition:'pers
    lastScroll='';scrollReady=true;return;
   }
   lastScroll=JSON.stringify(saved);
-  // Retry briefly for pages whose content expands after DOM ready.
-  for(const delay of [100,450,1100,2200]){
-   setTimeout(()=>{
-    if(wc.isDestroyed()||wc.getURL()!==url)return;
-    wc.executeJavaScript('window.scrollTo('+Math.max(0,saved.x)+','+Math.max(0,saved.y)+')',true).catch(()=>{});
-    if(delay===2200)scrollReady=true;
+  const x=Math.max(0,saved.x),y=Math.max(0,saved.y);
+  if(x===0&&y===0){scrollReady=true;return;}
+  // Layout can expand several seconds after DOM ready. Never save the temporary
+  // top-of-page position while waiting, or it would replace the good snapshot.
+  const delays=[100,350,800,1600,3000,5000,8000,12000];
+  for(const delay of delays){
+   setTimeout(async()=>{
+    if(generation!==restoreGeneration||wc.isDestroyed()||wc.getURL()!==url)return;
+    try{
+     const result=await wc.executeJavaScript(
+      '(()=>{const x='+x+',y='+y+';window.scrollTo(x,y);return {x:window.scrollX,y:window.scrollY}})()',true);
+     if(generation!==restoreGeneration)return;
+     const reached=Math.abs(result.x-x)<3&&Math.abs(result.y-y)<3;
+     if(reached||delay===12000){scrollReady=true;restoreGeneration++;}
+    }catch{if(delay===12000){scrollReady=true;restoreGeneration++;}}
    },delay);
   }
  };
