@@ -1220,6 +1220,30 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
   },5200);
   return true;
  };
+ // A tiny, in-memory rolling matcher. Never store or log typed characters.
+ // Works across Chromium web tabs and Hexora UI, without intercepting typing.
+ const birthdayBuffers=new WeakMap();
+ const watchBirthdayTyping=(contents)=>{
+  if(!contents||contents.isDestroyed())return;
+  contents.on('before-input-event',(_event,input)=>{
+   if(input.type!=='keyDown'||input.isAutoRepeat||input.control||input.meta||input.alt)return;
+   if(!contents.isFocused())return;
+   const key=input.key;
+   if(key==='Backspace'){birthdayBuffers.set(contents,(birthdayBuffers.get(contents)||'').slice(0,-1));return;}
+   if(key==='Escape'||key==='Enter'||key==='Tab'){birthdayBuffers.set(contents,'');return;}
+   if(typeof key!=='string'||key.length!==1)return;
+   const next=((birthdayBuffers.get(contents)||'')+key.toLowerCase()).slice(-8);
+   birthdayBuffers.set(contents,next);
+   if(next==='birthday'){
+    birthdayBuffers.set(contents,'');
+    showCarCelebration();
+   }
+  });
+  contents.on('destroyed',()=>birthdayBuffers.delete(contents));
+ };
+ const {webContents:electronWebContents}=require('electron');
+ for(const contents of electronWebContents.getAllWebContents())watchBirthdayTyping(contents);
+ app.on('web-contents-created',(_event,contents)=>watchBirthdayTyping(contents));
  const syncCelebration=()=>{
   if(!celebrationWindow||celebrationWindow.isDestroyed()||!win||win.isDestroyed())return;
   if(win.isMinimized()){celebrationWindow.hide();return;}
