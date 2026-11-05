@@ -11,3 +11,6 @@
 /* The 30px strip replaces Windows' separate title bar. */
 #tv-tabs{-webkit-app-region:drag;padding-right:145px}
 #tv-tabs button{-webkit-app-region:no-drag}
+
+#tv-tabs .youtube-header-toggle{flex:0 0 auto;min-width:83px;max-width:none;color:#b8d5ff;border:1px solid #3b577b;background:#17263c;padding:3px 7px}
+#tv-tabs .youtube-header-toggle:hover{background:#243a58;color:#fff}
