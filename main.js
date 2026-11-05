@@ -1204,14 +1204,14 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
  if(store.getMeta('mainWindowMaximized')==='true')win.maximize();
  // Separate transparent child window renders above native WebContentsViews.
  let celebrationWindow=null,celebrationTimer=null;
- const showCarCelebration=()=>{
+ const showCarCelebration=(birthdayMode=false)=>{
   if(!win||win.isDestroyed())return false;
   if(celebrationTimer){clearTimeout(celebrationTimer);celebrationTimer=null;}
   if(celebrationWindow&&!celebrationWindow.isDestroyed()){celebrationWindow.close();celebrationWindow=null;}
   const b=win.getBounds();
   celebrationWindow=new BrowserWindow({parent:win,x:b.x,y:b.y,width:b.width,height:b.height,frame:false,transparent:true,show:false,focusable:false,skipTaskbar:true,resizable:false,movable:false,hasShadow:false,backgroundColor:'#00000000',webPreferences:{sandbox:true,contextIsolation:true,nodeIntegration:false}});
   celebrationWindow.setIgnoreMouseEvents(true,{forward:true});
-  celebrationWindow.loadFile('car-celebration.html').then(()=>{
+  celebrationWindow.loadFile('car-celebration.html',{query:birthdayMode?{mode:'birthday'}:{}}).then(()=>{
    if(celebrationWindow&&!celebrationWindow.isDestroyed()&&!win.isMinimized())celebrationWindow.showInactive();
   }).catch(error=>console.warn('[Hexora] Celebration overlay:',error));
   celebrationTimer=setTimeout(()=>{
@@ -1236,7 +1236,7 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
    birthdayBuffers.set(contents,next);
    if(next==='birthday'){
     birthdayBuffers.set(contents,'');
-    showCarCelebration();
+    showCarCelebration(true);
    }
   });
   contents.on('destroyed',()=>birthdayBuffers.delete(contents));
