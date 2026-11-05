@@ -562,6 +562,16 @@ function showClientZone(){
  mainViewport.addChildView(clientZoneView);
  clientZoneVisible=true;bounds();emit();
 }
+function sleepClientWorkspace(workspace){
+ if(typeof workspace!=='string'||!workspace.startsWith('client:'))return {ok:false,reason:'not-client'};
+ const rows=store.page(workspace,0,100000);
+ // Detached windows and native VS Code hosts cannot be safely unloaded as ordinary web views.
+ if(rows.some(row=>detached.has(row.id)||nativeCodeHosts.has(row.id)))return {ok:false,reason:'detached-or-native'};
+ if(tabLoadingFor&&rows.some(row=>row.id===tabLoadingFor))hideNewTabLoader(tabLoadingFor);
+ for(const row of rows)discard(row.id);
+ showClientZone();
+ return {ok:true};
+}
 ipcMain.handle('client-zone:open',(event,id,name)=>{
  if(!clientZoneView||event.sender!==clientZoneView.webContents)return false;
  if(!/^[a-zA-Z0-9_-]{1,80}$/.test(id))return false;
@@ -1300,6 +1310,7 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
  ipcMain.handle('tabs:lookup',(_e,id)=>{const row=store.get(Number(id));return row?pageRow(row):null;});
  ipcMain.handle('tabs:action',(event,action,arg)=>{
   const current=store.get(activeId);const wc=live.get(activeId)?.webContents;
+  if(action==='sleep-client-workspace')return sleepClientWorkspace(arg);
   if(action==='dual-mirror')return openDualMirror();
   if(action==='dual-pair-get'){
    const row=store.get(Number(arg));
