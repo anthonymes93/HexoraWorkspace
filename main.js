@@ -569,6 +569,11 @@ ipcMain.on('dock-strip:move',(event,direction)=>{
  if(displays.length<2)return;
  const current=displays.findIndex(d=>d.id===source[0]);if(current<0)return;
  const target=displays[(current+direction+displays.length)%displays.length];
+ // The dock's top/bottom position belongs to the moving stack, not its old monitor.
+ const position=dockVerticalPositions.get(source[0])||'top';
+ dockVerticalPositions.set(target.id,position);
+ const targetStrip=dockIconStrips.get(target.id);
+ if(targetStrip&&!targetStrip.isDestroyed())targetStrip.webContents.send('dock-strip:position',position);
  for(const record of desktopAlerts.values()){
   if(record.docked&&record.dockDisplayId===source[0])record.dockDisplayId=target.id;
  }
