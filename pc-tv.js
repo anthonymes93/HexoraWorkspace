@@ -16,6 +16,11 @@ function open(){
  windowRef.loadFile(path.join(__dirname,'pc-tv.html'));
  view=new WebContentsView({webPreferences:{partition:PARTITION,sandbox:true,contextIsolation:true,nodeIntegration:false,webSecurity:true}});
  const wc=view.webContents;
+ wc.on('before-input-event',(event,input)=>{
+  if(input.type!=='keyDown')return;
+  if(input.key==='F10'){event.preventDefault();toggleControls(!controlsVisible);}
+  else if(input.key==='F11'){event.preventDefault();windowRef.setFullScreen(!windowRef.isFullScreen());}
+ });
  // Match normal Hexora Chrome-compatible website identity.
  const ua=wc.getUserAgent().replace(/\\s+(?:Electron|hexora-workspace)\\/[^\\s]+/gi,'').replace(/\\s{2,}/g,' ').trim();
  wc.setUserAgent(ua);
