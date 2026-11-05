@@ -507,6 +507,8 @@ function hideNewTabLoader(id){
 // Clip the native web view to the available viewport while keeping its internal layout stable.
 // The right edge stays anchored to the window; the left portion is revealed/hidden by the panel.
 const desktopAlerts=new Map();
+const dockIconStrips=new Map();
+const dockStripHeight=40,dockStripGap=8;
 let desktopAlertSequence=0;
 const alertExpandedSize={width:560,height:540},alertDockSize={width:300,height:108};
 function alertDisplay(record){return screen.getDisplayMatching(record.window.getBounds());}
@@ -530,10 +532,28 @@ function layoutDockedAlerts(){
   const display=screen.getDisplayMatching(record.window.getBounds());
   const group=groups.get(display.id)||[];group.push(record);groups.set(display.id,group);
  }
- for(const group of groups.values()){
+ for(const [displayId,strip] of dockIconStrips){
+  if(!groups.has(displayId)){dockIconStrips.delete(displayId);if(!strip.isDestroyed())strip.close();}
+ }
+ for(const [displayId,group] of groups){
   const area=alertDisplay(group[0]).workArea;
+  let strip=dockIconStrips.get(displayId);
+  if(!strip||strip.isDestroyed()){
+   strip=new BrowserWindow({width:alertDockSize.width,height:dockStripHeight,x:area.x+12,y:area.y+12,
+    frame:false,transparent:true,show:false,alwaysOnTop:true,skipTaskbar:true,
+    resizable:false,minimizable:false,maximizable:false,focusable:false,
+    backgroundColor:'#00000000',webPreferences:{sandbox:true,contextIsolation:true,nodeIntegration:false}});
+   dockIconStrips.set(displayId,strip);
+   strip.setAlwaysOnTop(true,'floating');
+   strip.webContents.loadFile(path.join(__dirname,'dock-icon-strip.html')).then(()=>{if(!strip.isDestroyed())strip.showInactive();}).catch(console.error);
+  }
+  const capacity=Math.max(1,Math.floor((area.height-dockStripHeight-dockStripGap-24)/(alertDockSize.height+10)));
+  const firstColumnCount=Math.min(group.length,capacity);
+  const stripY=area.y+12+firstColumnCount*(alertDockSize.height+10);
+  strip.setBounds({x:area.x+12,y:Math.min(stripY,area.y+area.height-dockStripHeight-8),width:alertDockSize.width,height:dockStripHeight});
+
   group.forEach((record,index)=>{
-   const slot=Math.floor((area.height-12)/(alertDockSize.height+10));
+   const slot=Math.max(1,Math.floor((area.height-dockStripHeight-dockStripGap-24)/(alertDockSize.height+10)));
    const column=Math.floor(index/Math.max(1,slot)),row=index%Math.max(1,slot);
    animateAlert(record,{x:area.x+12+column*(alertDockSize.width+10),y:area.y+12+row*(alertDockSize.height+10),...alertDockSize});
   });
