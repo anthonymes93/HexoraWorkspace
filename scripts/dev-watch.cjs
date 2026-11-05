@@ -4,8 +4,10 @@
 const {spawn,execFileSync}=require('node:child_process');
 const path=require('node:path');
 const ROOT=path.resolve(__dirname,'..');
-const POLL_MS=12000;
+const RELAY_URL='wss://hexora-update-relay.itsme-bad.workers.dev/connect';
+const RECONNECT_MS=10000;
 let child=null,stopping=false,busy=false,lastHead='',lastDirty='',restartRequested=false;
+let socket=null,reconnectTimer=null;
 function git(...args){return execFileSync('git',args,{cwd:ROOT,encoding:'utf8',stdio:['ignore','pipe','pipe'],timeout:15000}).trim();}
 function log(message){console.log('[Hexora Dev] '+message);}
 function branch(){return git('branch','--show-current');}
@@ -80,9 +82,27 @@ async function poll(){
  }catch(err){log('Sync skipped: '+String(err.stderr||err.message).trim().slice(0,220));}
  finally{busy=false;}
 }
-async function shutdown(){if(stopping)return;stopping=true;clearInterval(timer);await stopChild();process.exit(0);}
+async function shutdown(){if(stopping)return;stopping=true;clearTimeout(reconnectTimer);if(socket)socket.close();await stopChild();process.exit(0);}
+function connect(){
+ if(stopping)return;
+ if(typeof WebSocket!=='function'){
+  log('This Node version lacks WebSocket support. Use Node 22+ for push updates.');return;
+ }
+ try{
+  const ws=new WebSocket(RELAY_URL);socket=ws;
+  ws.addEventListener('open',()=>{log('Connected to push relay');poll();});
+  ws.addEventListener('message',event=>{
+   try{const msg=JSON.parse(event.data);if(msg.type==='update'&&msg.branch===branch())poll();}catch{}
+  });
+  ws.addEventListener('error',()=>log('Relay connection error; will reconnect'));
+  ws.addEventListener('close',()=>{
+   if(socket===ws)socket=null;
+   if(!stopping)reconnectTimer=setTimeout(connect,RECONNECT_MS);
+  });
+ }catch(err){log('Relay unavailable: '+err.message);reconnectTimer=setTimeout(connect,RECONNECT_MS);}
+}
 process.on('SIGINT',shutdown);process.on('SIGTERM',shutdown);
 lastHead=head();
-log('Watching origin/'+branch()+' every '+POLL_MS/1000+' seconds. Your logins and local data stay in the existing Hexora profile.');
+log('Listening for push updates on '+branch()+'. Your logins and local data stay in the existing Hexora profile.');
 launch();
-const timer=setInterval(poll,POLL_MS);
+connect();
