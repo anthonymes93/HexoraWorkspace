@@ -559,7 +559,7 @@ function hideNewTabLoader(id){
 const desktopAlerts=new Map();
 let preservingAlertsForQuit=false;
 function saveDesktopAlerts(){
- if(preservingAlertsForQuit||!store)return;
+ if(preservingAlertsForQuit||tabStoreClosing||!store)return;
  const alerts=[...desktopAlerts.values()].filter(r=>!r.window.isDestroyed()).map(r=>{
   const display=screen.getAllDisplays().find(d=>d.id===r.dockDisplayId)||screen.getDisplayMatching(r.window.getBounds());
   return {docked:r.docked,displayId:String(display.id),bounds:r.window.getBounds(),
@@ -2001,7 +2001,7 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
    if(win&&!win.isDestroyed())win.close();
   });
  });
- win.on('closed',()=>{if(nativeCodeLifecycleTimer){clearTimeout(nativeCodeLifecycleTimer);nativeCodeLifecycleTimer=null;}quitting=true;if(nativeCodeInstaller&&nativeCodeInstaller.exitCode===null)nativeCodeInstaller.kill();stopAllNativeCode();for(const folder of [...extensionPopups.keys()])closeExtensionPopup(folder);if(sidebarAnimation)clearInterval(sidebarAnimation);for(const popup of detached.values())if(!popup.isDestroyed())popup.close();detached.clear();clearInterval(recoveryTimer);recoveryPassword=null;clearTimeout(stateTimer);win=null;for(const id of Array.from(live.keys()))discard(id);vault?.lock();tabStoreClosing=true;store.close();});
+ win.on('closed',()=>{saveDesktopAlerts();preservingAlertsForQuit=true;if(nativeCodeLifecycleTimer){clearTimeout(nativeCodeLifecycleTimer);nativeCodeLifecycleTimer=null;}quitting=true;if(nativeCodeInstaller&&nativeCodeInstaller.exitCode===null)nativeCodeInstaller.kill();stopAllNativeCode();for(const folder of [...extensionPopups.keys()])closeExtensionPopup(folder);if(sidebarAnimation)clearInterval(sidebarAnimation);for(const popup of detached.values())if(!popup.isDestroyed())popup.close();detached.clear();clearInterval(recoveryTimer);recoveryPassword=null;clearTimeout(stateTimer);win=null;for(const id of Array.from(live.keys()))discard(id);vault?.lock();tabStoreClosing=true;store.close();});
  // Register every IPC handler before the renderer can issue actions.
  const stopCornerGoogleGesture=require('./corner-google-gesture').startCornerGoogleGesture();
  win.once('closed',stopCornerGoogleGesture);
