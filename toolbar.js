@@ -2,6 +2,32 @@
 document.querySelectorAll('[data-window-action]').forEach(button=>button.addEventListener('click',()=>window.hexora.windowControl(button.dataset.windowAction)));
 const $=id=>document.getElementById(id);
 $('demo-alert-rail')?.addEventListener('click',()=>window.hexora.action('demo-alert:open').catch(console.error));
+const dockSettings=$('dock-monitor-settings');
+function closeDockSettings(){dockSettings.hidden=true;}
+$('dock-monitor-close').onclick=closeDockSettings;
+$('dock-monitor-cancel').onclick=closeDockSettings;
+dockSettings.addEventListener('click',event=>{if(event.target===dockSettings)closeDockSettings();});
+$('dock-settings-rail').addEventListener('click',async()=>{
+ try{
+  const {displays,order}=await window.hexora.action('dock:monitors-get');
+  const fields=$('dock-monitor-fields');fields.replaceChildren();
+  $('dock-monitor-error').textContent='';
+  order.forEach((id,i)=>{
+   const label=document.createElement('label');label.textContent='Position '+(i+1);
+   const select=document.createElement('select');select.className='dock-monitor-select';
+   for(const display of displays){const option=document.createElement('option');option.value=display.id;option.textContent=display.label;select.append(option);}
+   select.value=id;label.append(select);fields.append(label);
+  });
+  dockSettings.hidden=false;
+ }catch(error){console.error('Dock settings',error);}
+});
+$('dock-monitor-save').addEventListener('click',async()=>{
+ const order=[...document.querySelectorAll('.dock-monitor-select')].map(select=>select.value);
+ if(new Set(order).size!==order.length){$('dock-monitor-error').textContent='Each screen must appear only once.';return;}
+ try{await window.hexora.action('dock:monitors-set',order);closeDockSettings();}
+ catch(error){$('dock-monitor-error').textContent=error.message||'Could not save order.';}
+});
+
 /* A fast upward flick into the screen's top edge enters focus mode.
    A cursor parked at the edge never triggers; no click is needed. */
 let frameCompact=false;
