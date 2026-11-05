@@ -509,6 +509,40 @@ function hideNewTabLoader(id){
 const desktopAlerts=new Map();
 const dockIconStrips=new Map();
 const dockVerticalPositions=new Map();
+let dockSettingsWindow=null;
+function dockDisplays(){
+ return screen.getAllDisplays().sort((a,b)=>a.bounds.x-b.bounds.x||a.bounds.y-b.bounds.y);
+}
+function dockDisplayOrder(){
+ const displays=dockDisplays();
+ let saved=[];try{saved=JSON.parse(store.getMeta('dock:monitor-order')||'[]');}catch{}
+ if(!Array.isArray(saved))saved=[];
+ const lookup=new Map(displays.map(d=>[String(d.id),d]));
+ const ordered=[],seen=new Set();
+ for(const id of saved){const key=String(id);if(lookup.has(key)&&!seen.has(key)){ordered.push(lookup.get(key));seen.add(key);}}
+ return ordered.concat(displays.filter(d=>!seen.has(String(d.id))));
+}
+function openDockSettings(){
+ if(dockSettingsWindow&&!dockSettingsWindow.isDestroyed()){dockSettingsWindow.show();dockSettingsWindow.focus();return true;}
+ const popup=new BrowserWindow({width:430,height:520,minWidth:390,minHeight:400,title:'Hexora · Dock monitor order',backgroundColor:'#1c1a2b',autoHideMenuBar:true,
+  webPreferences:{sandbox:true,contextIsolation:true,nodeIntegration:false,preload:path.join(__dirname,'dock-monitor-settings-preload.js')}});
+ dockSettingsWindow=popup;
+ popup.on('closed',()=>{if(dockSettingsWindow===popup)dockSettingsWindow=null;});
+ popup.loadFile(path.join(__dirname,'dock-monitor-settings.html')).catch(console.error);
+ return true;
+}
+ipcMain.handle('dock-settings:get',event=>{
+ if(event.sender!==dockSettingsWindow?.webContents)throw Error('Unauthorized settings request');
+ return {displays:dockDisplays().map((d,i)=>({id:String(d.id),label:'Screen '+(i+1)+' · '+d.bounds.width+' × '+d.bounds.height})),order:dockDisplayOrder().map(d=>String(d.id))};
+});
+ipcMain.handle('dock-settings:save',(event,ids)=>{
+ if(event.sender!==dockSettingsWindow?.webContents)throw Error('Unauthorized settings request');
+ const actual=dockDisplays().map(d=>String(d.id));
+ if(!Array.isArray(ids)||ids.length!==actual.length||new Set(ids).size!==actual.length||!ids.every(id=>typeof id==='string'&&actual.includes(id)))throw Error('Select each connected screen exactly once.');
+ store.setMeta('dock:monitor-order',JSON.stringify(ids));return true;
+});
+ipcMain.on('dock-settings:close',event=>{if(event.sender===dockSettingsWindow?.webContents)dockSettingsWindow.close();});
+
 const dockStripHeight=40,dockStripGap=8;
 let desktopAlertSequence=0;
 const alertExpandedSize={width:560,height:540},alertDockSize={width:300,height:108};
@@ -565,7 +599,7 @@ function layoutDockedAlerts(){
 ipcMain.on('dock-strip:move',(event,direction)=>{
  const source=[...dockIconStrips.entries()].find(([,win])=>!win.isDestroyed()&&win.webContents===event.sender);
  if(!source||![-1,1].includes(direction))return;
- const displays=screen.getAllDisplays().sort((a,b)=>a.bounds.x-b.bounds.x||a.bounds.y-b.bounds.y);
+ const displays=dockDisplayOrder();
  if(displays.length<2)return;
  const current=displays.findIndex(d=>d.id===source[0]);if(current<0)return;
  const target=displays[(current+direction+displays.length)%displays.length];
@@ -1422,6 +1456,7 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
  ipcMain.handle('tabs:lookup',(_e,id)=>{const row=store.get(Number(id));return row?pageRow(row):null;});
  ipcMain.handle('tabs:action',(event,action,arg)=>{
   const current=store.get(activeId);const wc=live.get(activeId)?.webContents;
+  if(action==='dock-settings:open')return openDockSettings();
   if(action==='demo-alert:open')return openDemoAlert();
   if(action==='sleep-client-workspace')return sleepClientWorkspace(arg);
   if(action==='dual-mirror')return openDualMirror();
