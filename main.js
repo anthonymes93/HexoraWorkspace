@@ -658,11 +658,29 @@ ipcMain.on('dock-strip:vertical',event=>{
  event.sender.send('dock-strip:position',next);
  layoutDockedAlerts();saveDesktopAlerts();
 });
+let closingAllDesktopAlerts=false;
 function closeDemoAlert(popup){
- const record=desktopAlerts.get(popup?.webContents.id);if(!record)return;
- clearInterval(record.animation);desktopAlerts.delete(popup.webContents.id);
- if(!popup.isDestroyed())popup.close();
- layoutDockedAlerts();saveDesktopAlerts();
+ if(!popup||popup.isDestroyed())return;
+ const record=[...desktopAlerts.values()].find(item=>item.window===popup);
+ if(!record)return;
+ clearInterval(record.animation);
+ desktopAlerts.delete(record.webContentsId);
+ popup.close();
+ if(!closingAllDesktopAlerts){layoutDockedAlerts();saveDesktopAlerts();}
+}
+function closeAllDemoAlerts(){
+ closingAllDesktopAlerts=true;
+ try{
+  for(const record of [...desktopAlerts.values()]){
+   clearInterval(record.animation);
+   desktopAlerts.delete(record.webContentsId);
+   if(!record.window.isDestroyed())record.window.close();
+  }
+ }finally{
+  closingAllDesktopAlerts=false;
+  layoutDockedAlerts();
+  saveDesktopAlerts();
+ }
 }
 function openDemoAlert(options={}){
  const display=options?.display||screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
@@ -672,10 +690,10 @@ function openDemoAlert(options={}){
   backgroundColor:'#00000000',
   webPreferences:{sandbox:true,contextIsolation:true,nodeIntegration:false,preload:path.join(__dirname,'demo-alert-preload.js')}
  });
- const record={window:popup,docked:Boolean(options.restore?.docked),dockDisplayId:options.restore?.docked?display.id:null,animation:null};
+ const record={window:popup,webContentsId:popup.webContents.id,docked:Boolean(options.restore?.docked),dockDisplayId:options.restore?.docked?display.id:null,animation:null};
  desktopAlerts.set(popup.webContents.id,record);
  popup.setAlwaysOnTop(true,'floating');
- popup.on('closed',()=>{clearInterval(record.animation);desktopAlerts.delete(popup.webContents.id);layoutDockedAlerts();saveDesktopAlerts();});
+ popup.on('closed',()=>{clearInterval(record.animation);desktopAlerts.delete(record.webContentsId);if(!closingAllDesktopAlerts){layoutDockedAlerts();saveDesktopAlerts();}});
  popup.webContents.loadFile(path.join(__dirname,'demo-alert.html')).then(()=>{
   if(!popup.isDestroyed()){
    if(record.docked){popup.webContents.send('demo-alert:mode','docked');layoutDockedAlerts();popup.showInactive();}
@@ -692,8 +710,7 @@ ipcMain.on('demo-alert:close-menu',event=>{
   {label:'Close alert',click:()=>closeDemoAlert(record.window)},
   {type:'separator'},
   {label:'Close all alerts',click:()=>{
-   for(const item of [...desktopAlerts.values()])closeDemoAlert(item.window);
-   saveDesktopAlerts();
+   closeAllDemoAlerts();
   }}
  ]).popup({window:record.window});
 });
