@@ -5,13 +5,7 @@ const companion=require('./dev-companion-state');
 const PARTITION='persist:hexora-chatgpt';
 const HOME='https://www.youtube.com/';
 let windowRef=null,views=new Map(),active=null,serial=0,controlsVisible=true,youtubeHeaderHidden=false;
-const youtubeHeaderCSS=`ytd-masthead, #masthead-container, ytm-mobile-topbar-renderer {display:none !important;}
-#content.ytd-app, ytd-page-manager, #page-manager {margin-top:0 !important;padding-top:0 !important;}
-ytd-watch-flexy #columns, ytd-watch-flexy #primary, ytd-watch-flexy #primary-inner {max-width:none !important;width:100% !important;margin:0 !important;padding:0 !important;}
-ytd-watch-flexy #player, ytd-watch-flexy #player-container-outer, ytd-watch-flexy #player-container-inner, ytd-watch-flexy #full-bleed-container {width:100% !important;max-width:none !important;margin:0 !important;}
-ytd-watch-flexy #player-container-outer, ytd-watch-flexy #player-container-inner, ytd-watch-flexy #full-bleed-container {height:calc(100vh - 110px) !important;min-height:0 !important;max-height:none !important;}
-ytd-watch-flexy #movie_player, ytd-watch-flexy .html5-video-player {width:100% !important;height:100% !important;}
-ytd-watch-flexy video {object-fit:contain !important;}`;
+const youtubeHeaderCSS='ytd-masthead, #masthead-container, ytm-mobile-topbar-renderer {display:none !important;} #content.ytd-app, ytd-page-manager, #page-manager {margin-top:0 !important; padding-top:0 !important;}';
 const headerStyleKeys=new Map();
 async function syncYoutubeHeader(wc){
  if(!wc||wc.isDestroyed())return;
