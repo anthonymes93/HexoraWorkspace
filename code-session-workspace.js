@@ -19,7 +19,13 @@ function workspaceForTab(userData,tabId,projectFolder){
  const dir=codeSessionDirectory(userData);
  fs.mkdirSync(dir,{recursive:true});
  fs.writeFileSync(path.join(dir,'.hexora-session-marker'),'Hexora native VS Code sessions v1\n','utf8');
- const workspace=path.join(dir,'tab-'+tabId+'.code-workspace');
+ // Keep per-tab identity in the parent directory, not in VS Code's visible title.
+ const tabDir=path.join(dir,'tab-'+tabId);
+ fs.mkdirSync(tabDir,{recursive:true});
+ const displayName=projectFolder
+  ? path.basename(path.normalize(projectFolder)).replace(/[<>:"|?*\x00-\x1f]/g,'_').replace(/[. ]+$/g,'') || 'Project'
+  : 'Hexora';
+ const workspace=path.join(tabDir,displayName+'.code-workspace');
  // Empty descriptors are intentional: new tabs can launch into their own
  // identifiable VS Code workspace before any project is chosen.
  const content=JSON.stringify({folders:projectFolder?[{path:projectFolder}]:[]},null,2)+'\n';
