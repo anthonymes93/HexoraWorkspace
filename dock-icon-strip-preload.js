@@ -1,1 +1,1 @@
-'use strict';const {contextBridge,ipcRenderer}=require('electron');contextBridge.exposeInMainWorld('dockControls',{move:direction=>ipcRenderer.send('dock-strip:move',direction),settings:()=>ipcRenderer.send('dock-strip:settings')});
+'use strict';const {contextBridge,ipcRenderer}=require('electron');contextBridge.exposeInMainWorld('dockControls',{move:direction=>ipcRenderer.send('dock-strip:move',direction),toggleVertical:()=>ipcRenderer.send('dock-strip:vertical'),onPosition:callback=>ipcRenderer.on('dock-strip:position',(_event,position)=>callback(position))});
