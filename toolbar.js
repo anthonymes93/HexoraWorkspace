@@ -223,6 +223,7 @@ function render(p){
  // Ensure the experimental entry is visible even if an older saved workspace list was restored.
  if(!workspaces.some(w=>w.id==='dual'))workspaces.push({id:'dual',name:'Dual Workspace (Test)',emoji:'◫'});
  const container=$('workspaces');container.replaceChildren();
+ $('client-work-area').replaceChildren();
  console.info('[Hexora Dual Workspace]',{workspaceIds:workspaces.map(w=>w.id),savedIds:(()=>{try{return JSON.parse(localStorage.getItem('hexora-workspace-settings')||'{}').workspaces?.map(w=>w.id)||[];}catch{return ['invalid saved JSON'];}})(),renderedAt:Date.now()});
  for(const w of orderSidebarItems(workspaces,sidebarWorkspaceOrderKey,w=>w.id)){
   const el=document.createElement('button');el.className='workspace'+(w.id===activeWorkspace?' selected':'');
