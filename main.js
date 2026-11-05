@@ -685,6 +685,18 @@ function openDemoAlert(options={}){
  }).catch(error=>{console.error('[Demo alert]',error);closeDemoAlert(popup);});
  return true;
 }
+ipcMain.on('demo-alert:close-menu',event=>{
+ const record=desktopAlerts.get(event.sender.id);
+ if(!record||!record.docked||record.window.isDestroyed())return;
+ Menu.buildFromTemplate([
+  {label:'Close alert',click:()=>closeDemoAlert(record.window)},
+  {type:'separator'},
+  {label:'Close all alerts',click:()=>{
+   for(const item of [...desktopAlerts.values()])closeDemoAlert(item.window);
+   saveDesktopAlerts();
+  }}
+ ]).popup({window:record.window});
+});
 ipcMain.on('demo-alert:close',event=>{
  const record=desktopAlerts.get(event.sender.id);if(record)closeDemoAlert(record.window);
 });
