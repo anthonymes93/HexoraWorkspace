@@ -7,7 +7,6 @@ const HOME='https://www.youtube.com/';
 let windowRef=null,views=new Map(),active=null,serial=0,controlsVisible=true,youtubeHeaderHidden=false;
 const youtubeHeaderCSS='ytd-masthead, #masthead-container, ytm-mobile-topbar-renderer {display:none !important;} #content.ytd-app, ytd-page-manager, #page-manager {margin-top:0 !important; padding-top:0 !important;}';
 const headerStyleKeys=new Map();
-const theaterWasEnabled=new WeakMap();
 async function syncYoutubeTheater(wc){
  if(!wc||wc.isDestroyed())return;
  try{
@@ -19,8 +18,7 @@ async function syncYoutubeTheater(wc){
    const toggle=document.querySelector('.ytp-size-button');
    if(!watch||!toggle)return false;
    const theater=watch.hasAttribute('theater');
-   if(${youtubeHeaderHidden?'true':'false'} && !theater){toggle.click();return true;}
-   if(!${youtubeHeaderHidden?'true':'false'} && theater && ${theaterWasEnabled.get(wc)===false?'true':'false'}){toggle.click();return true;}
+   if(!theater){toggle.click();return true;}
    return false;
   })()`,true);
  }catch(error){console.warn('[PC TV] YouTube theater:',error.message);}
@@ -35,7 +33,7 @@ async function syncYoutubeHeader(wc){
   void syncYoutubeTheater(wc);
  }catch(error){console.warn('[PC TV] YouTube header toggle:',error.message);}
 }
-function toggleYoutubeHeader(){youtubeHeaderHidden=!youtubeHeaderHidden;layout();for(const view of views.values()){void syncYoutubeHeader(view.webContents);if(!youtubeHeaderHidden)void syncYoutubeTheater(view.webContents);}notify();}
+function toggleYoutubeHeader(){youtubeHeaderHidden=!youtubeHeaderHidden;layout();for(const view of views.values()){void syncYoutubeHeader(view.webContents);}notify();}
 
 function safeVideoUrl(raw){
  try{
