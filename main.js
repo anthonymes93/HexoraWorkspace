@@ -1267,6 +1267,44 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
   return usageSnapshot();
  });
  win.on('close',()=>{clearInterval(usageTimer);saveUsage();if(timeDashboard&&!timeDashboard.isDestroyed())timeDashboard.close();});
+
+ // Global Notes Studio: shared across all workspaces, persisted locally in Hexora's profile.
+ let notesWindow=null;
+ const notesPath=path.join(app.getPath('userData'),'hexora-global-notes.json');
+ const loadNotes=()=>{
+  try{const value=JSON.parse(fs.readFileSync(notesPath,'utf8'));return Array.isArray(value)?value:[];}catch{return [];}
+ };
+ let globalNotes=loadNotes();
+ const persistNotes=()=>{
+  const tmp=notesPath+'.tmp';
+  fs.writeFileSync(tmp,JSON.stringify(globalNotes),'utf8');
+  fs.renameSync(tmp,notesPath);
+ };
+ const openNotes=()=>{
+  if(notesWindow&&!notesWindow.isDestroyed()){notesWindow.show();notesWindow.focus();return true;}
+  notesWindow=new BrowserWindow({parent:win,width:1120,height:800,minWidth:760,minHeight:520,title:'Hexora · Notes Studio',backgroundColor:'#0b1020',autoHideMenuBar:true,webPreferences:{preload:path.join(__dirname,'preload.js'),contextIsolation:true,sandbox:true,nodeIntegration:false}});
+  notesWindow.loadFile('notes-studio.html').catch(error=>console.error('[Hexora Notes]',error));
+  notesWindow.on('closed',()=>{notesWindow=null;});
+  return true;
+ };
+ ipcMain.removeHandler('notes:request');
+ ipcMain.handle('notes:request',(event,action,payload)=>{
+  if(!notesWindow||notesWindow.isDestroyed()||event.sender!==notesWindow.webContents)throw Error('Unauthorized notes request');
+  if(action==='list')return globalNotes;
+  if(action==='save'){
+   if(!payload||typeof payload.id!=='string'||!/^[a-zA-Z0-9_-]{1,80}$/.test(payload.id))throw Error('Invalid note ID');
+   if(typeof payload.title!=='string'||typeof payload.body!=='string'||payload.title.length>300||payload.body.length>500000)throw Error('Note exceeds size limit');
+   const existing=globalNotes.find(n=>n.id===payload.id);
+   const note={id:payload.id,title:payload.title,body:payload.body,pinned:!!payload.pinned,createdAt:existing?.createdAt||Date.now(),updatedAt:Date.now()};
+   if(existing)Object.assign(existing,note);else globalNotes.unshift(note);
+   persistNotes();return note;
+  }
+  if(action==='delete'){
+   globalNotes=globalNotes.filter(n=>n.id!==payload);persistNotes();return true;
+  }
+  throw Error('Unknown notes action');
+ });
+ win.on('close',()=>{if(notesWindow&&!notesWindow.isDestroyed())notesWindow.close();});
  safeApplyTaskbar(win,mainTaskbar);
  if(isDevelopment){
   // A loaded HTML title may overwrite BrowserWindow.title; keep the native
@@ -1623,6 +1661,7 @@ if(hasSingleInstanceLock)app.whenReady().then(()=>{
  ipcMain.handle('tabs:lookup',(_e,id)=>{const row=store.get(Number(id));return row?pageRow(row):null;});
  ipcMain.handle('tabs:action',(event,action,arg)=>{
   const current=store.get(activeId);const wc=live.get(activeId)?.webContents;
+  if(action==='notes-studio:open')return openNotes();
   if(action==='time-intelligence:open')return openTimeDashboard();
   if(action==='car-celebration')return showCarCelebration();
   if(action==='dock-settings:open')return openDockSettings();
