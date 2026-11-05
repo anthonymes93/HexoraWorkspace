@@ -444,8 +444,8 @@ function wire(t){const view=new WebContentsView({webPreferences:{partition:'pers
       '(()=>{const x='+x+',y='+y+';window.scrollTo(x,y);return {x:window.scrollX,y:window.scrollY}})()',true);
      if(generation!==restoreGeneration)return;
      const reached=Math.abs(result.x-x)<3&&Math.abs(result.y-y)<3;
-     if(reached||delay===12000)scrollReady=true;
-    }catch{if(delay===12000)scrollReady=true;}
+     if(reached||delay===12000){scrollReady=true;restoreGeneration++;}
+    }catch{if(delay===12000){scrollReady=true;restoreGeneration++;}}
    },delay);
   }
  };
