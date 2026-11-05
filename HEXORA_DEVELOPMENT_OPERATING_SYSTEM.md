@@ -58,3 +58,15 @@ Follow `HEXORA_DEVELOPMENT_COORDINATION.md` in full. If documents conflict, stop
 
 ## Project setup
 Create GitHub Projects board through GitHub UI if connector cannot manage Projects. Link repository; configure fields/views above; turn on built-in auto-add workflow if available. Project URL must be verified before declaring board created. Add both this document and the ChatGPT Project instructions file to the Hexora ChatGPT Project files, and paste the latter into Project instructions. Project files alone may not guarantee automatic reading; Project instructions make the convention explicit.
+
+
+## Fast development delivery (approved 2026-11-05)
+The default target for requested code changes is **develop**. Treat a user request to implement a change as authorization to finish delivery to develop, not merely to open a PR or leave a branch waiting. **main remains stable** and requires explicit approval to update.
+
+- **Small, isolated changes** (labels, icons, minor layout/bug fixes): inspect live develop and overlapping work, create a short-lived task branch, commit, open a PR, and **merge to develop immediately in the same workflow** when mergeable and safe. Do not stop at branch creation or PR creation. Report the actual merge result.
+- **Larger or conflicting changes**: use a dedicated branch and PR; integrate into develop when checks and dependencies permit. Ask for a decision only if a real conflict, risk, missing permission, or manual test blocks safe integration. Never overwrite parallel work.
+- Do not push directly to main or force-push shared branches. Do not merge an incomplete implementation just to claim delivery.
+- The desired experience is **request → implement → integrate into develop → Hexora dev watcher receives push and restarts**. Avoid unnecessary user terminal commands and routine manual Git steps.
+- The Cloudflare push relay drives remote update notifications. **Do not introduce GitHub polling.** Local Git changes may be watched locally; the watcher must protect divergent or dirty work rather than overwrite it.
+- State clearly when a change is only committed or a PR is open, versus **merged into develop**. Never claim automatic restart or Windows visual verification without evidence.
+- If a tool operation fails, retry the supported path or report exactly what remains unfinished; do not imply the change shipped.
