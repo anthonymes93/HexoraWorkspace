@@ -375,6 +375,14 @@ function applyHexoraWebsiteScrollbars(wc){
  }).catch(error=>console.warn('[Hexora] Website scrollbar style unavailable:',error.message));
 }
 function wire(t){const view=new WebContentsView({webPreferences:{partition:'persist:hexora-chatgpt',preload:path.join(__dirname,'site-vault-preload.js'),sandbox:true,contextIsolation:true,nodeIntegration:false,webSecurity:true,javascript:true}});const wc=view.webContents;
+ wc.on('context-menu',(_event,params)=>{
+  const candidate=params.linkURL||wc.getURL();
+  const video=require('./pc-tv').safeVideoUrl(candidate);
+  if(!video)return;
+  Menu.buildFromTemplate([{label:'Send to PC TV',click:()=>{
+   try{require('./pc-tv').sendVideo(video);}catch(error){console.error('[PC TV] Send video failed:',error);}
+  }}]).popup({window:win});
+ });
  wc.setAudioMuted(!!t.muted);
  if(chromeMode(t.id))wc.setUserAgent(chromeUserAgent(wc));
  // Use a neutral white backing for transparent areas in third-party websites.
