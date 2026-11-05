@@ -5,7 +5,7 @@ const companion=require('./dev-companion-state');
 const PARTITION='persist:hexora-chatgpt';
 const HOME='https://www.youtube.com/';
 let windowRef=null,views=new Map(),active=null,serial=0,controlsVisible=true,youtubeHeaderHidden=false;
-const youtubeHeaderCSS='ytd-masthead, #masthead-container, ytm-mobile-topbar-renderer {display:none !important;} #content.ytd-app, ytd-page-manager, #page-manager {margin-top:0 !important; padding-top:0 !important;}';
+const youtubeHeaderCSS=`ytd-masthead, #masthead-container, ytm-mobile-topbar-renderer {display:none !important;}\n#content.ytd-app, ytd-page-manager, #page-manager {margin-top:0 !important;padding-top:0 !important;}\n/* Taller in-flow theater player; normal title, sidebar and scrolling stay intact. */\nytd-watch-flexy[theater] #full-bleed-container, ytd-watch-flexy[theater] #player-theater-container {height:calc(100vh - 90px) !important;min-height:0 !important;max-height:none !important;}\n`;
 const headerStyleKeys=new Map();
 async function syncYoutubeTheater(wc){
  if(!wc||wc.isDestroyed())return;
