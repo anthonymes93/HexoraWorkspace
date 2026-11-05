@@ -243,8 +243,8 @@ function render(p){
   el.append(symbol,label,count,edit);attachWorkspaceHoverTip(el,w,Number(count.textContent)||0);el.addEventListener('contextmenu',e=>showWorkspaceMenu(e,w));el.onclick=async()=>{activeWorkspace=w.id;offset=0;save();await action('switch-workspace',w.id);if(w.id==='dual'){await action('dual-setup');await action('dual-mirror');}refresh();};if(w.id==='client-work-area'){$('client-work-area').append(el);}else{enableSidebarDrag(el,w.id,sidebarWorkspaceOrderKey);container.append(el);}
  }
  const conversations=$('conversations');conversations.replaceChildren();
- renderStackTree(conversations,p);
- for(const item of p.tabs){
+ if(activeWorkspace!=='client-work-area')renderStackTree(conversations,p);
+ for(const item of (activeWorkspace==='client-work-area'?[]:p.tabs)){
   const el=document.createElement('button');el.className='chat-row'+(item.active?' active':'');
   const symbol=document.createElement('span');symbol.className='symbol';symbol.textContent=item.nativeCodeProjectMissing?'⚠':item.nativeCode?'⌘':item.suspended?'☾':'▤';
   const name=document.createElement('span');name.className='label';name.textContent=item.title||'New tab';
