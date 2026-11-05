@@ -12,8 +12,18 @@ canvas{position:fixed;inset:0;width:100%;height:100%}
 @keyframes ring{0%{opacity:.9;transform:translate(-50%,-50%) scale(.12)}100%{opacity:0;transform:translate(-50%,-50%) scale(2.3)}}
 @keyframes banner{0%{opacity:0;transform:translate(-50%,-50%) scale(.5) rotate(-4deg)}14%,76%{opacity:1;transform:translate(-50%,-50%) scale(1) rotate(0)}100%{opacity:0;transform:translate(-50%,-60%) scale(1.12)}}
 @media(prefers-reduced-motion:reduce){canvas,.ring,.glow,.flash{display:none}.banner{animation:none;opacity:1;transform:translate(-50%,-50%)}}
-</style></head><body><div class="glow"></div><div class="flash"></div><div class="ring"></div><div class="ring two"></div><canvas id="party"></canvas><div class="banner">🚘 FULL THROTTLE!<small>HEXORA · LET'S GO</small></div>
+
+/* Birthday mode leaves the car celebration untouched. */
+body.birthday-mode .banner,body.birthday-mode .glow,body.birthday-mode .ring,body.birthday-mode .flash{display:none}
+.birthday-word{display:none;position:fixed;top:43%;left:50%;transform:translate(-50%,-50%);font:900 clamp(36px,7vw,100px)/1.2 system-ui,sans-serif;white-space:nowrap;letter-spacing:.03em;filter:drop-shadow(0 8px 18px #10142d99)}
+body.birthday-mode .birthday-word{display:flex;gap:.015em;animation:birthday-word-out 3s both}
+.birthday-word span{display:inline-block;animation:birthday-dance .55s ease-in-out infinite alternate;animation-delay:calc(var(--i)*-90ms);color:var(--color)}
+@keyframes birthday-dance{from{transform:translateY(10px) rotate(-12deg) scale(.93)}to{transform:translateY(-22px) rotate(12deg) scale(1.12)}}
+@keyframes birthday-word-out{0%,88%{opacity:1}100%{opacity:0}}
+@media(prefers-reduced-motion:reduce){body.birthday-mode .birthday-word{animation:none;opacity:1}body.birthday-mode .birthday-word span{animation:none}}
+</style></head><body><div class="glow"></div><div class="flash"></div><div class="ring"></div><div class="ring two"></div><canvas id="party"></canvas><div class="birthday-word" aria-hidden="true"><span style="--i:0;--color:#ff6b98">b</span><span style="--i:1;--color:#ffd166">i</span><span style="--i:2;--color:#70e1f5">r</span><span style="--i:3;--color:#a38cff">t</span><span style="--i:4;--color:#77e9aa">h</span><span style="--i:5;--color:#ff9d65">d</span><span style="--i:6;--color:#f97ce5">a</span><span style="--i:7;--color:#8bb9ff">y</span></div><div class="banner">🚘 FULL THROTTLE!<small>HEXORA · LET'S GO</small></div>
 <script>
+if(new URLSearchParams(location.search).get('mode')==='birthday')document.body.classList.add('birthday-mode');
 if(!matchMedia('(prefers-reduced-motion: reduce)').matches){
 const canvas=document.getElementById('party'),ctx=canvas.getContext('2d'),colors=['#6fd7ff','#658dff','#a78bff','#ff69c7','#ffe66b','#67ffd7','#ffffff','#ff956b'];
 let w=0,h=0,dpr=1;function size(){dpr=Math.min(devicePixelRatio||1,2);w=innerWidth;h=innerHeight;canvas.width=Math.round(w*dpr);canvas.height=Math.round(h*dpr);ctx.setTransform(dpr,0,0,dpr,0,0);}size();addEventListener('resize',size);
