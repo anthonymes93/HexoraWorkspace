@@ -2,6 +2,18 @@
 const key='hexora:client-work-zone:clients:v1';
 const query=document.getElementById('query'),results=document.getElementById('results');
 function clients(){try{const v=JSON.parse(localStorage.getItem(key)||'[]');return Array.isArray(v)?v.filter(c=>c&&typeof c.name==='string'):[];}catch{return [];}}
+// Temporary local demo records. Preserve any clients the user has already entered.
+function seedDemoClients(){
+ const existing=clients();
+ let changed=false;
+ for(const name of ['Jim','John','Jake']){
+  if(existing.some(client=>client.name.trim().toLowerCase()===name.toLowerCase()))continue;
+  existing.push({id:'demo-'+name.toLowerCase(),name,domain:'',contact:'',phone:'',demo:true});
+  changed=true;
+ }
+ if(changed)localStorage.setItem(key,JSON.stringify(existing));
+}
+seedDemoClients();
 function render(){
  const term=query.value.trim().toLowerCase();results.replaceChildren();
  const matches=clients().filter(c=>[c.name,c.domain,c.contact,c.phone].some(v=>String(v||'').toLowerCase().includes(term)));
