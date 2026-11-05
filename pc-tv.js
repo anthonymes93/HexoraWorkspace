@@ -7,15 +7,33 @@ const HOME='https://www.youtube.com/';
 let windowRef=null,views=new Map(),active=null,serial=0,controlsVisible=true,youtubeHeaderHidden=false;
 const youtubeHeaderCSS='ytd-masthead, #masthead-container, ytm-mobile-topbar-renderer {display:none !important;} #content.ytd-app, ytd-page-manager, #page-manager {margin-top:0 !important; padding-top:0 !important;}';
 const headerStyleKeys=new Map();
+async function syncYoutubeTheater(wc){
+ if(!wc||wc.isDestroyed())return;
+ try{
+  const url=new URL(wc.getURL());
+  if(!['youtube.com','www.youtube.com','m.youtube.com'].includes(url.hostname)||url.pathname!=='/watch')return;
+  // Use YouTube's own theater layout; it retains the title, comments and normal scrolling.
+  await wc.executeJavaScript(`(() => {
+   const watch=document.querySelector('ytd-watch-flexy');
+   const toggle=document.querySelector('.ytp-size-button');
+   if(!watch||!toggle)return false;
+   const theater=watch.hasAttribute('theater');
+   if(!theater){toggle.click();return true;}
+   return false;
+  })()`,true);
+ }catch(error){console.warn('[PC TV] YouTube theater:',error.message);}
+}
+
 async function syncYoutubeHeader(wc){
  if(!wc||wc.isDestroyed())return;
  const old=headerStyleKeys.get(wc);if(old){headerStyleKeys.delete(wc);try{await wc.removeInsertedCSS(old);}catch{}}
  if(!youtubeHeaderHidden||wc.isDestroyed())return;
  try{const host=new URL(wc.getURL()).hostname;if(!['youtube.com','www.youtube.com','m.youtube.com'].includes(host))return;
   const key=await wc.insertCSS(youtubeHeaderCSS);if(!wc.isDestroyed())headerStyleKeys.set(wc,key);
+  void syncYoutubeTheater(wc);
  }catch(error){console.warn('[PC TV] YouTube header toggle:',error.message);}
 }
-function toggleYoutubeHeader(){youtubeHeaderHidden=!youtubeHeaderHidden;layout();for(const view of views.values())void syncYoutubeHeader(view.webContents);notify();}
+function toggleYoutubeHeader(){youtubeHeaderHidden=!youtubeHeaderHidden;layout();for(const view of views.values()){void syncYoutubeHeader(view.webContents);}notify();}
 
 function safeVideoUrl(raw){
  try{
@@ -50,7 +68,7 @@ function createTab(url=HOME){
  wc.on('before-input-event',(event,input)=>{if(input.type!=='keyDown')return;if(input.key==='F10'){event.preventDefault();toggleControls(!controlsVisible);}else if(input.key==='F11'){event.preventDefault();windowRef.setFullScreen(!windowRef.isFullScreen());}});
  wc.setWindowOpenHandler(({url:target})=>{if(/^https:\/\//i.test(target))shell.openExternal(target);return {action:'deny'};});
  for(const event of ['did-navigate','did-navigate-in-page','page-title-updated','did-finish-load'])wc.on(event,notify);
- wc.on('did-finish-load',()=>void syncYoutubeHeader(wc));
+ wc.on('did-finish-load',()=>{void syncYoutubeHeader(wc);});
  views.set(id,v);windowRef.contentView.addChildView(v);active=id;layout();notify();
  wc.loadURL(url).catch(error=>console.warn('[PC TV] Load failed:',error.message));
  return id;
