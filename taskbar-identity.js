@@ -5,6 +5,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const zlib = require('node:zlib');
+const {logoIconPath}=require('./hexora-logo');
 
 const APP_ID = 'app.hexora.workspace';
 const DEV_APP_ID = APP_ID + '.dev';
@@ -48,7 +49,8 @@ function pngBytes(kind, id) {
   const n = 256;
   const pixels = Buffer.alloc((n * 4 + 1) * n);
   const main = kind === 'main';
-  const color = main ? [110, 73, 216] : PALETTE[(id - 1) % PALETTE.length];
+  const tv = kind === 'tv';
+  const color = main ? [110, 73, 216] : tv ? [19, 100, 178] : PALETTE[(id - 1) % PALETTE.length];
   for (let y = 0; y < n; y++) {
     const row = y * (n * 4 + 1);
     pixels[row] = 0; // Scanline has no PNG filter.
@@ -58,7 +60,11 @@ function pngBytes(kind, id) {
       if (!bg) continue;
       const shade = 0.81 + 0.25 * (x + y) / 512;
       let mark;
-      if (main) {
+      if (tv) {
+        // Television frame, screen and play glyph.
+        mark = Math.max(rounded(x,y,51,67,205,183,19)-rounded(x,y,68,84,188,164,9),
+          Math.max(0,1-Math.hypot(x-131,y-125)/24));
+      } else if (main) {
         // The main window's recognizable four-tile Hexora mark.
         mark = Math.max(
           rounded(x, y, 66, 66, 119, 119, 12),
@@ -109,7 +115,7 @@ function icoBytes(png) {
 }
 function iconFile(userData, kind, id) {
   const folder = path.join(userData, 'taskbar-icons');
-  const filename = kind === 'main' ? 'hexora-main-v1.ico' : 'hexora-tab-' + id + '-v1.ico';
+  const filename = kind === 'main' ? 'hexora-main-v1.ico' : kind === 'tv' ? 'hexora-pctv-v2.ico' : 'hexora-tab-' + id + '-v1.ico';
   fs.mkdirSync(folder, { recursive: true });
   const target = path.join(folder, filename);
   if (!fs.existsSync(target)) fs.writeFileSync(target, icoBytes(pngBytes(kind, id)));
@@ -118,12 +124,18 @@ function iconFile(userData, kind, id) {
 function taskbarIdentity(userData, tabId = null, platform = process.platform, appIdBase = APP_ID) {
   if (platform !== 'win32') return null;
   const kind = tabId === null ? 'main' : 'tab';
+  // Unpackaged development must retain Electron's default taskbar icon.
+  if (appIdBase === DEV_APP_ID) return null;
   const id = kind === 'main' ? 0 : Number(tabId);
   if (kind === 'tab' && (!Number.isSafeInteger(id) || id < 1)) throw Error('Invalid taskbar window tab');
   return {
     appId: kind === 'main' ? appIdBase : appIdBase + '.tab.' + id,
-    iconPath: iconFile(userData, kind, id)
+    iconPath: kind === 'main' ? logoIconPath(userData) : iconFile(userData, kind, id)
   };
+}
+function tvTaskbarIdentity(userData, platform=process.platform){
+ if(platform!=='win32')return null;
+ return {appId:APP_ID+'.pctv',iconPath:iconFile(userData,'tv',0)};
 }
 function applyTaskbarIdentity(window, identity, platform = process.platform) {
   if (!identity || platform !== 'win32' || window.isDestroyed()) return;
@@ -132,4 +144,4 @@ function applyTaskbarIdentity(window, identity, platform = process.platform) {
   // Explicitly update the live HWND's small/large icon too.
   window.setIcon(identity.iconPath);
 }
-module.exports = { APP_ID, DEV_APP_ID, taskbarIdentity, applyTaskbarIdentity };
+module.exports = { APP_ID, DEV_APP_ID, taskbarIdentity, tvTaskbarIdentity, applyTaskbarIdentity };
