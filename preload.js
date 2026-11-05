@@ -1,5 +1,6 @@
 const {contextBridge,ipcRenderer}=require('electron');
 contextBridge.exposeInMainWorld('hexora',{
+ usageSnapshot:()=>ipcRenderer.invoke('usage:snapshot'),
  startPushwardAlarm:()=>ipcRenderer.invoke('pushward:alarm:start'),
  windowControl:action=>ipcRenderer.invoke('main-window:control',action),
  codePicker:{locations:()=>ipcRenderer.invoke('code-picker:locations'),list:folder=>ipcRenderer.invoke('code-picker:list',folder),favorite:folder=>ipcRenderer.invoke('code-picker:favorite',folder)},

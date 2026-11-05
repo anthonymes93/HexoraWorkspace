@@ -2062,3 +2062,5 @@ $('open-pc-tv')?.addEventListener('click',()=>window.hexora.pcTv.open().catch(er
  car.setAttribute('aria-label','Launch confetti celebration');
  car.addEventListener('click',()=>window.hexora.action('car-celebration').catch(error=>console.error('[Hexora] Car celebration:',error)));
 })();
+
+$('time-intelligence-rail')?.addEventListener('click',()=>window.hexora.action('time-intelligence:open').catch(console.error));
