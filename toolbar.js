@@ -61,6 +61,7 @@ if(new URLSearchParams(window.location.search).get('hexoraDev')==='1'){
  if(indicator)indicator.hidden=false;
 }
 const workspaces=[{id:'client-work-area',name:'Client Work Zone',emoji:'▦'},{id:'web',name:'Web Development',emoji:'◈'},{id:'business',name:'Business',emoji:'▤'},{id:'personal',name:'Personal',emoji:'☼'},{id:'ideas',name:'Ideas Lab',emoji:'✦'},{id:'dual',name:'Dual Workspace (Test)',emoji:'◫'}];
+const clientWorkspaceNames=new Map(Object.entries((()=>{try{return JSON.parse(localStorage.getItem('hexora:client-workspace-names')||'{}');}catch{return {};}})()));
 const conversationsCollapsedKey='hexora-conversations-collapsed';
 function setConversationsCollapsed(collapsed){
  const list=document.getElementById('conversations'),toggle=document.getElementById('toggle-conversations');
@@ -209,6 +210,11 @@ try{const s=JSON.parse(localStorage.getItem('hexora-workspace-settings')||'{}');
 const save=()=>localStorage.setItem('hexora-workspace-settings',JSON.stringify({workspaces,selected:activeWorkspace,sidebarOpen}));
 if(!workspaces.some(w=>w.id===activeWorkspace))activeWorkspace=workspaces[0].id;
 const action=(name,arg)=>window.hexora.action(name,arg);
+window.hexora.onClientSelected(({workspace,name})=>{
+ if(!workspace?.startsWith('client:'))return;
+ activeWorkspace=workspace;clientWorkspaceNames.set(workspace,name||'Client');localStorage.setItem('hexora:client-workspace-names',JSON.stringify(Object.fromEntries(clientWorkspaceNames)));offset=0;save();refresh();
+});
+
 if(activeWorkspace==='client-work-area')action('switch-workspace','client-work-area').catch(console.error);
 async function refresh(){
  if(tabPointer?.moving)return;
@@ -219,8 +225,9 @@ async function refresh(){
 }
 function render(p){
  if(p.activeId&&p.activePanelMode){const desired=p.activePanelMode==='wide';if(sidebarOpen!==desired){sidebarOpen=desired;updateSidebar(false);}}
- const workspace=workspaces.find(w=>w.id===activeWorkspace)||workspaces[0];
+ const workspace=workspaces.find(w=>w.id===activeWorkspace)||{id:activeWorkspace,name:clientWorkspaceNames.get(activeWorkspace)||'Client Workspace',emoji:'▦'};
  $('current-workspace').textContent=workspace.emoji+'  '+workspace.name;
+ document.body.classList.toggle('client-zone-hub',activeWorkspace==='client-work-area');
  // Ensure the experimental entry is visible even if an older saved workspace list was restored.
  if(!workspaces.some(w=>w.id==='dual'))workspaces.push({id:'dual',name:'Dual Workspace (Test)',emoji:'◫'});
  const container=$('workspaces');container.replaceChildren();
@@ -236,8 +243,8 @@ function render(p){
   el.append(symbol,label,count,edit);attachWorkspaceHoverTip(el,w,Number(count.textContent)||0);el.addEventListener('contextmenu',e=>showWorkspaceMenu(e,w));el.onclick=async()=>{activeWorkspace=w.id;offset=0;save();await action('switch-workspace',w.id);if(w.id==='dual'){await action('dual-setup');await action('dual-mirror');}refresh();};if(w.id==='client-work-area'){$('client-work-area').append(el);}else{enableSidebarDrag(el,w.id,sidebarWorkspaceOrderKey);container.append(el);}
  }
  const conversations=$('conversations');conversations.replaceChildren();
- renderStackTree(conversations,p);
- for(const item of p.tabs){
+ if(activeWorkspace!=='client-work-area')renderStackTree(conversations,p);
+ for(const item of (activeWorkspace==='client-work-area'?[]:p.tabs)){
   const el=document.createElement('button');el.className='chat-row'+(item.active?' active':'');
   const symbol=document.createElement('span');symbol.className='symbol';symbol.textContent=item.nativeCodeProjectMissing?'⚠':item.nativeCode?'⌘':item.suspended?'☾':'▤';
   const name=document.createElement('span');name.className='label';name.textContent=item.title||'New tab';

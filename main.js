@@ -555,12 +555,22 @@ function showClientZone(){
  if(isCodeTab(store.get(activeId)))hideNativeCode(activeId);
  for(const view of live.values())mainViewport.removeChildView(view);
  if(!clientZoneView){
-  clientZoneView=new WebContentsView({webPreferences:{nodeIntegration:false,contextIsolation:true,sandbox:true}});
+  clientZoneView=new WebContentsView({webPreferences:{nodeIntegration:false,contextIsolation:true,sandbox:true,preload:path.join(__dirname,'client-zone-preload.js')}});
   clientZoneView.webContents.loadFile(path.join(__dirname,'client-zone.html')).catch(err=>console.error('[Client Zone] load failed:',err));
  }
  mainViewport.addChildView(clientZoneView);
  clientZoneVisible=true;bounds();emit();
 }
+ipcMain.handle('client-zone:open',(event,id,name)=>{
+ if(!clientZoneView||event.sender!==clientZoneView.webContents)return false;
+ if(!/^[a-zA-Z0-9_-]{1,80}$/.test(id))return false;
+ const workspace='client:'+id;
+ const selected=Number(store.getMeta('workspaceActive:'+workspace));
+ const candidate=(selected&&store.get(selected)?.workspace===workspace?selected:null)||store.page(workspace,0,1)[0]?.id;
+ if(candidate)activate(candidate);else newTab(workspace);
+ win.webContents.send('client-zone:selected',{id,name:String(name).slice(0,120),workspace});
+ return true;
+});
 function hideClientZone(){
  if(!clientZoneVisible)return;
  clientZoneVisible=false;

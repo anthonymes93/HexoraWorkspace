@@ -16,14 +16,14 @@ function seedDemoClients(){
 seedDemoClients();
 function render(){
  const term=query.value.trim().toLowerCase();results.replaceChildren();
- const matches=clients().filter(c=>[c.name,c.domain,c.contact,c.phone].some(v=>String(v||'').toLowerCase().includes(term)));
+ const matches=(term?clients():[]).filter(c=>[c.name,c.domain,c.contact,c.phone].some(v=>String(v||'').toLowerCase().includes(term)));
  for(const c of matches.slice(0,40)){
   const row=document.createElement('button');row.type='button';row.className='result';
   const content=document.createElement('span'),title=document.createElement('strong'),meta=document.createElement('small');
   title.textContent=c.name;meta.textContent=[c.contact,c.domain,c.phone].filter(Boolean).join(' · ');
-  content.append(title,meta);row.append(content);row.onclick=()=>alert([c.name,c.contact,c.domain,c.phone].filter(Boolean).join('\n'));results.append(row);
+  content.append(title,meta);row.append(content);row.onclick=()=>window.clientZone.openClient(c.id,c.name);results.append(row);
  }
- if(!matches.length){const empty=document.createElement('div');empty.className='empty';empty.textContent=term?'No matching clients':'Your client directory is empty. Add your first client to get started.';results.append(empty);}
+ if(!matches.length){const empty=document.createElement('div');empty.className='empty';empty.textContent=term?'No matching clients':'';results.append(empty);}
 }
 document.getElementById('add').onclick=()=>{
  const name=prompt('Business or client name');if(!name?.trim())return;
