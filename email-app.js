@@ -5,11 +5,11 @@ const companion=require('./dev-companion-state');
 const SERVICES={gmail:'https://mail.google.com/mail/u/0/#inbox',outlook:'https://outlook.live.com/mail/',proton:'https://mail.proton.me/',custom:null};
 let windowRef=null,views=new Map(),active=null,panelOpen=false;
 const HEADER_HEIGHT=84;
-const EMAIL_APP_ID='com.hexora.workspace.email';
+const EMAIL_APP_ID='app.hexora.workspace.email';
 const EMAIL_ICON_BASE64='AAABAAEAICAAAAAAIAACAQAAFgAAAIlQTkcNChoKAAAADUlIRFIAAAAgAAAAIAgGAAAAc3p69AAAAMlJREFUeJztlsEVgCAIhrPXGLVFzZf7OYaD1MmLAYLwpINcOpj8n4o/hv28n8UxVk/xCTABfgGwUYM5RTOh44JzBcgHLIVbIOQRYNRaURKgrL5M0kLUeerdBXegFu2F4OQBAaAakEJA/0N50RrQQHDFSQAKAgPBxqhb1TQibDK3TlpXmuWEOUXySLBVc/xEZMXcupAYmbgXtJJLXbSrGWEiPRbe3Q2LWP0dBmAhrgawiA+AVQfEQtSORwT4ICnh9iIaGe5HMAEmwAuyG1t3GpB6PgAAAABJRU5ErkJggg==';
 function emailIconPath(){
  const dir=path.join(app.getPath('userData'),'icons');
- const dest=path.join(dir,'hexora-email.ico');
+ const dest=path.join(dir,'hexora-email-v2.ico');
  if(!fs.existsSync(dest)){fs.mkdirSync(dir,{recursive:true});fs.writeFileSync(dest,Buffer.from(EMAIL_ICON_BASE64,'base64'));}
  return dest;
 }
@@ -25,7 +25,11 @@ function show(id){const account=read().find(x=>x.id===id);if(!account||!windowRe
 const ua=view.webContents.getUserAgent().replace(/\s+(?:Electron|hexora-workspace)\/[^\s]+/gi,'').replace(/\s{2,}/g,' ').trim();
 view.webContents.setUserAgent(ua);
 views.set(id,view);windowRef.contentView.addChildView(view);view.webContents.setZoomFactor(EMAIL_ZOOM);view.webContents.on('did-finish-load',()=>view.webContents.setZoomFactor(EMAIL_ZOOM));view.webContents.on('did-navigate',()=>send());view.webContents.on('did-navigate-in-page',()=>send());view.webContents.on('page-title-updated',()=>send());view.webContents.setWindowOpenHandler(({url})=>{if(/^https:\/\//.test(url))require('electron').shell.openExternal(url);return {action:'deny'};});view.webContents.loadURL(account.url).catch(()=>{});}view.webContents.setZoomFactor(EMAIL_ZOOM);active=id;panelOpen=false;companion.save('email',{activeAccount:id});layout();send();}
-function open(restore=null){if(windowRef&&!windowRef.isDestroyed()){windowRef.show();windowRef.focus();return;}windowRef=new BrowserWindow({width:1280,height:840,minWidth:700,minHeight:450,title:'Hexora · Email',frame:false,titleBarStyle:'hidden',icon:emailIconPath(),backgroundColor:'#11131d',autoHideMenuBar:true,webPreferences:{preload:path.join(__dirname,'email-preload.js'),sandbox:true,contextIsolation:true,nodeIntegration:false}});if(process.platform==='win32')windowRef.setAppDetails({appId:EMAIL_APP_ID,appIconPath:emailIconPath(),appIconIndex:0,relaunchDisplayName:'Hexora Email'});
+function open(restore=null){if(windowRef&&!windowRef.isDestroyed()){windowRef.show();windowRef.focus();return;}windowRef=new BrowserWindow({width:1280,height:840,minWidth:700,minHeight:450,title:'Hexora · Email',frame:false,titleBarStyle:'hidden',icon:emailIconPath(),backgroundColor:'#11131d',autoHideMenuBar:true,webPreferences:{preload:path.join(__dirname,'email-preload.js'),sandbox:true,contextIsolation:true,nodeIntegration:false}});if(process.platform==='win32'){
+ const identity={appId:app.isPackaged?EMAIL_APP_ID:EMAIL_APP_ID+'.dev',appIconPath:emailIconPath(),appIconIndex:0,relaunchDisplayName:'Hexora Email'};
+ const apply=()=>{if(windowRef&&!windowRef.isDestroyed()){windowRef.setAppDetails(identity);windowRef.setIcon(identity.appIconPath);}};
+ apply();windowRef.once('ready-to-show',apply);
+}
 companion.manageWindow('email',windowRef);
 companion.restoreBounds(windowRef,restore);
  companion.save('email',{open:true,bounds:windowRef.getBounds()});
