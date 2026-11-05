@@ -47,6 +47,9 @@ jobs:
       - run: npm run test:links
       - run: npm run test:taskbar
       - run: npm run test:code-session
+      - name: Generate full-size Stable Windows icon
+        shell: pwsh
+        run: ./scripts/generate-stable-icon.ps1
       - name: Publish NSIS installer and update metadata
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
