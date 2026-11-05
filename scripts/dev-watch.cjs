@@ -3,11 +3,9 @@
 // and restart Electron after fast-forward updates. No production updater involved.
 const {spawn,execFileSync}=require('node:child_process');
 const path=require('node:path');
-const fs=require('node:fs');
 const ROOT=path.resolve(__dirname,'..');
 const POLL_MS=12000;
 let child=null,stopping=false,busy=false,lastHead='',lastDirty='',restartRequested=false;
-const win=process.platform==='win32';
 function git(...args){return execFileSync('git',args,{cwd:ROOT,encoding:'utf8',stdio:['ignore','pipe','pipe'],timeout:15000}).trim();}
 function log(message){console.log('[Hexora Dev] '+message);}
 function branch(){return git('branch','--show-current');}
@@ -28,13 +26,22 @@ function launch(){
 }
 async function stopChild(){
  if(!child)return;
- const running=child;child=null;
- if(win){
-  await new Promise(resolve=>{
-   const killer=spawn('taskkill',['/PID',String(running.pid),'/T','/F'],{windowsHide:true,stdio:'ignore'});
-   killer.on('error',()=>resolve());killer.on('exit',()=>resolve());
-  });
- }else{try{running.kill('SIGTERM');}catch{}}
+ const running=child;
+ // Never use taskkill /T: Electron can share a Windows process tree with
+ // the npm/Node watcher. Tree termination may terminate this supervisor too.
+ await new Promise(resolve=>{
+  if(running.exitCode!==null||running.signalCode!==null){resolve();return;}
+  let settled=false;
+  const done=()=>{if(settled)return;settled=true;clearTimeout(timeout);resolve();};
+  running.once('exit',done);
+  running.once('error',done);
+  const timeout=setTimeout(()=>{
+   log('Electron shutdown timed out; continuing with relaunch.');
+   done();
+  },5000);
+  try{running.kill('SIGTERM');}catch{done();}
+ });
+ if(child===running)child=null;
 }
 async function restart(reason){
  if(stopping)return;
@@ -43,6 +50,7 @@ async function restart(reason){
  await stopChild();
  restartRequested=false;
  launch();
+ log('Restart attempted; check for the new Hexora window.');
 }
 async function poll(){
  if(stopping||busy)return;
