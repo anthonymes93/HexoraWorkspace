@@ -657,7 +657,8 @@ window.hexora.onDeepLink(async target=>{
   if(target.tabId!==null&&!tab){linkToast('That tab was closed or is not on this device');return;}
   // Resolve a moved tab from SQLite rather than trusting its old workspace URL.
   const destination=tab?.workspace||target.workspace;
-  if(!workspaces.some(w=>w.id===destination)){linkToast('Workspace not found on this device');return;}
+  // Client Work Zone sub-workspaces are dynamic and are not in the main workspace list.
+  if(!destination.startsWith('client:')&&!workspaces.some(w=>w.id===destination)){linkToast('Workspace not found on this device');return;}
   activeWorkspace=destination;offset=0;save();
   if(tab)await action('activate',tab.id);
   else await action('switch-workspace',destination);
