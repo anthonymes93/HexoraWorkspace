@@ -1,6 +1,7 @@
 'use strict';
 // Local-only Hexora routes: identities are stable IDs, never display names or positions.
-const WORKSPACE_ID=/^[A-Za-z0-9_-]{1,80}$/;
+// Client Work Zone tabs use workspace IDs such as client:123. Keep all other IDs strict.
+const WORKSPACE_ID=/^(?:[A-Za-z0-9_-]{1,80}|client:[A-Za-z0-9_-]{1,80})$/;
 function workspaceLink(workspace){
  if(typeof workspace!=='string'||!WORKSPACE_ID.test(workspace))throw Error('Invalid workspace ID.');
  return 'hexora://workspace/'+workspace;
